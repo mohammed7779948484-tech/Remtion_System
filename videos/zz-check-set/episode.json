@@ -1,0 +1,35 @@
+{
+  "id": "zz-check-set",
+  "title": "Set check (scratch)",
+  "set": { "environment": "dev-office" },
+  "mood": "late-night",
+  "cast": {
+    "rayan": { "actor": "rayan", "at": "chair-seat", "pose": "sit_typing" },
+    "claude": { "actor": "claude", "at": "desk-mascot", "scale": 1.5 }
+  },
+  "actions": [
+    { "at": 1, "actor": "claude", "look": "rayan" },
+    { "at": 4, "actor": "rayan", "look": "claude", "pose": "sit_idle", "emotion": "skeptical" },
+    { "at": 7, "actor": "rayan", "emotion": "shocked", "look": "monitor-main.screen" }
+  ],
+  "camera": [
+    { "at": 0, "shot": "establishing" },
+    { "at": 2, "shot": "establishing", "spot": "wide-front" },
+    { "at": 3, "shot": "over-shoulder", "subject": "claude", "over": "rayan" },
+    { "at": 4, "shot": "close", "subject": "rayan" },
+    { "at": 5, "shot": "close", "subject": "claude" },
+    { "at": 6, "shot": "insert", "item": "monitor-main", "anchor": "screen" },
+    { "at": 7, "shot": "medium", "subject": "rayan" },
+    { "at": 8, "shot": "two-shot", "subject": ["rayan", "claude"] },
+    { "at": 9, "shot": "establishing", "spot": "high-corner" }
+  ],
+  "lighting": [
+    { "at": 6.5, "mood": "red-alert", "transition": 0.3 },
+    { "at": 8.5, "mood": "day-office", "transition": 0.3 }
+  ],
+  "props": [
+    { "at": 6.5, "item": "monitor-main", "set": { "screen": { "preset": "error" } } },
+    { "at": 1, "item": "monitor-side", "set": { "screen": { "preset": "deploy", "duration": 4, "failAt": 0.8 } } }
+  ],
+  "end": 10
+}

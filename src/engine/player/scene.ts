@@ -38,17 +38,25 @@ export const buildTracks = (r: ResolvedEpisode, defs: Record<string, ActorDefini
 
 export const makeQuery = (r: ResolvedEpisode, tracks: ActorTrack[]): SceneQuery => {
   const byId = new Map(tracks.map((t) => [t.id, t]));
-  // Cache of pure results (bounded); safe because actorBase is a pure function of (track, t).
-  const cache = new Map<string, ActorBase>();
+  // Cache of pure results keyed by the EXACT time (never rounded: nearby times must not share
+  // an entry, or results would depend on evaluation order). Bounded; safe because actorBase is pure.
+  const cache = new Map<string, Map<number, ActorBase>>();
+  let size = 0;
   const base = (id: string, t: number) => {
     const track = byId.get(id);
     if (!track) return undefined;
-    const key = `${id}@${t.toFixed(5)}`;
-    let b = cache.get(key);
+    let perActor = cache.get(id);
+    if (!perActor) cache.set(id, (perActor = new Map()));
+    let b = perActor.get(t);
     if (!b) {
-      if (cache.size > 4000) cache.clear();
+      if (size > 6000) {
+        cache.clear();
+        size = 0;
+        cache.set(id, (perActor = new Map()));
+      }
       b = actorBase(track, t);
-      cache.set(key, b);
+      perActor.set(t, b);
+      size++;
     }
     return b;
   };

@@ -53,7 +53,7 @@ export const Claude: React.FC<ActorViewProps> = ({ channels: c, appearance, held
   const mats = useMemo(
     () => ({
       body: new THREE.MeshStandardMaterial({ color: look.bodyColor, roughness: 0.68, metalness: 0.03, flatShading: true }),
-      eyes: new THREE.MeshStandardMaterial({ color: look.eyeColor, roughness: 0.35, metalness: 0.05 }),
+      eyes: new THREE.MeshStandardMaterial({ color: look.eyeColor, roughness: 0.9, metalness: 0 }),
     }),
     [look.bodyColor, look.eyeColor],
   );

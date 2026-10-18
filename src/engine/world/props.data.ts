@@ -66,7 +66,7 @@ export const PROPS: Record<string, PropMeta> = {
     anchors: { top: [0, 0.11, 0] },
     params: {
       color: { type: "color", default: "#f4f4f5", description: "Mug" },
-      steam: { type: "boolean", default: true, description: "Steam wisps" },
+      steam: { type: "boolean", default: false, description: "Steam wisps" },
     },
   },
   desk_lamp: {

@@ -127,7 +127,7 @@ const Monitor: React.FC<PropViewProps> = (props) => {
         />
       </group>
       {brightness > 0.01 ? (
-        <pointLight position={[0, 0.3, 0.3]} color={preset?.glow ?? "#88aaff"} intensity={0.9 * brightness} distance={1.8} decay={2} />
+        <pointLight position={[0, 0.3, 0.35]} color={preset?.glow ?? "#88aaff"} intensity={0.3 * brightness} distance={1.4} decay={2} />
       ) : null}
     </group>
   );
@@ -170,7 +170,7 @@ export const Mug: React.FC<PropViewProps> = (props) => {
             return (
               <mesh key={i} position={[Math.sin(props.t * 2 + i * 2) * 0.012, 0.12 + u * 0.14, 0]} scale={0.6 + u}>
                 <icosahedronGeometry args={[0.012, 0]} />
-                <meshStandardMaterial color="#ffffff" transparent opacity={0.35 * (1 - u)} depthWrite={false} />
+                <meshBasicMaterial color="#ffffff" transparent opacity={0.18 * (1 - u)} depthWrite={false} />
               </mesh>
             );
           })
@@ -208,7 +208,7 @@ const DeskLamp: React.FC<PropViewProps> = (props) => {
           <meshBasicMaterial color={on ? light : "#555"} toneMapped={false} />
         </mesh>
       </group>
-      {k > 0.01 ? <pointLight position={[0, 0.36, 0.2]} color={light} intensity={1.6 * k} distance={2.4} decay={2} /> : null}
+      {k > 0.01 ? <pointLight position={[0, 0.3, 0.2]} color={light} intensity={0.8 * k} distance={2.0} decay={2} /> : null}
     </group>
   );
 };

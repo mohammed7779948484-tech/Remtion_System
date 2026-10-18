@@ -125,7 +125,7 @@ const SPECS: Record<ShotType, Spec> = {
   close: { lens: 50, fill: 0.9, angle: 18, dof: { bokeh: 6, range: 0.3 } },
   "two-shot": { lens: 35, fill: 0.82, angle: 0, dof: { bokeh: 2.5, range: 1.0 } },
   "over-shoulder": { lens: 45, fill: 0.85, angle: 0, dof: { bokeh: 5, range: 0.45 } },
-  insert: { lens: 50, fill: 0.8, angle: 10, dof: { bokeh: 5, range: 0.2 } },
+  insert: { lens: 35, fill: 0.8, angle: 10, dof: { bokeh: 5, range: 0.2 } },
   custom: { lens: 35, fill: 1, angle: 0, dof: null },
 };
 
@@ -408,9 +408,32 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
       if (found !== undefined) {
         yaw = found;
         distance = shot.distance ?? fitDistance(fov, yaw);
+      } else if (!distanceAuthored) {
+        // Last resort: move in front of the blocker on the requested angle, widening the lens.
+        let d = distance;
+        while (d > 0.25 && clearFor(yaw, d) !== null) d *= 0.88;
+        if (clearFor(yaw, d) === null) {
+          if (!fovAuthored) fov = clamp((2 * Math.atan(Math.tan((fov * DEG) / 2) * (distance / d))) / DEG, 10, 70);
+          warnings.push(`moved camera closer to clear "${blocker}"`);
+          distance = d;
+        } else warnings.push(`no clear angle found around "${blocker}"; keeping the requested angle`);
       } else {
         warnings.push(`no clear angle found around "${blocker}"; keeping the requested angle`);
       }
+    }
+  }
+
+  // Pan-only tracking keeps the camera body still: back off until every sampled moment fits.
+  if (shot.track && !shot.follow && !distanceAuthored) {
+    for (let iter = 0; iter < 3; iter++) {
+      const cam = build(yaw, distance);
+      let deficit = 0;
+      for (const w of windows) {
+        const need = (w.top - w.bottom) / spec.fill / 2 / Math.tan((fov * DEG) / 2);
+        deficit = Math.max(deficit, need - len(sub(cam, w.center)));
+      }
+      if (deficit <= 0.01) break;
+      distance += deficit;
     }
   }
 
@@ -423,7 +446,7 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
       while (d > 0.3 && !insideBounds(build(yaw, d), q.bounds)) d *= 0.95;
       if (!fovAuthored) {
         const needed = 2 * Math.atan(Math.tan((fov * DEG) / 2) * (distance / d)) / DEG;
-        fov = clamp(needed, 10, 100);
+        fov = clamp(needed, 10, 70);
       } else {
         warnings.push("pulled camera inside bounds with an authored lens: framing will be tighter");
       }
@@ -456,14 +479,18 @@ const overShoulder = (shot: Shot, q: SceneQuery, w: Window, span: number, baseFo
   }
   const size = oTop[1] - (q.anchor(over, "feet", t)?.[1] ?? 0);
   const k = clamp(size / 1.78, 0.15, 3);
-  const back = norm([oHead[0] - target[0], 0, oHead[2] - target[2]]);
-  const right = cross(back, UP);
+  // `side` picks which of the foreground actor's shoulders we look past (negative angle = other side).
   const side = shot.angle !== undefined && shot.angle < 0 ? -1 : 1;
-  const position: Vec3 = add(add(oHead, mul(back, 0.55 * k)), add(mul(right, side * 0.3 * k), [0, (shot.height === "high" ? 0.25 : 0.05) * k, 0]));
+  const back = norm([oHead[0] - target[0], 0, oHead[2] - target[2]]);
+  const left = cross(back, UP); // camera-left when looking from behind `over` toward the subject
+  // Look past a point just outside the shoulder so the foreground head sits at the frame edge.
+  const pivot = add(oHead, add(mul(left, side * 0.4 * k), [0, -0.12 * k, 0]));
+  const dir = norm(sub(pivot, target));
+  const position: Vec3 = add(add(pivot, mul(dir, 0.95 * k)), [0, (shot.height === "high" ? 0.35 : 0.12) * k, 0]);
   const distance = len(sub(position, target));
-  const fov = fovAuthored ? baseFov : clamp((2 * Math.atan(span / 0.85 / 2 / distance)) / DEG, 12, 70);
+  const fov = fovAuthored ? baseFov : clamp((2 * Math.atan(span / 0.75 / 2 / distance)) / DEG, 22, 55);
   const d = sub(position, target);
-  return { yaw: Math.atan2(d[0], d[2]), rise: d[1], distance, fov, offset: shot.offset ?? [-side * 0.18, 0], aim: target, fixed: { position, target }, span, warnings };
+  return { yaw: Math.atan2(d[0], d[2]), rise: d[1], distance, fov, offset: shot.offset ?? [side * 0.12, 0], aim: target, fixed: { position, target }, span, warnings };
 };
 
 // ---------------------------------------------------------------- evaluation

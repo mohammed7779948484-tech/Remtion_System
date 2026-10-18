@@ -125,6 +125,8 @@ const newVideo = () => {
   if (fs.existsSync(dir)) fail(`videos/${slug} already exists`);
   const preset = flag("preset") ?? "landscape";
   const env = flag("env") ?? "dev-office";
+  // The starter places the cast on dev-office marks; other sets get plain positions.
+  const office = env === "dev-office";
   fs.mkdirSync(dir, { recursive: true });
   const episode = {
     $schema: "../../catalog/episode.schema.json",
@@ -133,8 +135,8 @@ const newVideo = () => {
     format: { preset },
     set: { environment: env },
     cast: {
-      rayan: { actor: "rayan", at: "chair-seat", pose: "sit_typing", voice: { system: "Microsoft David Desktop", elevenlabs: { voiceId: "JBFqnCBsd6RMkjVDRZzb" } } },
-      claude: { actor: "claude", at: "desk-mascot", scale: 1.5, voice: { system: "Microsoft Zira Desktop", pitch: "+25%", elevenlabs: { voiceId: "EXAVITQu4vr4xnSDxMaL" } } },
+      rayan: { actor: "rayan", at: office ? "chair-seat" : [-0.6, 0, 0], pose: office ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop", elevenlabs: { voiceId: "JBFqnCBsd6RMkjVDRZzb" } } },
+      claude: { actor: "claude", at: office ? "desk-mascot" : [0.7, 0, 0.2], scale: office ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%", elevenlabs: { voiceId: "EXAVITQu4vr4xnSDxMaL" } } },
     },
     dialogue: [
       { id: "l1", speaker: "rayan", text: "Hello world." },
@@ -142,10 +144,10 @@ const newVideo = () => {
     ],
     actions: [
       { at: "l1.start", actor: "claude", look: "rayan" },
-      { at: "l2.start", actor: "rayan", look: "claude", pose: "sit_idle", emotion: "happy" },
+      { at: "l2.start", actor: "rayan", look: "claude", emotion: "happy", ...(office ? { pose: "sit_idle" } : {}) },
     ],
     camera: [
-      { at: 0, shot: "establishing" },
+      office ? { at: 0, shot: "establishing" } : { at: 0, shot: "wide", subject: ["rayan", "claude"] },
       { at: "l1.start", shot: "close", subject: "rayan" },
       { at: "l2.start", shot: "over-shoulder", subject: "claude", over: "rayan" },
     ],

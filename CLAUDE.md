@@ -52,6 +52,13 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
   fixed. Use `track`/`follow` for moving subjects.
 - Mouths are amplitude-driven stylized mouthing (not phoneme lip-sync).
 
+## Examples
+
+- `videos/it-works-on-my-machine/` — 16:9 skit in the shared `dev-office` set; JSON direction plus one overlay.
+- `videos/launch-promo/` — 9:16 promo on a **new location defined inside the video folder**
+  (`video.data.ts` environment + custom stage components, holo-screen drawings, kinetic text overlays).
+  Copy its patterns when a video needs its own place or look.
+
 ## Gotchas learned building the first videos
 
 - Seated actors need seated poses (`sit_idle`, `sit_typing`, `sit_explaining`, `sit_arms_crossed`); standing
@@ -61,3 +68,7 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
 - The Claude mascot is ~0.27 m at scale 1; use `scale` 1.5–1.8 on a desk, ~4 standing next to Rayan.
 - Remote sound effects (`sfx` library names) download at render time; very slow networks delay renders.
 - If a render dies after the machine slept, just re-run it.
+- A subject whose head is turned away (e.g. looking at another actor) can face away from a solver-chosen
+  camera: add `look: "camera"` or author an `angle`, then re-check the contact sheet.
+- Effects that render extra passes before the main render (drei `MeshReflectorMaterial`) see last frame's
+  shadow maps — see the `ShadowPrepass` in `videos/launch-promo/index.tsx`; confirm with `stills --verify`.

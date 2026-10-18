@@ -99,6 +99,15 @@ describe("tracking a moving subject", () => {
     });
   }
 
+  it("checks occlusion where a follow camera will travel, not just where it starts", () => {
+    // A shelf near the end of the walk, between the walker and the default follow camera.
+    const set = { set: { add: [{ id: "blocker", kind: "bookshelf", position: [4.5, 0, 1.9], rotation: 90 }] }, ...walk };
+    const authored = scene("landscape", [{ at: 0, shot: "full", subject: "rayan", follow: true, angle: 20 }], set);
+    expect(shotLayout(authored.r.shots[0], authored.q).warnings.join()).toMatch(/blocked by "blocker"/);
+    const auto = scene("landscape", [{ at: 0, shot: "full", subject: "rayan", follow: true }], set);
+    expect(shotLayout(auto.r.shots[0], auto.q).warnings.join()).not.toMatch(/blocked/);
+  });
+
   it("is order-independent (shuffled frames equal sequential)", () => {
     const { r, q } = scene("portrait", [{ at: 0, shot: "medium", subject: "rayan", follow: { lag: 0.8 }, move: ["push-in", "handheld"] }], walk);
     const frames = Array.from({ length: 150 }, (_, i) => i / 30);

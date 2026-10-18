@@ -183,3 +183,8 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - `stills --verify` reports differences → something depends on render order (state, async textures,
   `Math.random`). Scene state can be checked in Node with `evaluateScene` in both orders.
 - Render timeout after sleep → re-run. Sparse `--frames` lists must be rendered `--props={"silent":true}`.
+- Passes that render before the main render (reflections, render targets) read shadow maps from the
+  previous frame → order-dependent pixels. Refresh shadows first with a negative-priority `useFrame`
+  pre-render (`ShadowPrepass` in `videos/launch-promo/index.tsx`). Only render-order plumbing may use
+  `useFrame`; never animate with it.
+- Async textures (e.g. SMAA lookup images) make a tab's first frame differ — that's why the engine uses MSAA.

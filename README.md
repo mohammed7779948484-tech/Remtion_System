@@ -4,7 +4,7 @@ Code-first studio for stylized low-poly 3D videos with AI coding agents — Remo
 
 - **Make a video**: see [CLAUDE.md](CLAUDE.md) (workflow + rules) and [docs/ENGINE.md](docs/ENGINE.md) (reference).
 - **Discover capabilities**: `npm run cli -- list`, `catalog/*.json`.
-- **Videos**: `videos/<slug>/` — e.g. `it-works-on-my-machine` (16:9 skit).
+- **Videos**: `videos/<slug>/` — `it-works-on-my-machine` (16:9 skit in the shared office set) and `launch-promo` (9:16 promo on a custom stage defined in its own folder).
 - **Status / decisions**: [PROGRESS.md](PROGRESS.md).
 
 ```

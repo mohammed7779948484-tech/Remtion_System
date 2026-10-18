@@ -374,13 +374,34 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
     const horiz = Math.sqrt(Math.max(0.01, distance * distance - rise * rise));
     return add(aim, add(mul(dirFromYaw(yaw), horiz), [0, rise, 0]));
   };
+  // The flat fit above ignores perspective: a camera above/below the aim with a wide lens sees the
+  // near end of the span larger. Back off until the span's ends fit the lens's angular budget.
+  const fitPerspective = (yaw: number, d: number) => {
+    const budget = Math.tan((fov * DEG) / 2) * spec.fill;
+    for (let i = 0; i < 8; i++) {
+      const cam = build(yaw, d);
+      const fwd = norm(sub(aim, cam));
+      let worst = 0;
+      for (const y of [top, bottom]) {
+        const v = sub([aim[0], y, aim[2]], cam);
+        const along = dot(v, fwd);
+        worst = Math.max(worst, len(sub(v, mul(fwd, along))) / Math.max(1e-3, along));
+      }
+      if (worst <= budget * 1.001) break;
+      d *= worst / budget;
+    }
+    return d;
+  };
+  const fit = (yaw: number) => fitPerspective(yaw, fitDistance(fov, yaw));
 
   const excluded = new Set([...shot.subjects, ...(shot.allowOcclusion ?? []), ...(shot.over ? [shot.over] : []), ...(shot.item ? [shot.item] : [])]);
   const clearFor = (yaw: number, distance: number) => {
-    const cam = build(yaw, distance);
+    const fixedCam = build(yaw, distance);
     for (const t of times) {
       const w = framingWindow(shot, q, t);
       if (!w) continue;
+      // A follow camera travels with its subject, so test where it will actually be at each sample.
+      const cam = shot.follow ? add(fixedCam, sub(w.center, aim)) : fixedCam;
       const targets = shot.type === "insert" ? [w.center] : w.heads.map((h) => [h[0], w.face, h[2]] as Vec3);
       for (const target of targets) {
         for (const box of q.occluders) if (!excluded.has(box.id) && segmentHitsBox(cam, target, box)) return box.id;
@@ -395,7 +416,7 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
   };
 
   let yaw = baseYaw + angle;
-  let distance = shot.distance ?? fitDistance(fov, yaw);
+  let distance = shot.distance ?? fit(yaw);
 
   // Occlusion: search nearby angles (only when the angle was not authored and the shot isn't locked).
   const blocker = clearFor(yaw, distance);
@@ -404,10 +425,10 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
       warnings.push(`camera view to subject is blocked by "${blocker}" (angle authored/locked, not corrected)`);
     } else {
       const offsets = [12, -12, 24, -24, 36, -36, 50, -50, 70, -70];
-      const found = offsets.map((o) => baseYaw + angle + o * DEG).find((y) => clearFor(y, shot.distance ?? fitDistance(fov, y)) === null);
+      const found = offsets.map((o) => baseYaw + angle + o * DEG).find((y) => clearFor(y, shot.distance ?? fit(y)) === null);
       if (found !== undefined) {
         yaw = found;
-        distance = shot.distance ?? fitDistance(fov, yaw);
+        distance = shot.distance ?? fit(yaw);
       } else if (!distanceAuthored) {
         // Last resort: move in front of the blocker on the requested angle, widening the lens.
         let d = distance;

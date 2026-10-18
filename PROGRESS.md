@@ -12,10 +12,10 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | 2 Set, props, screens, lighting | ✅ done | dev-office layout reworked after stills review |
 | 3 Camera + post | ✅ done | camera tests: framing ×3 aspects, tracking, occlusion, overrides |
 | 4 Episode JSON, audio, captions | ✅ done | system voices + captions + mouths verified in an MP4 |
-| 5 CLI, catalog, docs | 🟡 CLI + catalog done; docs written after video 1 | |
-| 6 Video 1 | ⬜ | |
-| 7 Video 2 | ⬜ | |
-| 8 Handoff | ⬜ | |
+| 5 CLI, catalog, docs | ✅ done | CLAUDE.md, docs/ENGINE.md, catalog/, `npm run cli` |
+| 6 Video 1 | ✅ done | `it-works-on-my-machine`: 16:9, 30.4 s, renders in ~52 s → out/it-works-on-my-machine.mp4 |
+| 7 Video 2 | ✅ done | `launch-promo`: 9:16, 28.7 s, custom stage in its folder → out/launch-promo.mp4 |
+| 8 Handoff | ✅ done | tests, validation, determinism checks, docs |
 
 ## Phase 0 findings (2026-10-18)
 
@@ -48,12 +48,40 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 - `@remotion/media` has no Node export, so the CLI cannot import video modules. Pure per-video data
   (environments, actorDefs, componentKinds) lives in optional `videos/<slug>/video.data.ts`.
 
+## Phase 6–7 findings
+
+- Directing video 1 needed: seated variants of explaining/arms-crossed poses; inserts must not treat their own
+  target as an occluder; over-shoulder offsets must scale with the foreground actor's *width* (small mascot).
+- Video 2 (new location, custom components, portrait, walking + follow) needed only two generic solver fixes:
+  follow shots are occlusion-tested where the camera will travel, and framing distance is now
+  perspective-correct (camera above/below the aim with wide portrait lenses clipped heads).
+  Video 1 stills were re-rendered afterwards: no regressions (framing marginally looser).
+- Reuse proof: video 2 added no files to `src/engine`; everything location-specific lives in
+  `videos/launch-promo/` (environment data, 5 stage components, 4 screen drawings, overlays, spotlights).
+
+## Verification snapshot (end of build)
+
+- `npm test`: 57 tests in 5 files (actors, camera incl. tracking/occlusion/overrides/aspect ratios, resolver, voice cache,
+  mocked ElevenLabs, catalog freshness, every video resolves). `tsc` clean.
+- `cli validate`: both videos valid, no warnings.
+- `cli stills --verify` (parallel vs single-tab sequential render):
+  - video 1: 11/12 frames byte-identical, 1 frame at 116 dB PSNR.
+  - video 2: 3/8 byte-identical, others ≥ 92 dB (≤ 233 pixels off by 1–3 levels near translucent holo
+    screens; GPU precision). Scene *state* is exactly deterministic (tested in Node).
+
 ## Reuse vs build changes
 
 - shiki (cached locally) used for screen syntax colours as planned.
 - `@remotion/google-fonts` → system font stacks (bandwidth); swap to `@remotion/fonts` + woff2 later if needed.
 - drei `Text3D` → canvas-text planes (no typeface files available offline).
 
-## Open issues
+## Open issues / next steps
 
-- ElevenLabs path implemented against documented API but untested live (no key yet).
+- ElevenLabs path implemented against the documented API (with-timestamps, wav_24000, sound-generation) and
+  tested with mocked HTTP only — no key yet. To finish: add `ELEVENLABS_API_KEY` to `.env`, run
+  `npm run cli -- voice <slug> --provider elevenlabs` for both videos, re-render.
+- Current voices are offline Windows SAPI voices (robotic but intelligible). Mouths are amplitude-driven, not
+  phoneme lip-sync (upgrade path documented in docs/ENGINE.md §7).
+- SFX use Remotion-hosted files fetched at render time (slow on this network); could be cached under public/.
+- Residual sub-perceptual pixel noise (≤3/255 on a few hundred pixels) on translucent/reflective effects.
+- No drei `Text3D` (no typeface files offline); 3D titles use canvas-text planes.

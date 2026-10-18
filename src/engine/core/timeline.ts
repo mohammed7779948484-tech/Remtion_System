@@ -315,7 +315,9 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     .sort((a, b) => a.at - b.at);
   const sfx = ep.sfx
     .map((s, i) => {
-      const src = SFX_LIBRARY[s.sound] ?? s.sound;
+      // Library name, URL, or a file relative to the video's public folder (public/videos/<id>/...).
+      const isFile = !SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound);
+      const src = SFX_LIBRARY[s.sound] ?? (isFile && !s.sound.startsWith("videos/") ? `videos/${ep.id}/${s.sound}` : s.sound);
       if (!SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound) && !/\.(wav|mp3|ogg|m4a)$/i.test(s.sound)) {
         errors.push(`sfx[${i}]: "${s.sound}" is not a library sound, URL or audio file in public/`);
       }

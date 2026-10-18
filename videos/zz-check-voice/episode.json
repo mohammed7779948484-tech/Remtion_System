@@ -1,0 +1,79 @@
+{
+  "$schema": "../../catalog/episode.schema.json",
+  "id": "zz-check-voice",
+  "title": "zz-check-voice",
+  "format": {
+    "preset": "landscape"
+  },
+  "set": {
+    "environment": "dev-office"
+  },
+  "cast": {
+    "rayan": {
+      "actor": "rayan",
+      "at": "chair-seat",
+      "pose": "sit_typing",
+      "voice": {
+        "system": "Microsoft David Desktop",
+        "elevenlabs": {
+          "voiceId": "JBFqnCBsd6RMkjVDRZzb"
+        }
+      }
+    },
+    "claude": {
+      "actor": "claude",
+      "at": "desk-mascot",
+      "scale": 1.5,
+      "voice": {
+        "system": "Microsoft Zira Desktop",
+        "pitch": "+25%",
+        "elevenlabs": {
+          "voiceId": "EXAVITQu4vr4xnSDxMaL"
+        }
+      }
+    }
+  },
+  "dialogue": [
+    {
+      "id": "l1",
+      "speaker": "rayan",
+      "text": "Hello world."
+    },
+    {
+      "id": "l2",
+      "speaker": "claude",
+      "text": "Hello, Rayan."
+    }
+  ],
+  "actions": [
+    {
+      "at": "l1.start",
+      "actor": "claude",
+      "look": "rayan"
+    },
+    {
+      "at": "l2.start",
+      "actor": "rayan",
+      "look": "claude",
+      "pose": "sit_idle",
+      "emotion": "happy"
+    }
+  ],
+  "camera": [
+    {
+      "at": 0,
+      "shot": "establishing"
+    },
+    {
+      "at": "l1.start",
+      "shot": "close",
+      "subject": "rayan"
+    },
+    {
+      "at": "l2.start",
+      "shot": "over-shoulder",
+      "subject": "claude",
+      "over": "rayan"
+    }
+  ]
+}

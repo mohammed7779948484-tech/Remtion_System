@@ -1,0 +1,39 @@
+{
+  "code": {
+    "description": "Code editor that types itself out (syntax highlighted).",
+    "params": {
+      "code": "source text",
+      "lang": "typescript|python|bash|json",
+      "title": "tab title",
+      "speed": "chars per second (default 30; 0 = show all)"
+    }
+  },
+  "terminal": {
+    "description": "Terminal printing lines one by one. Prefix a line with '!' for red, '+' for green.",
+    "params": {
+      "lines": "string[]",
+      "interval": "seconds between lines (default 0.5)",
+      "title": "window title"
+    }
+  },
+  "error": {
+    "description": "Flashing red failure screen.",
+    "params": {
+      "title": "headline (default BUILD FAILED)",
+      "message": "detail line",
+      "lines": "string[] of stack-trace lines"
+    }
+  },
+  "deploy": {
+    "description": "Deploy progress bar; optionally fails part way.",
+    "params": {
+      "label": "text above the bar",
+      "duration": "seconds to 100% (default 3)",
+      "failAt": "0..1 progress where it fails (omit = success)"
+    }
+  },
+  "off": {
+    "description": "Screen off (dark glass).",
+    "params": {}
+  }
+}

@@ -8,10 +8,15 @@ import { resolveEpisode, type ResolvedEpisode } from "../core/timeline";
 import type { EnvironmentDef } from "../world/layout";
 import { EpisodePlayer, type VideoExtras } from "./EpisodePlayer";
 
+/**
+ * Pure (Node-safe) data a video adds to the engine. Keep it in `videos/<slug>/video.data.ts`
+ * and spread it into defineVideo, so the CLI (validate/stills) can load it without React.
+ */
 export type VideoData = {
-  /** Pure data the CLI can load too (keep it in `video.data.ts`). */
   environments?: Record<string, EnvironmentDef>;
   actorDefs?: Record<string, ActorDefinition>;
+  /** Names of custom set item kinds provided as `components` in index.tsx. */
+  componentKinds?: string[];
 };
 
 export type VideoDefinition = VideoExtras &
@@ -33,16 +38,16 @@ export type VideoModule = {
 
 const FORMATS: Record<string, [number, number]> = { landscape: [1920, 1080], portrait: [1080, 1920], square: [1080, 1080] };
 
-export const resolveContext = (def: VideoDefinition) => ({
+export const resolveContext = (def: VideoData & Pick<VideoExtras, "actors" | "components">) => ({
   environments: def.environments,
   actors: { ...def.actorDefs, ...Object.fromEntries(Object.entries(def.actors ?? {}).map(([k, v]) => [k, v.def])) },
-  components: Object.keys(def.components ?? {}),
+  components: [...Object.keys(def.components ?? {}), ...(def.componentKinds ?? [])],
 });
 
 export const defineVideo = (def: VideoDefinition): VideoModule => {
   const ep = def.episode as { id: string; format?: { width?: number; height?: number; fps?: number; preset?: string } };
   const [w, h] = FORMATS[ep.format?.preset ?? "landscape"] ?? FORMATS.landscape;
-  const { episode: _e, environments: _env, actorDefs: _ad, ...extras } = def;
+  const { episode: _e, environments: _env, actorDefs: _ad, componentKinds: _ck, ...extras } = def;
 
   const component: React.FC<VideoProps> = ({ resolved }) => (resolved ? createElement(EpisodePlayer, { resolved, ...extras }) : null);
 

@@ -3,7 +3,7 @@
 // 3D content) and an `overlay` (extra 2D content); both can read everything via hooks.
 import { ThreeCanvas } from "@remotion/three";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
-import { AbsoluteFill, useCurrentFrame, useRemotionEnvironment, useVideoConfig } from "remotion";
+import { AbsoluteFill, getInputProps, useCurrentFrame, useRemotionEnvironment, useVideoConfig } from "remotion";
 import { ActorView } from "../actors/Actor";
 import { ACTORS } from "../actors";
 import type { Actor } from "../actors/types";
@@ -131,7 +131,8 @@ export const EpisodePlayer: React.FC<{ resolved: ResolvedEpisode; children?: Rea
       </ThreeCanvas>
       <EpisodeContext.Provider value={state}>{Overlay ? <Overlay /> : null}</EpisodeContext.Provider>
       <Captions resolved={resolved} />
-      <Soundtrack resolved={resolved} />
+      {/* `--props={"silent":true}` (used for still sequences) skips audio entirely. */}
+      {getInputProps().silent === true ? null : <Soundtrack resolved={resolved} />}
       {env.isStudio && resolved.warnings.length ? (
         <AbsoluteFill style={{ pointerEvents: "none", alignItems: "flex-start", padding: 16 }}>
           <div style={{ fontFamily: FONTS.code, fontSize: 18, color: "#111", background: "#fde047", padding: "6px 10px", borderRadius: 6, maxWidth: "70%" }}>

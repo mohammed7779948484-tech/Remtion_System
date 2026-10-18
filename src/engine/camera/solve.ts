@@ -19,7 +19,7 @@ export const SHOT_TYPES: Record<ShotType, string> = {
   close: "Head and shoulders.",
   "two-shot": "Two (or more) subjects together, head to waist.",
   "over-shoulder": "Over `over` actor's shoulder onto the subject.",
-  insert: "Detail of a set item (`item` + optional `itemAnchor`, e.g. monitor screen).",
+  insert: "Detail of a set item (`item` + optional `anchor`, e.g. a monitor's \"screen\").",
   custom: "Explicit `position` / `target` / `fov`.",
 };
 

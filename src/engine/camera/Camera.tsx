@@ -2,7 +2,7 @@
 // field follows the frame's focus distance.
 import { PerspectiveCamera } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
-import { Bloom, DepthOfField, EffectComposer, SMAA, ToneMapping, Vignette } from "@react-three/postprocessing";
+import { Bloom, DepthOfField, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode, type EffectComposer as Composer } from "postprocessing";
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useCurrentFrame, useDelayRender } from "remotion";
@@ -65,17 +65,20 @@ export type PostFXProps = {
   vignette?: number;
 };
 
-/** Deterministic post stack: no temporal or self-animating effects. */
+/**
+ * Deterministic post stack: no temporal or self-animating effects. Anti-aliasing is MSAA on the
+ * composer buffers (synchronous); SMAA was dropped because its lookup textures load
+ * asynchronously, which made the first frame of each render tab differ.
+ */
 export const PostFX: React.FC<PostFXProps> = ({ focus, bloom = 0.6, vignette = 0.55 }) => {
   const composer = useRef<Composer | null>(null);
   return (
     <>
-      <EffectComposer multisampling={0} ref={composer}>
+      <EffectComposer multisampling={4} ref={composer}>
         <DepthOfField focusDistance={focus?.distance ?? 10} focusRange={focus?.range ?? 100} bokehScale={focus ? focus.bokeh : 0} />
         <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.2} intensity={bloom} mipmapBlur />
         <Vignette offset={0.32} darkness={vignette} />
         <ToneMapping mode={ToneMappingMode.NEUTRAL} />
-        <SMAA />
       </EffectComposer>
       <ComposerGate composer={composer} />
     </>

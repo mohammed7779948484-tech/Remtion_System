@@ -16,7 +16,7 @@ const EYE_NEUTRAL = eyes({ x: 0.032, y: 0, sx: 1, sy: 1, rz: 0 }, { x: -0.032, y
 
 export const claudeDef: ActorDefinition = {
   id: "claude",
-  name: "Claude mascot",
+  name: "Claude",
   kind: "creature",
   description: "Five-lobed orange starburst with vertical block eyes and stubby feet. Expressive through squash, tilt and eye shapes. Scale it up for standing scenes (scale 4 ≈ 1.1 m).",
   size: { height: 0.27, width: 0.34, depth: 0.17 },

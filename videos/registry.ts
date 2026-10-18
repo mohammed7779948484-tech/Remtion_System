@@ -2,5 +2,6 @@
 import type { VideoModule } from "../src/engine";
 import zzCheckActors from "./zz-check-actors";
 import zzCheckSet from "./zz-check-set";
+import zzCheckVoice from "./zz-check-voice";
 
-export const VIDEOS: VideoModule[] = [zzCheckActors, zzCheckSet];
+export const VIDEOS: VideoModule[] = [zzCheckActors, zzCheckSet, zzCheckVoice];

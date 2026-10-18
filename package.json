@@ -40,8 +40,8 @@
   "scripts": {
     "dev": "remotion studio",
     "test": "vitest run",
-    "cli": "tsx scripts/cli.ts",
-    "catalog": "tsx scripts/catalog.ts",
+    "cli": "node --no-deprecation --import tsx scripts/cli.ts",
+    "catalog": "node --no-deprecation --import tsx scripts/catalog.ts",
     "typecheck": "tsc",
     "lint": "eslint src && tsc",
     "upgrade": "remotion upgrade"

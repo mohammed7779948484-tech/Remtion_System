@@ -8,11 +8,11 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | Phase | State | Notes |
 |---|---|---|
 | 0 Scaffold + risk spike | ✅ done | see findings below |
-| 1 Core + actors | 🟡 code written, tests pending | `src/engine/actors` |
-| 2 Set, props, screens, lighting | 🟡 code written | `src/engine/world`, `src/engine/lighting` |
-| 3 Camera + post | 🟡 code written | `src/engine/camera` |
-| 4 Episode JSON, audio, captions | 🟡 code written | `src/engine/core`, `src/engine/audio`, `src/engine/player` |
-| 5 CLI, catalog, docs | ⬜ | |
+| 1 Core + actors | ✅ done | actor tests + visual pose/emotion review |
+| 2 Set, props, screens, lighting | ✅ done | dev-office layout reworked after stills review |
+| 3 Camera + post | ✅ done | camera tests: framing ×3 aspects, tracking, occlusion, overrides |
+| 4 Episode JSON, audio, captions | ✅ done | system voices + captions + mouths verified in an MP4 |
+| 5 CLI, catalog, docs | 🟡 CLI + catalog done; docs written after video 1 | |
 | 6 Video 1 | ⬜ | |
 | 7 Video 2 | ⬜ | |
 | 8 Handoff | ⬜ | |
@@ -36,6 +36,17 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 - Remotion's bundled ffmpeg lacks `psnr`/`tile`; CLI uses system `ffmpeg` when present for contact sheets
   and pixel comparisons (skips gracefully otherwise).
 - three r186 removed PCFSoftShadowMap → use `shadows="percentage"`.
+
+## Phase 1–4 findings
+
+- SMAA's lookup textures load asynchronously, so the first frame of each render tab had different edge
+  anti-aliasing. Replaced by composer MSAA (multisampling 4); `stills --verify` is now byte-identical.
+- The anchor cache keyed time by `toFixed(5)`, which made results depend on evaluation order (nearby
+  sample times shared entries). Now keyed by the exact time.
+- Remotion's inline audio mixing crashes (EINVAL) on sparse `--frames` lists even with `--muted`; stills
+  pass `--props={"silent":true}` and the player then skips the soundtrack.
+- `@remotion/media` has no Node export, so the CLI cannot import video modules. Pure per-video data
+  (environments, actorDefs, componentKinds) lives in optional `videos/<slug>/video.data.ts`.
 
 ## Reuse vs build changes
 

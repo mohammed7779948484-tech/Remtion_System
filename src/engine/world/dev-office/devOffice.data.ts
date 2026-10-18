@@ -15,7 +15,7 @@ export const devOffice: EnvironmentDef = {
     { id: "monitor-side", kind: "monitor", on: "desk", position: [0.72, 0.76, -0.2], rotation: 244, params: { screen: { preset: "terminal" } } },
     { id: "keyboard", kind: "keyboard", on: "desk", position: [0, 0.76, -0.2], rotation: 180 },
     { id: "mug", kind: "mug", on: "desk", position: [0.27, 0.76, -0.25] },
-    { id: "lamp", kind: "desk_lamp", on: "desk", position: [-0.68, 0.76, 0.2], rotation: 200 },
+    { id: "lamp", kind: "desk_lamp", on: "desk", position: [-0.7, 0.76, -0.28], rotation: 150 },
     { id: "chair", kind: "office_chair", position: [0, 0, -0.08] },
     { id: "bookshelf", kind: "bookshelf", position: [-1.6, 0, -1.6] },
     { id: "plant", kind: "plant", position: [-2.3, 0, -1.25] },

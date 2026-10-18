@@ -23,6 +23,8 @@
     "celebrate": "Both arms raised overhead.",
     "sit_idle": "Seated (place root at a chair-seat mark), hands resting on thighs.",
     "sit_typing": "Seated, leaning in, hands on a keyboard; fingers type automatically.",
+    "sit_explaining": "Seated, turned-in torso, both forearms up explaining; hands animate while talking.",
+    "sit_arms_crossed": "Seated, leaning back with arms folded.",
     "walk": "Walk cycle in place (a `move` cue walks automatically from any standing pose)."
   },
   "emotions": {

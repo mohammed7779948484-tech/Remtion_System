@@ -168,8 +168,8 @@ export const Mug: React.FC<PropViewProps> = (props) => {
         ? [0, 1, 2].map((i) => {
             const u = (props.t * 0.35 + i / 3) % 1;
             return (
-              <mesh key={i} position={[Math.sin(props.t * 2 + i * 2) * 0.012, 0.12 + u * 0.14, 0]} scale={0.6 + u}>
-                <icosahedronGeometry args={[0.012, 0]} />
+              <mesh key={i} position={[Math.sin(props.t * 2 + i * 2) * 0.01, 0.12 + u * 0.12, 0]} scale={0.5 + u * 0.8}>
+                <sphereGeometry args={[0.008, 6, 4]} />
                 <meshBasicMaterial color="#ffffff" transparent opacity={0.18 * (1 - u)} depthWrite={false} />
               </mesh>
             );

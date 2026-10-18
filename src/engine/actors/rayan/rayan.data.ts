@@ -101,6 +101,14 @@ export const rayanDef: ActorDefinition = {
       description: "Seated, leaning in, hands on a keyboard; fingers type automatically.",
       set: { ...seated(0.06), "torso.x": 0.12, "head.x": 0.14, ...arm("L", { x: -0.7, y: -0.22, z: 0.15 }, { x: -1.05, y: 0, z: 0 }), ...arm("R", { x: -0.7, y: 0.22, z: -0.15 }, { x: -1.05, y: 0, z: 0 }) },
     },
+    sit_explaining: {
+      description: "Seated, turned-in torso, both forearms up explaining; hands animate while talking.",
+      set: { ...seated(0.08), "torso.x": 0.04, ...arm("L", { x: -0.75, y: 0.25, z: 0.22 }, { x: -1.15, y: 0.3, z: 0 }), ...arm("R", { x: -0.75, y: -0.25, z: -0.22 }, { x: -1.15, y: -0.3, z: 0 }) },
+    },
+    sit_arms_crossed: {
+      description: "Seated, leaning back with arms folded.",
+      set: { ...seated(0.1), "torso.x": -0.08, ...arm("L", { x: -0.75, y: -0.55, z: 0.15 }, { x: -1.65, y: 0, z: -0.4 }), ...arm("R", { x: -0.78, y: 0.55, z: -0.15 }, { x: -1.65, y: 0, z: 0.4 }) },
+    },
     walk: { description: "Walk cycle in place (a `move` cue walks automatically from any standing pose).", set: STAND_ARMS },
   },
   emotions: {
@@ -198,7 +206,7 @@ export const rayanDef: ActorDefinition = {
       c["mouth.wide"] = lerp(c["mouth.wide"], 0.92 + s.noise("mouthW", 6) * 0.15, s.talk);
       c["head.x"] += s.noise("talkNod", 3) * 0.035 * s.talk;
       c["torso.x"] += s.noise("talkBounce", 4) * 0.015 * s.talk;
-      if (s.pose === "explaining") {
+      if (s.pose === "explaining" || s.pose === "sit_explaining") {
         c["elbowL.x"] += s.noise("gestL", 2.2) * 0.16 * s.talk;
         c["elbowR.x"] += s.noise("gestR", 2.4) * 0.16 * s.talk;
       }

@@ -375,7 +375,7 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
     return add(aim, add(mul(dirFromYaw(yaw), horiz), [0, rise, 0]));
   };
 
-  const excluded = new Set([...shot.subjects, ...(shot.allowOcclusion ?? []), ...(shot.over ? [shot.over] : [])]);
+  const excluded = new Set([...shot.subjects, ...(shot.allowOcclusion ?? []), ...(shot.over ? [shot.over] : []), ...(shot.item ? [shot.item] : [])]);
   const clearFor = (yaw: number, distance: number) => {
     const cam = build(yaw, distance);
     for (const t of times) {
@@ -483,10 +483,12 @@ const overShoulder = (shot: Shot, q: SceneQuery, w: Window, span: number, baseFo
   const side = shot.angle !== undefined && shot.angle < 0 ? -1 : 1;
   const back = norm([oHead[0] - target[0], 0, oHead[2] - target[2]]);
   const left = cross(back, UP); // camera-left when looking from behind `over` toward the subject
-  // Look past a point just outside the shoulder so the foreground head sits at the frame edge.
-  const pivot = add(oHead, add(mul(left, side * 0.4 * k), [0, -0.12 * k, 0]));
+  // Look past a point just outside the foreground actor's silhouette so it sits at the frame edge.
+  // Offsets scale with its width (a small mascot needs less room than its height suggests).
+  const halfW = q.actorBox(over, t)?.half[0] ?? 0.25 * k;
+  const pivot = add(oHead, add(mul(left, side * (halfW * 1.3 + 0.05)), [0, -0.12 * k, 0]));
   const dir = norm(sub(pivot, target));
-  const position: Vec3 = add(add(pivot, mul(dir, 0.95 * k)), [0, (shot.height === "high" ? 0.35 : 0.12) * k, 0]);
+  const position: Vec3 = add(add(pivot, mul(dir, 0.45 + halfW * 1.5)), [0, (shot.height === "high" ? 0.35 : 0.12) * k, 0]);
   const distance = len(sub(position, target));
   const fov = fovAuthored ? baseFov : clamp((2 * Math.atan(span / 0.75 / 2 / distance)) / DEG, 22, 55);
   const d = sub(position, target);

@@ -93,11 +93,11 @@
       "id": "lamp",
       "kind": "desk_lamp",
       "position": [
-        -0.68,
+        -0.7,
         0.76,
-        0.2
+        -0.28
       ],
-      "rotation": 200,
+      "rotation": 150,
       "on": "desk"
     },
     {

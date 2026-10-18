@@ -26,7 +26,7 @@ import {
 } from "@react-three/postprocessing";
 import { ToneMappingMode } from "postprocessing";
 import * as THREE from "three";
-import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import { useDelayRender } from "remotion";
 import { createHighlighterCoreSync } from "shiki/core";

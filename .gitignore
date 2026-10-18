@@ -8,3 +8,4 @@ out
 
 # Local tooling
 *.log
+scratch/

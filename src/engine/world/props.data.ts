@@ -1,0 +1,124 @@
+// Prop catalog metadata (pure). Origin = bottom centre, front faces +Z, metres.
+// `size` doubles as the occluder box used by the camera solver.
+import type { Vec3 } from "../core/time";
+
+export type ParamSpec = { type: "color" | "boolean" | "number" | "string" | "screen"; default: unknown; description: string };
+
+export type PropMeta = {
+  description: string;
+  size: Vec3;
+  /** Blocks camera rays (false for flat things like rugs). */
+  occluder: boolean;
+  /** Named points in prop-local space (framing targets, seats, surfaces). */
+  anchors: Record<string, Vec3>;
+  params: Record<string, ParamSpec>;
+};
+
+const screenParam: ParamSpec = {
+  type: "screen",
+  default: { preset: "code" },
+  description: "Screen content: { preset: code|terminal|error|deploy|off, ...preset params }",
+};
+
+export const PROPS: Record<string, PropMeta> = {
+  desk: {
+    description: "Wooden desk with dark legs.",
+    size: [1.6, 0.76, 0.75],
+    occluder: true,
+    anchors: { top: [0, 0.76, 0], center: [0, 0.6, 0] },
+    params: {
+      color: { type: "color", default: "#7a5a40", description: "Desktop wood" },
+      legColor: { type: "color", default: "#2b2b33", description: "Legs" },
+      width: { type: "number", default: 1.6, description: "Desk width (m)" },
+    },
+  },
+  office_chair: {
+    description: "Swivel office chair. Seat actors at its `chair-seat` mark (sit_* poses).",
+    size: [0.62, 1.1, 0.62],
+    occluder: false,
+    anchors: { seat: [0, 0.46, 0.02], back: [0, 0.85, -0.24] },
+    params: {
+      color: { type: "color", default: "#232838", description: "Upholstery" },
+      accent: { type: "color", default: "#f59e0b", description: "Trim" },
+    },
+  },
+  monitor: {
+    description: "Flat monitor on a stand with an animated screen.",
+    size: [0.62, 0.5, 0.2],
+    occluder: true,
+    anchors: { screen: [0, 0.31, 0.03], top: [0, 0.5, 0] },
+    params: {
+      screen: screenParam,
+      bezel: { type: "color", default: "#17181d", description: "Frame" },
+    },
+  },
+  keyboard: {
+    description: "Low-profile keyboard.",
+    size: [0.44, 0.03, 0.15],
+    occluder: false,
+    anchors: { top: [0, 0.03, 0] },
+    params: { color: { type: "color", default: "#2a2d36", description: "Body" } },
+  },
+  mug: {
+    description: "Coffee mug (holdable).",
+    size: [0.09, 0.11, 0.09],
+    occluder: false,
+    anchors: { top: [0, 0.11, 0] },
+    params: {
+      color: { type: "color", default: "#f4f4f5", description: "Mug" },
+      steam: { type: "boolean", default: true, description: "Steam wisps" },
+    },
+  },
+  desk_lamp: {
+    description: "Articulated desk lamp; its light follows mood.practicals.lamp.",
+    size: [0.22, 0.48, 0.22],
+    occluder: false,
+    anchors: { bulb: [0, 0.42, 0.12] },
+    params: {
+      color: { type: "color", default: "#f59e0b", description: "Lamp body" },
+      on: { type: "boolean", default: true, description: "Light on" },
+      light: { type: "color", default: "#ffcf8a", description: "Light colour" },
+    },
+  },
+  plant: {
+    description: "Potted leafy plant.",
+    size: [0.5, 1.0, 0.5],
+    occluder: true,
+    anchors: { top: [0, 1.0, 0] },
+    params: {
+      pot: { type: "color", default: "#c2410c", description: "Pot" },
+      leaves: { type: "color", default: "#2f9e5a", description: "Leaves" },
+      scale: { type: "number", default: 1, description: "Overall scale" },
+    },
+  },
+  bookshelf: {
+    description: "Tall shelf with seeded colourful books.",
+    size: [1.0, 1.8, 0.35],
+    occluder: true,
+    anchors: { top: [0, 1.8, 0] },
+    params: {
+      color: { type: "color", default: "#5b4636", description: "Wood" },
+      seed: { type: "string", default: "shelf", description: "Book colour/layout seed" },
+    },
+  },
+  rug: {
+    description: "Flat rug.",
+    size: [2.4, 0.01, 1.8],
+    occluder: false,
+    anchors: {},
+    params: {
+      color: { type: "color", default: "#3b3f6b", description: "Main colour" },
+      border: { type: "color", default: "#f59e0b", description: "Border" },
+    },
+  },
+  window: {
+    description: "Wall window with a procedural city skyline (lit by mood.practicals.window).",
+    size: [1.3, 1.2, 0.12],
+    occluder: true,
+    anchors: { center: [0, 0.6, 0] },
+    params: {
+      frame: { type: "color", default: "#e7e5e4", description: "Frame" },
+      seed: { type: "string", default: "city", description: "Skyline seed" },
+    },
+  },
+};

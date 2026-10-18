@@ -1,17 +1,24 @@
 import { Composition } from "remotion";
-import { Spike } from "./spike/Spike";
+import { VIDEOS } from "../videos/registry";
 
+// One composition per video folder (videos/registry.ts). Duration, size and props are filled in
+// by each video's calculateMetadata from its episode.json + cached voice manifest.
 export const RemotionRoot: React.FC = () => {
   return (
     <>
-      <Composition
-        id="Spike"
-        component={Spike}
-        durationInFrames={150}
-        fps={30}
-        width={1280}
-        height={720}
-      />
+      {VIDEOS.map((v) => (
+        <Composition
+          key={v.id}
+          id={v.id}
+          component={v.component}
+          durationInFrames={300}
+          fps={v.fps}
+          width={v.width}
+          height={v.height}
+          defaultProps={{ resolved: null }}
+          calculateMetadata={v.calculateMetadata}
+        />
+      ))}
     </>
   );
 };

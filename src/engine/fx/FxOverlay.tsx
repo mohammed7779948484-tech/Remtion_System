@@ -63,7 +63,7 @@ const Callout: React.FC<{ fx: ResolvedFx }> = ({ fx }) => {
         <path d={path} fill="none" stroke={color} strokeWidth={9 * u} strokeLinecap="round" strokeDasharray={strokeDasharray} strokeDashoffset={strokeDashoffset} />
         {draw > 0.95 ? <path d={`M ${hx - head * Math.cos(ang - 0.5)} ${hy - head * Math.sin(ang - 0.5)} L ${hx} ${hy} L ${hx - head * Math.cos(ang + 0.5)} ${hy - head * Math.sin(ang + 0.5)}`} fill="none" stroke={color} strokeWidth={9 * u} strokeLinecap="round" strokeLinejoin="round" /> : null}
       </svg>
-      <div style={{ position: "absolute", left: lx, top: ly, translate: "-50% -50%", scale: String(pop), background: color, color: "#111", fontFamily: FONTS.display, fontWeight: 900, fontSize: 52 * u, padding: `${8 * u}px ${24 * u}px`, borderRadius: 18 * u, boxShadow: `0 ${8 * u}px 0 rgba(0,0,0,0.45)`, whiteSpace: "nowrap", textTransform: "uppercase" }}>
+      <div style={{ position: "absolute", left: lx, top: ly, translate: "-50% -50%", scale: String(pop), background: color, color: "#111", fontFamily: FONTS.display, fontWeight: 900, fontSize: 66 * u, padding: `${8 * u}px ${24 * u}px`, borderRadius: 18 * u, boxShadow: `0 ${8 * u}px 0 rgba(0,0,0,0.45)`, whiteSpace: "nowrap", textTransform: "uppercase" }}>
         {String(fx.data.text ?? "")}
       </div>
     </AbsoluteFill>

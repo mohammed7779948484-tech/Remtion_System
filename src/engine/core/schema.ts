@@ -92,8 +92,9 @@ const Action = z.strictObject({
   hand: z.string().optional(),
   /** press/place: false = too light to push the target down (the gag). */
   weight: z.boolean().optional(),
-  /** Sound played at the recipe's moment of contact (library name or file). */
+  /** Sound played at the recipe's moment of contact (library name or file), and its volume. */
   sound: z.string().optional(),
+  volume: z.number().min(0).optional(),
   /** place: yaw (degrees) of the put-down item. */
   rotation: z.number().optional(),
 });

@@ -21,7 +21,8 @@ const Dots: React.FC<{ local: number; color: string; size: number }> = ({ local,
 export const AppWindow: React.FC<AppWindowProps> = ({ local, width, ...params }) => {
   const s = windowState(params, local);
   const th = windowTheme(params);
-  const u = width / 900;
+  // Designed at 600 px wide: at the default 86% of a 1080 frame, body text is ~60 px — readable on a phone.
+  const u = width / 600;
   const caret = <span style={{ display: "inline-block", width: 10 * u, height: 30 * u, background: th.accent, marginLeft: 3 * u, translate: `0 ${5 * u}px` }} />;
   const frame: React.CSSProperties = {
     width,

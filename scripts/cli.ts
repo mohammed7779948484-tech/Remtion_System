@@ -5,7 +5,8 @@
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
 //   validate <slug>
 //   stills <slug> [--frames 0,90,180] [--verify] [--guides]
-//   render <slug> [--out out/<slug>.mp4] [--draft] [--timeout ms]
+//   render <slug> [--out out/<slug>.mp4] [--draft] [--master (loudness -14 LUFS)] [--timeout ms]
+//   review <slug>   (after render: frame sheet of every shot/accent + loudness and mix balance)
 //   catalog
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -31,7 +32,7 @@ const flag = (name: string) => {
 };
 const has = (name: string) => args.includes(`--${name}`);
 /** Flags that take no value (everything else consumes the next token). */
-const BOOLEAN_FLAGS = ["--force", "--verify", "--draft", "--guides", "--check"];
+const BOOLEAN_FLAGS = ["--force", "--verify", "--draft", "--guides", "--check", "--master"];
 const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !BOOLEAN_FLAGS.includes(args[i - 1])));
 
 const fail = (msg: string): never => {
@@ -394,8 +395,75 @@ const render = async () => {
   const out = flag("out") ?? path.join("out", `${slug}${draft ? "-draft" : ""}.mp4`);
   const timeout = flag("timeout");
   const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `--props={"draft":true}`;
-  npx(["remotion", "render", slug, out, "--log=info", ...(draft ? [draftProps] : []), ...(timeout ? [`--timeout=${timeout}`] : [])]);
+  const master = has("master");
+  const target = master ? out.replace(/\.mp4$/, ".unmastered.mp4") : out;
+  npx(["remotion", "render", slug, target, "--log=info", ...(draft ? [draftProps] : []), ...(timeout ? [`--timeout=${timeout}`] : [])]);
+  if (master) {
+    // Social platforms normalise to about -14 LUFS: master the soundtrack there (two-pass loudnorm,
+    // true peak -1.5 dBTP) and copy the video stream untouched.
+    if (!hasFfmpeg()) fail("--master needs ffmpeg on PATH");
+    const measure = spawnSync("ffmpeg", ["-hide_banner", "-i", target, "-af", "loudnorm=I=-14:TP=-1.5:LRA=11:print_format=json", "-f", "null", "-"], { cwd: ROOT, encoding: "utf8" }).stderr;
+    const m = JSON.parse(measure.slice(measure.lastIndexOf("{"), measure.lastIndexOf("}") + 1)) as Record<string, string>;
+    const af = `loudnorm=I=-14:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
+    const r = spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", target, "-c:v", "copy", "-af", af, "-ar", "48000", "-c:a", "aac", "-b:a", "256k", out], { cwd: ROOT, encoding: "utf8" });
+    if (r.status !== 0) fail(`mastering failed: ${r.stderr}`);
+    fs.rmSync(path.join(ROOT, target), { force: true });
+    console.log(`✔ mastered to -14 LUFS (was ${m.input_i} LUFS, true peak ${m.input_tp} dBTP)`);
+  }
   console.log(`✔ rendered ${out}${draft ? " (draft)" : ""}`);
+};
+
+/** Post-render review: a frame sheet of every shot/accent from the MP4, plus loudness and mix balance. */
+const review = async () => {
+  const slug = positional[1] ?? fail("usage: review <slug>   (after render)");
+  const mp4 = flag("file") ?? path.join("out", `${slug}.mp4`);
+  if (!fs.existsSync(path.join(ROOT, mp4))) fail(`${mp4} not found — run \`npm run cli -- render ${slug}\` first`);
+  if (!hasFfmpeg()) fail("review needs ffmpeg on PATH");
+  const r = await resolve(slug);
+  const run = (a: string[]) => spawnSync("ffmpeg", a, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
+
+  // Frames: the middle of every shot and the peak of every screen accent, in time order.
+  const times = [...new Set([...r.shots.map((s) => (s.at + s.end) / 2), ...r.fx.filter((f) => f.type !== "shake").map((f) => Math.min(f.end - 0.05, f.at + 0.35))].map((t) => Math.round(t * 10) / 10))].sort((a, b) => a - b);
+  const dir = path.join("out", slug, "review");
+  fs.rmSync(path.join(ROOT, dir), { recursive: true, force: true });
+  fs.mkdirSync(path.join(ROOT, dir), { recursive: true });
+  times.forEach((t, i) => run(["-v", "error", "-y", "-ss", String(t), "-i", mp4, "-frames:v", "1", "-vf", "scale=360:-1", path.join(dir, `${String(i).padStart(3, "0")}.png`)]));
+  const cols = Math.min(6, times.length);
+  run(["-v", "error", "-y", "-i", path.join(dir, "%03d.png"), "-filter_complex", `tile=${cols}x${Math.ceil(times.length / cols)}:padding=4`, "-frames:v", "1", path.join("out", slug, "review-sheet.png")]);
+  console.log(`✔ review sheet → out/${slug}/review-sheet.png (${times.length} frames at ${times.map((t) => t.toFixed(1)).join(", ")} s)`);
+
+  // Loudness (EBU R128) and true peak.
+  const ebu = run(["-hide_banner", "-nostats", "-i", mp4, "-af", "ebur128=peak=true", "-f", "null", "-"]).stderr;
+  const lufs = ebu.match(/I:\s+(-?[\d.]+) LUFS/g)?.at(-1)?.match(/-?[\d.]+/)?.[0];
+  const tp = ebu.match(/Peak:\s+(-?[\d.]+) dBFS/g)?.at(-1)?.match(/-?[\d.]+/)?.[0];
+  console.log(`loudness: ${lufs} LUFS integrated (social platforms normalise around -14), true peak ${tp} dBFS${Number(tp) > -1 ? "  ⚠ above -1 dBFS" : ""}`);
+
+  // Mix: dialogue level over spoken words vs a 0.25 s window at each sound; sounds that land on words.
+  const pcm = spawnSync("ffmpeg", ["-v", "error", "-i", mp4, "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], { cwd: ROOT, maxBuffer: 1 << 28 }).stdout as Buffer;
+  const sr = 16000;
+  const n = pcm.length / 2;
+  let clipped = 0;
+  for (let i = 0; i < n; i++) if (Math.abs(pcm.readInt16LE(i * 2)) >= 32700) clipped++;
+  const rms = (a: number, b: number) => {
+    let s = 0;
+    const i0 = Math.max(0, Math.floor(a * sr));
+    const i1 = Math.min(n, Math.floor(b * sr));
+    for (let i = i0; i < i1; i++) s += (pcm.readInt16LE(i * 2) / 32768) ** 2;
+    return Math.sqrt(s / Math.max(1, i1 - i0));
+  };
+  const dB = (v: number) => 20 * Math.log10(Math.max(1e-9, v));
+  const hits = r.sfx.map((s) => s.at);
+  const words = r.lines.flatMap((l) => l.words.map((w) => ({ line: l.id, text: w.text, a: l.start + w.start, b: l.start + w.end })));
+  const clean = words.filter((w) => !hits.some((h) => h > w.a - 0.35 && h < w.b + 0.05));
+  const dialogue = clean.length ? Math.sqrt(clean.reduce((s, w) => s + rms(w.a, w.b) ** 2, 0) / clean.length) : 0;
+  console.log(`clipped samples: ${clipped}${clipped ? "  ⚠" : ""}; dialogue level ${dialogue ? dB(dialogue).toFixed(1) : "—"} dBFS RMS`);
+  for (const s of r.sfx) {
+    const rel = dialogue ? dB(rms(s.at, s.at + 0.25)) - dB(dialogue) : NaN;
+    const on = words.find((w) => s.at >= w.a - 0.05 && s.at <= w.b);
+    const loud = rel > 6 ? "  ⚠ much louder than the voices" : "";
+    console.log(`  ${s.src.replace(/^.*\//, "").padEnd(20)} @${s.at.toFixed(2).padStart(6)}s  ${Number.isNaN(rel) ? "" : `${rel >= 0 ? "+" : ""}${rel.toFixed(1)} dB vs dialogue`}${on ? `  ⚠ lands on "${on.text}" (${on.line})` : ""}${loud}`);
+  }
+  console.log("Now watch the MP4 with sound and write the editorial review (hook, pacing, timing, acting, readability, mix, payoff).");
 };
 
 const commands: Record<string, () => unknown> = {
@@ -406,12 +474,14 @@ const commands: Record<string, () => unknown> = {
   validate,
   stills,
   render,
+  review,
   catalog: () => console.log(`✔ catalog/: ${writeCatalog().length} files`),
 };
 
 const cmd = positional[0];
 if (!cmd || !commands[cmd]) {
-  console.log(fs.readFileSync(__filename, "utf8").split("\n").filter((l) => l.startsWith("//")).slice(0, 10).join("\n").replace(/^\/\/ ?/gm, ""));
+  const header = fs.readFileSync(__filename, "utf8").split("\n");
+  console.log(header.slice(0, header.findIndex((l) => !l.startsWith("//"))).join("\n").replace(/^\/\/ ?/gm, ""));
   process.exit(cmd ? 1 : 0);
 }
 Promise.resolve(commands[cmd]()).catch((e) => fail((e as Error).stack ?? String(e)));

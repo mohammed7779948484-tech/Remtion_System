@@ -370,7 +370,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       pointOf: (ref, at) => pointOf(ref, at, `${where} do:${a.do}`),
       pressable,
       addProp: (at, item, set) => recipeProps.push({ at, item, set }),
-      addSfx: (at, sound) => recipeSfx.push({ at, sound }),
+      addSfx: (at, sound, volume) => recipeSfx.push({ at, sound, volume }),
       addItem: (item) => {
         layout.items.push(item);
         itemIds.add(item.id);

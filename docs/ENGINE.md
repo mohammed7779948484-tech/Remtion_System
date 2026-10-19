@@ -82,10 +82,31 @@ earlier lines.
 `monitor-main.screen`), an actor (`claude`, `claude.face`), or `"camera"` (look into the lens).
 
 **Actions** (any combination per entry): `pose`, `emotion`, `gesture` (+`speed`, `intensity`), `look`
-(`null` = straight ahead), `move` (`to`, `speed|duration`, `face`: `path|keep|<deg>`; arriving at a mark
-turns to its yaw), `turn` (deg or target), `hold` (`{ socket: item|null }`; a held set item hides from the
-set), `joints` (precise channel overrides, see the actor manifest's `channels`; `mode: add` for offsets,
-`duration` to release), `transition` (blend seconds).
+(`null` = straight ahead), `move` (`to`, `speed|duration`, `face`: `path|keep|<deg>`, `ease`: `in` for falls;
+arriving at a mark turns to its yaw), `turn` (deg or target), `hold` (`{ socket: item|null }`; a held set item
+hides from the set), `joints` (precise channel overrides, see the actor manifest's `channels`; `mode: add` for
+offsets, `duration` to release), `transition` (blend seconds).
+
+**Interaction recipes** — `"do"` expands at resolve time into the cues above (plus props cues and sfx), so
+nothing new runs per frame and every anatomy uses its own channels (`reach`, `recipeGestures` in its definition):
+
+| do | needs | what it does |
+|---|---|---|
+| `press` | `target: "item.anchor"` | standing on it → stomp (Rayan) / hop (mascot) and sink with the key; otherwise a hand tap. `weight: false` = too light (nothing moves). `duration` = hold, then release. |
+| `point` | `target` | look + straight arm at it (mascot leans). `duration` = how long. |
+| `pick-up` | `item` | walks close if needed, crouches for low things, reaches, holds it in the near hand (mascot: on top). |
+| `place` | `target` | walks close, reaches, releases; the carried item reappears there (a copy toggled visible, so camera occluders stay static). On a pressable anchor its weight presses it. |
+| `react` | `target?` | flinch + shocked + look at the source. |
+| `sit-down` / `stand-up` | `target?` (seat mark / where to walk) | walk + slow pose blend. |
+
+Every recipe takes `sound` (played at the moment of contact). Only `emotion` is applied alongside a `do`. For
+choreography the recipes can't express, use `joints` or a custom `scene` component.
+
+**Accents** (`"fx": [...]`, see `catalog/fx.json`, `npm run cli -- list fx`): `text` (kinetic type: pop | stagger |
+slam | type, auto-fit), `window` (AppWindow: chat | terminal | dialog | notification), `callout` (arrow + label pinned
+to `on`: item.anchor / actor[.anchor] / mark / point), `impact` (3D burst at `on`), `shake`, `glitch` (chromatic
+aberration), `flash`, `dip` (cover a cut at its middle). Each takes `at`, optional `duration`, `sound`, `volume`.
+Screen accents keep clear of the vertical-video UI bands; the effect set for post is fixed per episode.
 
 **Camera shots**: `establishing` (`spot`), `wide`, `full`, `medium`, `close`, `two-shot`, `over-shoulder`
 (`over`), `insert` (`item`, `anchor`), `custom` (`position`, `target`, `fov`). Modifiers: `angle` (deg around
@@ -158,7 +179,15 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - Prop = catalog metadata (`world/props.data.ts`: size = occluder box, anchors, params) + view
   (`world/props.tsx`). Props get time-resolved params (`props` cues) and the mood's practical-light levels.
 - Screens (`world/Screen.tsx`): canvas textures redrawn per frame by pure `draw(ctx, {t, since}, params)`;
-  presets `code` (shiki-highlighted typing), `terminal`, `error`, `deploy`, `off`.
+  presets `code` (shiki-highlighted typing), `terminal`, `error`, `deploy`, `window` (AppWindow: AI chat, terminal,
+  dialog, notification), `off`. Any preset accepts `popup: { kind: dialog|notification, title, message }`.
+  Resolutions above 1024 keep the 1024-wide layout but render sharper (giant screens use 2048).
+- Reusable UI (`src/engine/ui/`): `AppWindow` (DOM) and `drawWindow` (Canvas2D) share one pure model
+  (`windowState`), so the same params work as an overlay or on any in-world screen; `KineticText` for titles and
+  punchlines. Use them directly in a video's `overlay`/`scene`, or through `fx` / the `window` screen preset.
+- `micro-keyboard` environment: the world is a laptop scaled ~50× (keys 0.95 m, tops at 0.42 m), actors stay
+  real size. `giant_keyboard` keys press via props cues `{ "keys": { "ctrl": true } }` or the `press` recipe;
+  anchors `key:<id>`; marks `on-<key>` and `drop-enter`. Environments may set `shadowRadius` for big sets.
 - Moods (`lighting/moods.ts`): data for key/fill/rim/ambient/hemi/fog/background/exposure/bloom/practicals,
   plus optional `pulse`. Inline moods: `{ "base": "late-night", "bloom": 1.2, … }`.
 
@@ -173,8 +202,15 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
   Rhubarb) would be the upgrade: add it to `voice.json` and map it in an actor's `life`.
 - Captions: word timings → `@remotion/captions` pages; styles `subtitle` (name tag + progressive words) and
   `pop` (big word-highlight).
-- SFX: library names (`catalog/sfx.json`, hosted by Remotion), URLs, or files under `public/videos/<id>/`.
-  An `sfx` entry with a `prompt` is generated by ElevenLabs into that path when a key is set.
+- SFX: library names resolve to the local CC0 kit in `public/sfx/` (`npm run cli -- list sfx`: description, tags,
+  loudness, license; provenance in `src/engine/audio/sfx.data.ts` and `THIRD_PARTY_NOTICES.md`), then to legacy
+  Remotion-hosted meme sounds (unknown rights → warned). Also URLs or files under `public/videos/<id>/`.
+- Voices: `voice --check` (free) shows plan, credits, models and usable voices. Paid generation needs
+  `--provider elevenlabs`; the default model is `eleven_v4` (stability + similarity only; inline audio tags like
+  `[sighs]` are performed, and stripped from captions, word refs and offline voices). Clips are cached by a
+  fingerprint of the effective request and record model/voice/plan tier; free-plan clips are non-commercial.
+- Audio readiness: final renders (CLI or plain `npx remotion render`) refuse unvoiced/stale lines and missing
+  files; drafts (`render --draft`) only refuse missing files (a 404 aborts any render).
 
 ## 8. Troubleshooting
 

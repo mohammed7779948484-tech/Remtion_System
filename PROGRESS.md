@@ -134,6 +134,35 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
   no code copied) and KineticText (fitText via @remotion/layout-utils 4.0.536); `window` screen preset and
   `popup` param on any screen. ctrl-z draft episode + BRIEF.md (renders; stills reviewed once).
 
+## Ctrl+Z — editorial / audiovisual review (final render, 9:16, 31.3 s)
+
+Method: watched by frame sheets from the real MP4 (`review` sheet: every shot + accent), measured audio with
+`review` (EBU R128, dialogue vs sfx, words). I can't listen, so delivery/tone judgments rely on the v4 timing data
+(e.g. the 0.8 s performed sigh) and levels, not on hearing.
+
+- **Hook (0–1 s)**: Rayan is in frame from frame 0, falling; CLACK + impact debris + shake at 0.48 s, "DEPLOYED." slams
+  in at 0.55 s. Passes: motion, sound and a question within the first second.
+- **Pacing**: a new beat every 1–3 s (beat sheet); the longest still stretch is Claude's sigh line (4.2 s), which is
+  the deliberate pause before "Duck. Now." No dead-air warnings.
+- **Comedic timing**: the useless hops get their own medium shot; glitch + error land 0.2 s after the second hop
+  (beat of air before the failure); "Deploy succeeded" toast lands after the line ends, then face-in-hand 0.4 s later,
+  then the title — reaction before title.
+- **Acting**: readable emotions in the closes (shocked, skeptical, pleading, tired); point read from the side;
+  crouch pick-up and carry; place presses CTRL; celebrate on success; face-in-hand payoff (joints override from `reach`).
+- **Mobile readability**: slam text ~200 px; toast/dialog text ≈ 60–70 px at 1080 wide; callouts pinned to the
+  keys; all key text outside the platform UI bands (`--guides`). Screen text in-world is decoration; the dialog
+  repeats what matters.
+- **Mix**: −14.4 LUFS integrated after `--master`, true peak −1.4 dBFS, 0 clipped samples; no sound lands on a word;
+  all hits within +5 dB of dialogue (success jingle and the final key slam are the loudest, intentionally).
+- **Payoff**: "Oh, and I redeployed it for you." → green "✓ LIVE" + toast → face in hand under the CTRL+Z title,
+  ends ~1.7 s later.
+- **Fixed during review**: empty first 0.3 s (fall started too high), tiny hops in a wide two-shot, pointing
+  foreshortened toward the lens, head cropped in the carry shot, facepalm not reaching the face standing (shared
+  gesture is tuned for seated), notification pings on words, three hits 6–8 dB over the voices, −18 LUFS loudness,
+  end title covering the payoff face, duplicated popup on the giant screen.
+- **Known limits**: free-plan voices (non-commercial; credit elevenlabs.io); 1–2/255 render-order noise on ≤90 px of
+  translucent dust/puff pixels (verified harmless).
+
 ## Resume here (next session)
 1. Write THIRD_PARTY_NOTICES.md (Remocn / Onda pattern credit, Kenney CC0 once sounds are added).
 2. Render-check the new fx/components in stills (not yet seen in a render): `stills ctrl-z --guides`, `stills --verify`.

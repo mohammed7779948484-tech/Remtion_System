@@ -28,7 +28,7 @@ export type RecipeHost = {
   /** How to press "item.anchor" (props cue builder + key travel), or null if it isn't pressable. */
   pressable: (ref: string) => { item: string; set: (down: boolean) => Record<string, unknown>; travel: number } | null;
   addProp: (at: number, item: string, set: Record<string, unknown>) => void;
-  addSfx: (at: number, sound: string) => void;
+  addSfx: (at: number, sound: string, volume?: number) => void;
   addItem: (item: SetItem) => void;
   error: (msg: string) => void;
 };
@@ -138,7 +138,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
           if (standing) h.apply({ at: contact + a.duration, move: { to: [px, py, pz], duration: 0.1, face: "keep" } });
         }
       }
-      if (a.sound) h.addSfx(contact, a.sound);
+      if (a.sound) h.addSfx(contact, a.sound, a.volume);
       return contact + (a.duration ?? 0.3);
     }
 
@@ -148,9 +148,14 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       if (!point) return t;
       const hold = a.duration ?? 1.2;
       h.apply({ at: t, look: point, transition: 0.2 });
-      const r = reachAt(h, t, point);
+      // Point near shoulder height: an arm aimed steeply at something low just looks like it's hanging.
+      const b = baseAt(h.ra, def, t);
+      const chest = b.anchors.chest ?? b.placement.position;
+      const dist = Math.hypot(point[0] - chest[0], point[2] - chest[2]);
+      const aim: Vec3 = [point[0], Math.max(point[1], chest[1] - 0.35 * dist), point[2]];
+      const r = reachAt(h, t, aim);
       if (r) h.apply({ at: t, joints: r.set, duration: hold, transition: 0.22 });
-      if (a.sound) h.addSfx(t, a.sound);
+      if (a.sound) h.addSfx(t, a.sound, a.volume);
       return t + hold;
     }
 
@@ -181,7 +186,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       h.apply({ at: contact, hold: { [socket]: item } });
       if (low && g.crouchPose) h.apply({ at: contact + 0.15, pose: before, transition: 0.35 });
       h.apply({ at: contact + 0.3, look: null, transition: 0.3 });
-      if (a.sound) h.addSfx(contact, a.sound);
+      if (a.sound) h.addSfx(contact, a.sound, a.volume);
       return contact + 0.5;
     }
 
@@ -214,7 +219,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       h.addProp(contact, copyId, { visible: true });
       if (original) h.addProp(contact, item, { visible: false });
       if (weight) h.addProp(contact + 0.05, press!.item, press!.set(true));
-      if (a.sound) h.addSfx(contact, a.sound);
+      if (a.sound) h.addSfx(contact, a.sound, a.volume);
       return contact + 0.5;
     }
 
@@ -222,7 +227,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const flinch = g.flinch ?? "flinch";
       if (!def.gestures[flinch]) return h.error(`${h.where}: ${def.id} has no "${flinch}" gesture for react`), t;
       h.apply({ at: t, gesture: flinch, intensity: a.intensity, ...(a.emotion ? {} : def.emotions.shocked ? { emotion: "shocked" } : {}), ...(a.target !== undefined ? { look: a.target } : {}) });
-      if (a.sound) h.addSfx(t, a.sound);
+      if (a.sound) h.addSfx(t, a.sound, a.volume);
       return t + def.gestures[flinch].duration;
     }
 

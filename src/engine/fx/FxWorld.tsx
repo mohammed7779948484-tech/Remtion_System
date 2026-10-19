@@ -42,9 +42,9 @@ const Impact: React.FC<{ fx: ResolvedFx }> = ({ fx }) => {
         );
       })}
       {/* dust puff */}
-      <mesh position={[0, 0.12 + u * 0.25, 0]} scale={0.25 + u * 1.1}>
+      <mesh position={[0, 0.08 + u * 0.12, 0]} scale={[0.2 + u * 0.75, 0.08 + u * 0.22, 0.2 + u * 0.75]}>
         <icosahedronGeometry args={[1, 1]} />
-        <meshStandardMaterial color={color} transparent opacity={0.45 * (1 - u)} depthWrite={false} roughness={1} flatShading />
+        <meshStandardMaterial color={color} transparent opacity={0.3 * (1 - u) ** 1.5} depthWrite={false} roughness={1} flatShading />
       </mesh>
       {/* ground ring */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]} scale={0.3 + u * 2.2}>

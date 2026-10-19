@@ -703,6 +703,10 @@
           "sound": {
             "type": "string"
           },
+          "volume": {
+            "type": "number",
+            "minimum": 0
+          },
           "rotation": {
             "type": "number"
           }

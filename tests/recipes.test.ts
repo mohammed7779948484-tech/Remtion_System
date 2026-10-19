@@ -105,3 +105,27 @@ describe("recipes", () => {
     expect(shuffled).toEqual(seq);
   });
 });
+
+describe("recipes in a seated scene", () => {
+  it("a seated actor picks something off the desk without crouching", () => {
+    const r = resolveEpisode(
+      {
+        id: "seat",
+        title: "seat",
+        set: { environment: "dev-office" },
+        cast: { rayan: { actor: "rayan", at: "chair-seat", pose: "sit_idle" } },
+        actions: [{ at: 1, actor: "rayan", do: "pick-up", item: "mug" }],
+        camera: [{ at: 0, shot: "establishing" }],
+      },
+      null,
+    );
+    const rayan = r.actors[0];
+    expect(rayan.poses.map((p) => p.pose)).toEqual(["sit_idle"]);
+    expect(rayan.holds.find((h) => h.item === "mug")).toBeDefined();
+  });
+
+  it("unknown code languages warn instead of crashing", () => {
+    const r = resolveEpisode({ id: "l", title: "l", set: { environment: "dev-office", params: { "monitor-main": { screen: { preset: "code", lang: "rust", code: "fn main() {}" } } } }, cast: { rayan: { actor: "rayan" } }, camera: [{ at: 0, shot: "establishing" }] }, null);
+    expect(r.warnings.join("\n")).toMatch(/lang "rust" isn't highlighted/);
+  });
+});

@@ -95,6 +95,15 @@ const approach = (h: RecipeHost, t: number, point: Vec3, reach: number): number 
   return t + duration + 0.05;
 };
 
+/**
+ * Whether reaching `y` needs a crouch: measured from the chest, not the floor, so a seated actor grabbing
+ * something off the desk stays seated while a standing one squats for things near its feet.
+ */
+const isLow = (h: RecipeHost, at: number, y: number) => {
+  const b = baseAt(h.ra, h.def, at);
+  return y < (b.anchors.chest?.[1] ?? b.placement.position[1] + 1) - 0.45 * h.ra.scale;
+};
+
 const poseAt = (ra: ResolvedActor, def: ActorDefinition, t: number) => sorted(ra.poses).filter((p) => p.at <= t).at(-1)?.pose ?? def.defaultPose;
 const heldAt = (ra: ResolvedActor, socket: string, t: number) => sorted(ra.holds).filter((x) => x.at <= t && x.socket === socket).at(-1)?.item ?? null;
 
@@ -176,7 +185,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       }
       const tA = approach(h, t, center, humanoidReach);
       const before = poseAt(h.ra, def, tA);
-      const low = grip[1] - baseAt(h.ra, def, tA).placement.position[1] < 0.9 * scale;
+      const low = isLow(h, tA, grip[1]);
       h.apply({ at: tA, look: grip, transition: 0.2 });
       if (low && g.crouchPose) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32 });
       const r = reachAt(h, tA + 0.32, grip, a.hand === "handL" ? "L" : a.hand === "handR" ? "R" : undefined);
@@ -203,7 +212,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const rest: Vec3 = [point[0], point[1] - (weight ? press!.travel : 0), point[2]];
       const tA = approach(h, t, point, handSockets(def).length ? humanoidReach : 0.2 * scale);
       const before = poseAt(h.ra, def, tA);
-      const low = point[1] - baseAt(h.ra, def, tA).placement.position[1] < 0.9 * scale;
+      const low = isLow(h, tA, point[1]);
       h.apply({ at: tA, look: point, transition: 0.2 });
       if (low && g.crouchPose && handSockets(def).length) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32 });
       const r = handSockets(def).includes(socket) ? reachAt(h, tA + 0.32, [point[0], point[1] + 0.12, point[2]], socket === "handL" ? "L" : "R") : null;

@@ -8,6 +8,8 @@ import tsLang from "shiki/langs/typescript.mjs";
 import pyLang from "shiki/langs/python.mjs";
 import bashLang from "shiki/langs/bash.mjs";
 import jsonLang from "shiki/langs/json.mjs";
+import cssLang from "shiki/langs/css.mjs";
+import htmlLang from "shiki/langs/html.mjs";
 import darkTheme from "shiki/themes/github-dark.mjs";
 import { FONTS } from "../fonts";
 import { clamp01 } from "../core/time";
@@ -21,7 +23,7 @@ export type ScreenContent = { preset: string } & Record<string, unknown>;
 
 const highlighter = createHighlighterCoreSync({
   themes: [darkTheme],
-  langs: [tsLang, pyLang, bashLang, jsonLang],
+  langs: [tsLang, pyLang, bashLang, jsonLang, cssLang, htmlLang],
   engine: createJavaScriptRegexEngine(),
 });
 const tokenCache = new Map<string, { content: string; color?: string }[][]>();
@@ -29,7 +31,10 @@ const tokensFor = (code: string, lang: string) => {
   const key = `${lang}\u0000${code}`;
   let tokens = tokenCache.get(key);
   if (!tokens) {
-    tokens = highlighter.codeToTokensBase(code, { lang: lang as "typescript", theme: "github-dark" });
+    // Unknown languages render as plain text instead of crashing the render (validate warns about them).
+    tokens = (highlighter.getLoadedLanguages() as string[]).includes(lang)
+      ? highlighter.codeToTokensBase(code, { lang: lang as "typescript", theme: "github-dark" })
+      : code.split("\n").map((line) => [{ content: line }]);
     tokenCache.set(key, tokens);
   }
   return tokens;

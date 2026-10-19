@@ -95,9 +95,9 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | 0 Safety + baseline | ✅ done | key moved to ignored `.env` (never printed); `.env.example` restored + `tests/secrets.test.ts`; exposure scan: 0/6 commits, nothing staged, no other files (key appeared only in a local session log → rotation recommended, low urgency). Baseline stills in `out/baseline/`. |
 | 1 V1 defect fixes | ✅ done | 11 confirmed defects fixed; each new regression test failed on the old code. 86 tests. Stills vs baseline: video 1 12/12 byte-identical; video 2 3/8 identical, others max diff 4/255 on ~0.001% of pixels (≈26 px, the known translucent-holo GPU noise) — harmless. |
 | 2 Eleven v4 live | ✅ done | live smoke test passed on the free plan (23 credits, 9,977 left). See log. |
-| 3 Showcase slice | ⏳ in progress | done: brief-first scaffolding, micro-keyboard world, recipes, fx engine, AppWindow + KineticText, screen popup/window preset. Left: see "Resume here". |
-| 4 Regressions | ⏳ | |
-| 5 Docs + skill | ⏳ | |
+| 3 Showcase slice | ✅ done | `videos/ctrl-z` (9:16, 31.3 s, Eleven v4, CC0 sfx, mastered −14.4 LUFS); editorial review below. |
+| 4 Regressions | ✅ done | 111 tests, tsc clean; both originals validate; stills vs baseline: video 1 12/12 byte-identical, video 2 4/8 identical + 4 frames ≤4/255 on ≤89 px (known holo GPU noise); both MP4s re-rendered (30.4 s 16:9, 28.7 s 9:16, audio present) and reviewed. |
+| 5 Docs + skill | ⏳ in progress | make-episode skill written; fresh-agent eval (2 prompts × with/without skill) running. |
 
 ## V2 log
 - Voice cost safety: ElevenLabs runs only with explicit `--provider elevenlabs` (a key alone never switches; an
@@ -173,3 +173,5 @@ Method: watched by frame sheets from the real MP4 (`review` sheet: every shot + 
 5. Second usage of AppWindow/KineticText outside ctrl-z (prove reuse); tests for fx resolution.
 6. Voice ctrl-z with `--provider elevenlabs` (~200 credits), validate, render, editorial review in this file.
 7. Phase 4 regressions (both videos: stills vs out/baseline, re-render), Phase 5 docs + make-episode skill + eval.
+- Phase 4 note: `review` on the untouched V1 videos shows their original mix (−16.8 / −17.3 LUFS, hot peaks,
+  meme sounds on words in launch-promo by design). Not regressions; `render <slug> --master` would normalise them.

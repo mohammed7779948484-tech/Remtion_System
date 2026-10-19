@@ -55,6 +55,7 @@ Lines can only reference earlier lines. A pause between words is the right spot 
 { "at": 8, "actor": "rayan", "hold": { "handR": "mug" } }
 ```
 `look`: actor (`"claude"`, `"claude.face"`), item (`"keyboard.key:ctrl"`), mark, `[x,y,z]`, `"camera"`, `null`.
+`turn`: degrees or a place/actor — not `"camera"` (use `look: "camera"` to face the lens).
 A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
 
 ## 5. Recipes (`do`)
@@ -103,6 +104,7 @@ Text styles: `pop` (word by word), `stagger`, `slam`, `type`; `position`: `top` 
 ]
 ```
 Screen presets: `code`, `terminal`, `error`, `deploy`, `window`, `off` (+ `popup` on any). `show screen <id>`.
+`code` highlights `lang`: typescript, python, bash, json, css, html (anything else shows as plain text).
 
 ## 8. Set overrides
 ```json
@@ -129,7 +131,8 @@ giant_keyboard` lists `key:<id>` anchors (y 0.42; pressed keys sink 0.18).
 { "at": 27, "shot": "close", "subject": "rayan", "angle": -15, "move": { "type": "push-in", "amount": 0.15 } }
 ```
 `angle` is degrees around the subject from its facing (+ = its left). Authored values are used exactly; solver
-warnings in `validate` mean a blocked or out-of-frame shot.
+warnings in `validate` mean a blocked or out-of-frame shot. In `dev-office` the monitors block many angles on the seated
+actor — try a few (`validate` is instant) before rendering stills. Close shots of the desk mascot work best from the front.
 
 ## 10. Sound
 ```json

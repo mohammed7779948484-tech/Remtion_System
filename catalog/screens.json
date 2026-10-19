@@ -3,7 +3,7 @@
     "description": "Code editor that types itself out (syntax highlighted).",
     "params": {
       "code": "source text",
-      "lang": "typescript|python|bash|json",
+      "lang": "typescript|python|bash|json|css|html",
       "title": "tab title",
       "speed": "chars per second (default 30; 0 = show all)",
       "fontSize": "px at 1024-wide canvas (default 30)"

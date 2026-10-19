@@ -6,7 +6,7 @@ export type ScreenMeta = { description: string; params: Record<string, string>; 
 export const SCREEN_META: Record<string, ScreenMeta> = {
   code: {
     description: "Code editor that types itself out (syntax highlighted).",
-    params: { code: "source text", lang: "typescript|python|bash|json", title: "tab title", speed: "chars per second (default 30; 0 = show all)", fontSize: "px at 1024-wide canvas (default 30)" },
+    params: { code: "source text", lang: "typescript|python|bash|json|css|html", title: "tab title", speed: "chars per second (default 30; 0 = show all)", fontSize: "px at 1024-wide canvas (default 30)" },
     glow: "#6ea8ff",
   },
   terminal: {
@@ -37,6 +37,9 @@ export const SCREEN_META: Record<string, ScreenMeta> = {
 };
 
 /** Params every preset accepts (drawn by ScreenSurface on top of any preset). */
+/** Languages the `code` preset highlights (others render as plain text). */
+export const CODE_LANGS = ["typescript", "python", "bash", "json", "css", "html"];
+
 export const COMMON_SCREEN_PARAMS: Record<string, string> = {
   preset: "preset name",
   popup: "{ kind: dialog|notification, title, message, icon, buttons, theme, accent } drawn over the content when this screen value is set",

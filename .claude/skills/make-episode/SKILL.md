@@ -18,7 +18,7 @@ Work in this order. Each step has a cheap check, so problems surface before the 
 npm run cli -- new <slug> [--env dev-office|micro-keyboard|custom] [--title "..."]   # 9:16 by default
 ```
 
-`new` scaffolds the folder, registers it, and writes a BRIEF.md template. Fill it in **before** directing:
+`new` scaffolds the folder, registers it in `videos/registry.ts` (that edit is expected), and writes a BRIEF.md template. Fill it in **before** directing:
 concept in one line, the hook (what happens in the first 1–2 s), beats (setup → escalation → payoff), who does
 what, setting, sound plan, what you reuse, what you must build. Keep it short and editable — it is the north
 star for every later decision, not a form. Read `references/creative-direction.md` for hooks, comedic timing,
@@ -78,6 +78,9 @@ npm run cli -- voice <slug> --provider elevenlabs    # paid, Eleven v4 (~1 credi
 ```
 
 Draft with offline voices; switch to ElevenLabs once the script is locked (it prints the character count first).
+Offline (SAPI) clips leave ~0.7 s of silence after each line, so drafts run long and captions linger: time the next
+beat off the last spoken word (`"l2.word:5.end+0.2"`) rather than `"l2.end"`, and keep `gap`s small. That timing
+also survives the switch to v4, whose clips are tighter.
 Inline tags like `[sighs]`, `[panicked]`, `[proudly]` are performed by v4 and stripped from captions and word refs.
 Unchanged lines are cached, so editing one line only re-buys that line. Free-plan clips are non-commercial and the
 post title must credit "elevenlabs.io" — `validate` reminds you; mention it in your report.

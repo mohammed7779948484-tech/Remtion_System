@@ -9,7 +9,7 @@ import { MOODS, type MoodCue, type MoodRef } from "../lighting/moods";
 import { ENVIRONMENTS } from "../world/environments";
 import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropCue, type SetOverrides } from "../world/layout";
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
-import { COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
+import { CODE_LANGS, COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
 import { SFX_INFO } from "../audio/sfx.data";
 import { FX_INFO, type ResolvedFx } from "./fx";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
@@ -574,6 +574,7 @@ const checkItemParams = (kind: string, params: Record<string, unknown>, where: s
       warnings.push(`${where}: unknown screen preset "${preset}" (renders "off"; has: ${[...Object.keys(SCREEN_META), ...customScreens].join(", ")})`);
       continue;
     }
+    if (preset === "code" && typeof screen.lang === "string" && !CODE_LANGS.includes(screen.lang)) warnings.push(`${where}: code screen lang "${screen.lang}" isn't highlighted (has: ${CODE_LANGS.join(", ")}); it shows as plain text`);
     for (const key of Object.keys(screen)) if (!sm.params[key] && !COMMON_SCREEN_PARAMS[key]) warnings.push(`${where}: screen preset "${preset}" has no param "${key}" (has: ${Object.keys(sm.params).join(", ")})`);
   }
 };

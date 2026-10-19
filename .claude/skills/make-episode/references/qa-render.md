@@ -32,6 +32,8 @@ something depends on render order (state, `Math.random`, async content) — fix 
 | Screen text too small on a phone | repeat it in a `window` or `text` accent |
 | UI ping lands on a word | put it in a pause: `"lN.word:K.end+0.03"` |
 | Hit much louder than voices (`review` ⚠) | `volume` 0.4–0.6 on that sound / recipe |
+| Drafts run long / captions linger after lines | offline voices trail ~0.7 s of silence: time beats off `lN.word:K.end`, small `gap`s |
+| Overlapping lines (negative gaps) hide caption words | don't overlap one speaker's lines; start the next line in the trailing silence instead |
 
 ## render
 - `render <slug>` — final: refuses unvoiced/stale dialogue and missing files (also enforced inside plain

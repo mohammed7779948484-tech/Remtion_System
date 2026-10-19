@@ -31,7 +31,12 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
             "voice": { "system": "Microsoft Zira Desktop", "pitch": "+30%", "rate": 1, "elevenlabs": { "voiceId": "cgSgspJ2msm6clMCkdW9" } } }
 ```
 - `at`: a mark (`show environment <id>` lists them), an item id, or `[x, y, z]` (y > 0 to stand on things).
-- Mascot scale: ~1.5 on a desk, ~2 on giant keys next to Rayan, ~4 standing beside him on the floor.
+- Environments (`set.environment`): `dev-office` (desk, monitors, lamp: `chair-seat`, `desk-mascot`, `beside-desk`),
+  `micro-keyboard` (giant laptop, stand on keys: `on-g`, `on-h`, `on-enter`…), `floating-space` (two floating islands
+  + a hard-light bridge in a starfield, mood `space-cool`: `stand-left`, `stand-right`, `stand-center`, `on-bridge`,
+  `far-spot`, `far-spot-2`, `drop-in`; walk `stand-right` → `far-spot` and the straight path follows the bridge;
+  spots `establishing`, `wide`, `hero-low`, `high`, `along-bridge`). Anything else: `new --env custom` (section 12).
+- Mascot scale: ~1.5 on a desk, ~2 on giant keys next to Rayan, ~4 standing beside him on the floor or an island.
 - Voice ids: `voice --check` lists the ones this key can use (Liam `TX3LPaxmHKxFdv7VOQHJ` = young male creator,
   Jessica `cgSgspJ2msm6clMCkdW9` = cute/playful, Will `bIHbv24MWmeRgasZH58o`, Laura `FGY2WhTYpPnrIDTdsKH5`).
 

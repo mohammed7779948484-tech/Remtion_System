@@ -167,7 +167,9 @@ export const itemWorld = (layout: Layout, id: string): { position: Vec3; yaw: nu
 export const itemAnchor = (layout: Layout, id: string, anchor: string): Vec3 => {
   const it = layout.items.find((i) => i.id === id);
   if (!it) throw new Error(`Unknown set item "${id}"`);
-  const local = PROPS[it.kind]?.anchors[anchor] ?? [0, (it.size ?? PROPS[it.kind]?.size ?? [0, 0, 0])[1] / 2, 0];
+  const meta = PROPS[it.kind];
+  const half = (it.size ?? meta?.size ?? [0, 0, 0])[1] / 2;
+  const local = meta?.anchors[anchor] ?? [0, meta?.origin === "top" ? -half : half, 0];
   const w = itemWorld(layout, id);
   const c = Math.cos(w.yaw);
   const s = Math.sin(w.yaw);
@@ -193,7 +195,9 @@ export const occluders = (layout: Layout, hidden: Set<string> = new Set()): Box[
     if (!size) continue;
     const w = itemWorld(layout, it.id);
     const [sx, sy, sz] = size.map((v) => v * w.scale);
-    boxes.push({ id: it.id, center: [w.position[0], w.position[1] + sy / 2, w.position[2]], half: [sx / 2, sy / 2, sz / 2], yaw: w.yaw });
+    // Most props stand on their origin; "top"-origin ones (floating islands) hang below it.
+    const cy = meta?.origin === "top" ? w.position[1] - sy / 2 : w.position[1] + sy / 2;
+    boxes.push({ id: it.id, center: [w.position[0], cy, w.position[2]], half: [sx / 2, sy / 2, sz / 2], yaw: w.yaw });
   }
   return boxes;
 };

@@ -13,7 +13,7 @@ repo are made with this engine, not with other video frameworks.
 ```
 npm run cli -- list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos]
 npm run cli -- show actor rayan            # or: prop giant_keyboard | environment micro-keyboard | mood macro-warm | screen window | fx callout | sfx key-slam
-npm run cli -- new <slug> [--env dev-office|micro-keyboard|custom] [--preset portrait] [--title "..."]   # writes BRIEF.md; 9:16 default
+npm run cli -- new <slug> [--env dev-office|micro-keyboard|floating-space|custom] [--preset portrait] [--title "..."]   # writes BRIEF.md; 9:16 default
 npm run cli -- voice <slug>                          # free offline voices (drafts)
 npm run cli -- voice --check                         # free: ElevenLabs plan, credits, models, voices
 npm run cli -- voice <slug> --provider elevenlabs    # paid (Eleven v4); never implied by a key in .env
@@ -57,6 +57,9 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
 - Seated actors need seated poses (`sit_idle`, `sit_typing`, `sit_explaining`, `sit_arms_crossed`); standing
   poses bring standing legs. The stock `facepalm` gesture stops at chest height; for a palm on the face use the
   `do: "facepalm"` recipe (seated or standing). `do: "sip"` brings a held mug to the mouth.
+- Scene presets: `dev-office` (desk set), `micro-keyboard` (giant laptop), `floating-space` (two rock islands joined
+  by a light bridge in a starfield: stand on `stand-left`/`stand-right`, walk `stand-right` → `far-spot` across the
+  bridge; island tops are at y = 0, no ground below), or `new --env custom` for a place of your own.
 - In `dev-office` the monitors sit at the seated actor's left and the mascot spot at their right: front-ish
   angles see faces; strong side angles get blocked (validate will tell you).
 - The Claude mascot is ~0.27 m at scale 1; use `scale` 1.5–1.8 on a desk, ~2 on giant keys, ~4 standing next to Rayan.

@@ -190,6 +190,12 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - `micro-keyboard` environment: the world is a laptop scaled ~50× (keys 0.95 m, tops at 0.42 m), actors stay
   real size. `giant_keyboard` keys press via props cues `{ "keys": { "ctrl": true } }` or the `press` recipe;
   anchors `key:<id>`; marks `on-<key>` and `drop-enter`. Environments may set `shadowRadius` for big sets.
+- `floating-space` environment (`world/floating-space/`): `shell.floor: "none"`; two `floating_island`s (tops at
+  y = 0, sized by item `scale`) joined by a `light_bridge`, a `starfield` (procedural nebula dome, 54 m, + twinkling
+  stars), a ringed `planet`, decorative bobbing islands and `space_rocks`; mood `space-cool`, `shadowRadius` 8.
+  Marks `stand-left`, `stand-right`, `stand-center`, `on-bridge`, `far-spot`, `far-spot-2`, `drop-in`; spots
+  `establishing`, `wide`, `hero-low`, `high`, `along-bridge` (framed for 9:16). Props with `origin: "top"` in the
+  catalog (islands, bridge) are positioned by their top surface and their occluder box hangs below it.
 - Moods (`lighting/moods.ts`): data for key/fill/rim/ambient/hemi/fog/background/exposure/bloom/practicals,
   plus optional `pulse`. Inline moods: `{ "base": "late-night", "bloom": 1.2, … }`.
 

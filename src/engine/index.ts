@@ -39,6 +39,8 @@ export { ScreenSurface, SCREEN_PRESETS, type DrawFn, type DrawContext, type Scre
 export { ENVIRONMENTS } from "./world/environments";
 export { KEYS, KEY_PITCH, KEY_TOP, KEY_TRAVEL, keyTop } from "./world/micro-keyboard/keys";
 export { GiantKeyboard, GiantScreen, RubberDuck, DustMotes, keyStates, keyTravel } from "./world/micro-keyboard/MicroKeyboard";
+export { ISLAND_DEPTH, ISLAND_INNER, SKY_RADIUS, bridgeBetween } from "./world/floating-space/space";
+export { FloatingIsland, LightBridge, Starfield, Planet, SpaceRocks } from "./world/floating-space/FloatingSpace";
 export * from "./world/layout";
 
 // Camera, lighting, post

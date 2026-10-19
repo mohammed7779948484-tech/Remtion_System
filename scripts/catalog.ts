@@ -47,7 +47,7 @@ export const buildCatalog = (): Record<string, unknown> => {
       description: env.description,
       defaultMood: env.defaultMood,
       shell: env.shell,
-      items: env.items.map((i) => ({ id: i.id, kind: i.kind, position: i.position, rotation: i.rotation ?? 0, ...(i.on ? { on: i.on } : {}), ...(i.params ? { params: i.params } : {}) })),
+      items: env.items.map((i) => ({ id: i.id, kind: i.kind, position: i.position, rotation: i.rotation ?? 0, ...(i.scale !== undefined ? { scale: i.scale } : {}), ...(i.on ? { on: i.on } : {}), ...(i.params ? { params: i.params } : {}) })),
       marks: env.marks,
       cameras: env.cameras,
       bounds: env.bounds,

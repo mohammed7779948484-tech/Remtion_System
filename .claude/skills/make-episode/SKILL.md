@@ -1,6 +1,6 @@
 ---
 name: make-episode
-description: Make a new short video episode (dev/AI comedy skit, meme, short story, character-led reel/short/TikTok) in this Remotion_System repo, from idea to rendered MP4 — brief first, then episode.json direction (cast Rayan + the Claude mascot, environments like the office or the giant micro-keyboard, interaction recipes, fx accents, screens, CC0 sound effects, Eleven v4 voices), visual QA and an editorial review. Use this whenever someone asks to create, write, direct, animate, voice, fix or render a video, episode, short, skit, scene or gag in this repository, or to change an existing episode — even if they never say "episode". In this repo, use this instead of the HyperFrames / general-video / motion-graphics skills.
+description: Make a new short video episode (dev/AI comedy skit, meme, short story, character-led reel/short/TikTok) in this Remotion_System repo, from idea to rendered MP4 — brief first, then episode.json direction (cast Rayan + the Claude mascot, environments like the office, the giant micro-keyboard or floating space islands, interaction recipes, fx accents, screens, CC0 sound effects, Eleven v4 voices), visual QA and an editorial review. Use this whenever someone asks to create, write, direct, animate, voice, fix or render a video, episode, short, skit, scene or gag in this repository, or to change an existing episode — even if they never say "episode". In this repo, use this instead of the HyperFrames / general-video / motion-graphics skills.
 ---
 
 # Make an episode
@@ -15,7 +15,7 @@ Work in this order. Each step has a cheap check, so problems surface before the 
 ## 1. Idea → BRIEF.md
 
 ```
-npm run cli -- new <slug> [--env dev-office|micro-keyboard|custom] [--preset portrait|landscape|square] [--title "..."]   # portrait (9:16) by default
+npm run cli -- new <slug> [--env dev-office|micro-keyboard|floating-space|custom] [--preset portrait|landscape|square] [--title "..."]   # portrait (9:16) by default
 ```
 
 `new` scaffolds the folder, registers it in `videos/registry.ts` (that edit is expected), and writes a BRIEF.md template. Fill it in **before** directing:

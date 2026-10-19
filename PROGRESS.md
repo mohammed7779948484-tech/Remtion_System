@@ -97,7 +97,7 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | 2 Eleven v4 live | ✅ done | live smoke test passed on the free plan (23 credits, 9,977 left). See log. |
 | 3 Showcase slice | ✅ done | `videos/ctrl-z` (9:16, 31.3 s, Eleven v4, CC0 sfx, mastered −14.4 LUFS); editorial review below. |
 | 4 Regressions | ✅ done | 111 tests, tsc clean; both originals validate; stills vs baseline: video 1 12/12 byte-identical, video 2 4/8 identical + 4 frames ≤4/255 on ≤89 px (known holo GPU noise); both MP4s re-rendered (30.4 s 16:9, 28.7 s 9:16, audio present) and reviewed. |
-| 5 Docs + skill | ⏳ in progress | make-episode skill written; fresh-agent eval (2 prompts × with/without skill) running. |
+| 5 Docs + skill | ✅ done | `.claude/skills/make-episode/` (skill-creator), `CLAUDE.md` → `@AGENTS.md` + skill pointer; 2 eval rounds with fresh agents; feedback applied (log below). 118 tests, tsc clean. |
 
 ## V2 log
 - Voice cost safety: ElevenLabs runs only with explicit `--provider elevenlabs` (a key alone never switches; an
@@ -163,15 +163,33 @@ Method: watched by frame sheets from the real MP4 (`review` sheet: every shot + 
 - **Known limits**: free-plan voices (non-commercial; credit elevenlabs.io); 1–2/255 render-order noise on ≤90 px of
   translucent dust/puff pixels (verified harmless).
 
-## Resume here (next session)
-1. Write THIRD_PARTY_NOTICES.md (Remocn / Onda pattern credit, Kenney CC0 once sounds are added).
-2. Render-check the new fx/components in stills (not yet seen in a render): `stills ctrl-z --guides`, `stills --verify`.
-3. Upgrade ctrl-z/episode.json to use recipes + fx (fixes found in the draft: land Rayan earlier in shot 1;
-   replace the overhead run shot with a shot along the keyboard; use `window` fx for the undo-failed popup
-   (phone-readable); `place` hides the original duck; tighter final two-shot; brighten Claude's face).
-4. SFX kit: Kenney CC0 files into public/sfx/ + SFX_LIBRARY metadata (license/source); mark remote meme sounds unknown.
-5. Second usage of AppWindow/KineticText outside ctrl-z (prove reuse); tests for fx resolution.
-6. Voice ctrl-z with `--provider elevenlabs` (~200 credits), validate, render, editorial review in this file.
-7. Phase 4 regressions (both videos: stills vs out/baseline, re-render), Phase 5 docs + make-episode skill + eval.
-- Phase 4 note: `review` on the untouched V1 videos shows their original mix (−16.8 / −17.3 LUFS, hot peaks,
-  meme sounds on words in launch-promo by design). Not regressions; `render <slug> --master` would normalise them.
+## Phase 5 — make-episode skill and fresh-agent evals (2026-10-19)
+- Skill created with skill-creator: `SKILL.md` (brief → discover → direct → custom code → voices → check → render +
+  review) and references `creative-direction.md`, `direction-cookbook.md`, `qa-render.md`; `evals/evals.json` holds
+  the two prompts and their assertions. `CLAUDE.md` imports `AGENTS.md` (one copy of the rules) and routes video
+  requests to the skill rather than the global HyperFrames/video skills.
+- Method: one fresh agent per prompt × {with skill, without skill}, each in its own git worktree (offline voices, no
+  credits), graded by `grade.mjs` plus reading their BRIEF/episode/contact sheets. Workspace (gitignored):
+  `.claude/skills/make-episode-workspace/`; viewer `out/skill-eval/review.html`.
+- Round 1 was invalid for the cloud-stage prompt (worktrees cut from `main`, without V2); its findings were still fixed
+  (commit c255a4b). Round 2 (worktrees on `v2`): with skill 24/24 assertions, without skill 23/24 (the baseline
+  skipped the `sit-down` recipe). The objective assertions barely separate the two because AGENTS.md is already
+  strong; the qualitative difference was in the briefs, hooks and QA loop. Both with-skill episodes were good; the
+  office-css run reused `AppWindow` through `fx window` — the second real usage of the component.
+- Round 2 feedback → fixes (commit 49247ba): `facepalm` and `sip` recipes (via the actor's `selfReach`, seated or
+  standing; the mascot gets tired + head shake); stationary pick-up/place turn back; `validate` warns when a shot sees
+  the back of its subject; same-speaker overlap ignores trailing silence; `shell.floor: "none"`; `stills --frames`
+  writes `contact-frames.png`; `--verify` prints max difference and pixel count; `new` template opens on a close-up.
+  Docs now state camera `angle`/`offset` semantics, custom-location facts (floor, shadowRadius, far plane 80 m,
+  anchors from `size`, `useEvent`), walk-in-and-sit, SAPI rate/pauses; the wrong AGENTS.md facepalm gotcha is fixed.
+- Check after the fixes: 118 tests, tsc clean, catalog regenerated; ctrl-z, it-works-on-my-machine and launch-promo
+  validate with the same warnings as before, and their resolved episodes are byte-identical to the previous commit
+  (render code for them is unchanged), so no re-render was needed.
+
+## Next steps
+- Rotate the ElevenLabs key (it appeared once in a local session log; never committed).
+- Before monetizing: voice with a paid plan (free-plan clips stay non-commercial) and replace the remote meme sounds
+  in the two V1 videos with kit sounds (`validate` lists them).
+- Deferred from the plan: `floating-space` preset (`new --env custom` covers new worlds today), a 3D chat screen,
+  music ducking.
+- Optional: `render --master` the two V1 videos (−16.8 / −17.3 LUFS as originally mixed).

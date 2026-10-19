@@ -187,6 +187,7 @@ Facts you'd otherwise dig out of engine source:
   const engine = (p: string) => import(pathToFileURL(path.resolve("src/engine", p)).href); // cwd = repo root
   const { rayanDef } = await engine("actors/rayan/rayan.data.ts");
   const { restChannels } = await engine("actors/rig.ts");
+  // Standing example; for a seated actor use rayanDef.poses.sit_idle.set here.
   const c = { ...restChannels(rayanDef), ...rayanDef.poses.stand_idle.set, "torso.x": 0.2, "head.x": 0.45 };
   const face = rayanDef.anchors(c).face;                       // anchors: feet waist chest head face top
   const r = rayanDef.reach!(c, [face[0] - 0.11, face[1] - 0.07, face[2] - 0.06], "R");

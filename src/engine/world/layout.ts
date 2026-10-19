@@ -95,7 +95,7 @@ export const resolveLayout = (env: EnvironmentDef, o: SetOverrides = {}, problem
       issues.push(`set.add: item "${add.id}" already exists`);
       continue;
     }
-    items.push({ ...add, params: { ...(add.params ?? {}), ...(o.params?.[add.id] ?? {}) } });
+    items.push({ ...add, ...(o.move?.[add.id] ?? {}), params: { ...(add.params ?? {}), ...(o.params?.[add.id] ?? {}) } });
   }
 
   // Parents must exist and must not loop.

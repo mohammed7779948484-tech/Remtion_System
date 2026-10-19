@@ -28,7 +28,7 @@ for (const slug of process.argv.slice(2)) {
     }
     const psnr = spawnSync("ffmpeg", ["-hide_banner", "-i", path.join(a, f), "-i", fb, "-lavfi", "psnr", "-f", "null", "-"], { encoding: "utf8" }).stderr.match(/average:([\w.]+)/)?.[1];
     // Count pixels whose max channel difference exceeds 3/255 (perceptible) via a thresholded difference image.
-    const diff = spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(a, f), "-i", fb, "-lavfi", "blend=all_mode=difference,format=gray,geq=lum='gt(lum(X,Y),3)*255',signalstats,metadata=print:key=lavfi.signalstats.YAVG", "-f", "null", "-"], { encoding: "utf8" }).stderr.match(/YAVG=([\d.]+)/)?.[1];
+    const diff = spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(a, f), "-i", fb, "-lavfi", "blend=all_mode=difference,format=gray,geq=lum='gt(lum(X,Y),3)*255',signalstats,metadata=mode=print:key=lavfi.signalstats.YAVG:file=-", "-f", "null", "-"], { encoding: "utf8" }).stdout.match(/YAVG=([\d.]+)/)?.[1];
     console.log(`  ${slug}/${f}: differs — PSNR ${psnr} dB, ${diff ? ((Number(diff) / 255) * 100).toFixed(4) : "?"}% of pixels differ by >3/255`);
   }
   console.log(`${slug}: ${same}/${files.length} byte-identical`);

@@ -15,7 +15,7 @@ Work in this order. Each step has a cheap check, so problems surface before the 
 ## 1. Idea → BRIEF.md
 
 ```
-npm run cli -- new <slug> [--env dev-office|micro-keyboard|custom] [--title "..."]   # 9:16 by default
+npm run cli -- new <slug> [--env dev-office|micro-keyboard|custom] [--preset portrait|landscape|square] [--title "..."]   # portrait (9:16) by default
 ```
 
 `new` scaffolds the folder, registers it in `videos/registry.ts` (that edit is expected), and writes a BRIEF.md template. Fill it in **before** directing:

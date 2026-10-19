@@ -31,6 +31,31 @@ describe("recipes", () => {
     expect(r.sfx.some((s) => Math.abs(s.at - contact) < 1e-6)).toBe(true);
   });
 
+  it("a typo in an item anchor is an error, not a silent press at the item centre", () => {
+    const err = (ep: object) => {
+      try {
+        resolveEpisode(ep, null);
+        return "";
+      } catch (e) {
+        return (e as Error).message;
+      }
+    };
+    expect(err(micro([{ at: 1, actor: "rayan", do: "press", target: "keyboard.key:entr" }]))).toMatch(/actions\[0\].*do:press: "keyboard" has no anchor "key:entr"/);
+    expect(err(micro([], { fx: [{ type: "impact", at: 1, on: "keyboard.key:entr" }] }))).toMatch(/fx\[0\] \(impact\): "keyboard" has no anchor "key:entr"/);
+    expect(err(micro([], { fx: [{ type: "impact", at: 1, on: "keyboard.center" }] }))).toBe("");
+  });
+
+  it("a bad generated sound names the action or fx it came from", () => {
+    try {
+      resolveEpisode(micro([{ at: 1, actor: "rayan", do: "press", target: "keyboard.key:z", sound: "nope" }], { fx: [{ type: "impact", at: 1, on: "keyboard.key:z", sound: "nada" }] }), null);
+      expect.unreachable();
+    } catch (e) {
+      const msg = (e as Error).message;
+      expect(msg).toMatch(/actions\[0\] \(rayan @ 1\.00s\) do:press: "nope" is not a library sound/);
+      expect(msg).toMatch(/fx\[0\] \(impact\): "nada" is not a library sound/);
+    }
+  });
+
   it("a weightless press hops but presses nothing (the mascot is too light)", () => {
     const r = resolveEpisode(micro([{ at: 1, actor: "claude", do: "press", target: "keyboard.key:ctrl", weight: false }]), null);
     expect(keyCues(r)).toEqual([]);

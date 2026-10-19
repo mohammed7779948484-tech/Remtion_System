@@ -398,7 +398,7 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
       .map((l) => l.id),
   );
   if (provider === "elevenlabs" && todo.size) {
-    if (!explicit) throw new Error(`${todo.size} line(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs (or --provider system for free offline voices).`);
+    if (!explicit) throw new Error(`${todo.size} line(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs. (--provider system re-voices ALL lines offline and discards the existing paid clips.)`);
     if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
     const chars = ep.dialogue.filter((l) => todo.has(l.id)).reduce((n, l) => n + l.text.length, 0);
     log(`  elevenlabs: ${todo.size} line(s), ${chars} characters to generate`);
@@ -444,6 +444,8 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
         log(`  ! sfx "${s.sound}" needs ElevenLabs to generate (prompt: ${s.prompt}); add the file manually or set a key`);
         continue;
       }
+      if (!explicit) throw new Error(`sfx "${s.sound}" needs paid ElevenLabs generation: re-run with --provider elevenlabs`);
+      if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
       fs.mkdirSync(path.dirname(target), { recursive: true });
       fs.writeFileSync(target, await elevenLabsSfx(s.prompt, apiKey, opts.fetchImpl));
       log(`  sfx: ${s.sound}`);

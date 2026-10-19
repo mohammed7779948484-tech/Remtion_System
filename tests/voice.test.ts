@@ -118,6 +118,18 @@ describe("cost safety", () => {
     await expect(generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/explicit flag/);
   });
 
+  it("prompted sound effects also need the explicit flag (unchanged dialogue doesn't open the paid path)", async () => {
+    const root = tmpRepo(episode(lines));
+    const fake = (async () => {
+      const chars = [..."Hello there."];
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.01), character_end_times_seconds: chars.map((_, i) => i * 0.01 + 0.01) } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: fake, log: () => {} });
+    fs.writeFileSync(path.join(root, "videos", "demo", "episode.json"), JSON.stringify({ ...episode(lines), sfx: [{ at: 0, sound: "sfx/boom.mp3", prompt: "a boom" }] }));
+    await expect(generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/sfx "sfx\/boom.mp3" needs paid ElevenLabs generation/);
+    await expect(generateVoices("demo", { root, provider: "elevenlabs", apiKey: "", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/ELEVENLABS_API_KEY is not set/);
+  });
+
   it("keeps already-generated clips in the manifest when a later line fails", async () => {
     const two = [lines[0], { id: "l2", speaker: "claude", text: "Second line." }];
     const root = tmpRepo(episode(two));

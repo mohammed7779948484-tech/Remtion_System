@@ -56,6 +56,11 @@ describe("prop parenting", () => {
     expect(msg).toMatch(/set.params: unknown item "monitor"/);
   });
 
+  it("set.move applies to items from set.add too", () => {
+    const layout = resolveLayout(devOffice, { add: [{ id: "mug-2", kind: "mug", on: "desk", position: [0, 0.76, 0] }], move: { "mug-2": { position: [0.3, 0.76, 0.1] } } });
+    expect(layout.items.find((i) => i.id === "mug-2")!.position).toEqual([0.3, 0.76, 0.1]);
+  });
+
   it("valid overrides still resolve", () => {
     expect(problems({ remove: ["plant"], params: { "mug-2": { color: "#fff" } }, add: [{ id: "mug-2", kind: "mug", on: "desk", position: [0, 0.76, 0] }] })).toBe("");
   });

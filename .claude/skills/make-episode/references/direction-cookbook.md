@@ -177,12 +177,16 @@ Facts you'd otherwise dig out of engine source:
 - **Exact joint poses** (`joints`, released after `duration`):
   `{ "at": 27.8, "actor": "rayan", "joints": { "shoulderR.x": -1.99, "elbowR.x": -1.14, "head.x": 0.45 }, "transition": 0.3 }`.
   `facepalm` and `sip` cover the common hand-to-face moves. For any other hand target, run the actor's `reach` once
-  in a scratch script kept outside the repo (your session scratchpad, `node --import tsx x.ts`, engine imported by
-  `file:///` URL). Targets are root-local metres, +Z forward, +X = his left; hands reach ~0.5 m; for a seated actor
-  start from `rayanDef.poses.sit_idle.set`:
+  in a scratch script kept outside the repo (your session scratchpad, e.g. `x.mts`, run from the repo root with
+  `node --import tsx <scratchpad>/x.mts`; the engine is imported by file URL so any checkout path works). Targets
+  are root-local metres, +Z forward, +X = his left; hands reach ~0.5 m; for a seated actor start from
+  `rayanDef.poses.sit_idle.set`:
   ```ts
-  import { rayanDef } from "file:///D:/Remtion_System/src/engine/actors/rayan/rayan.data.ts";
-  import { restChannels } from "file:///D:/Remtion_System/src/engine/actors/rig.ts";
+  import path from "node:path";
+  import { pathToFileURL } from "node:url";
+  const engine = (p: string) => import(pathToFileURL(path.resolve("src/engine", p)).href); // cwd = repo root
+  const { rayanDef } = await engine("actors/rayan/rayan.data.ts");
+  const { restChannels } = await engine("actors/rig.ts");
   const c = { ...restChannels(rayanDef), ...rayanDef.poses.stand_idle.set, "torso.x": 0.2, "head.x": 0.45 };
   const face = rayanDef.anchors(c).face;                       // anchors: feet waist chest head face top
   const r = rayanDef.reach!(c, [face[0] - 0.11, face[1] - 0.07, face[2] - 0.06], "R");

@@ -1,6 +1,6 @@
 // Agent-facing CLI:  npm run cli -- <command> [...]
 //   list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos]
-//   show <actor|prop|environment|mood|screen> <id>
+//   show <actor|prop|environment|mood|screen|fx|sfx> <id>
 //   new <slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title "..."]  (writes BRIEF.md)
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
 //   validate <slug>
@@ -413,7 +413,8 @@ const render = async () => {
   const timeout = flag("timeout");
   const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `--props={"draft":true}`;
   const master = has("master");
-  const target = master ? out.replace(/\.mp4$/, ".unmastered.mp4") : out;
+  // Mastering reads the render and writes `out`, so they must be different files (ffmpeg cannot edit in place).
+  const target = master ? (/\.mp4$/.test(out) ? out.replace(/\.mp4$/, ".unmastered.mp4") : `${out}.unmastered.mp4`) : out;
   npx(["remotion", "render", slug, target, "--log=info", ...(draft ? [draftProps] : []), ...(timeout ? [`--timeout=${timeout}`] : [])]);
   if (master) {
     // Social platforms normalise to about -14 LUFS: master the soundtrack there (two-pass loudnorm,

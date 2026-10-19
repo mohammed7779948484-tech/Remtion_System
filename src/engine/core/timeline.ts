@@ -260,7 +260,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const sortedActions = [...ep.actions].map((a, i) => ({ a, i, t: timeOf(a.at, `actions[${i}]`) })).sort((x, y) => x.t - y.t || x.i - y.i);
   // Cues produced by recipes (merged with the authored props/sfx below).
   const recipeProps: PropCue[] = [];
-  const recipeSfx: { at: number; sound: string; volume?: number }[] = [];
+  const recipeSfx: { at: number; sound: string; volume?: number; where: string }[] = [];
   const applyAction = (a: Omit<EpisodeAction, "at">, t: number, where: string) => {
     contentEnd = Math.max(contentEnd, t + (a.transition ?? 0));
     const ra = actorById.get(a.actor);
@@ -322,6 +322,14 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     }
   };
 
+  // An explicit item anchor must exist: a typo would otherwise fall back to the item centre silently.
+  const badAnchor = (item: string, anchor: string, where: string) => {
+    const kind = layout.items.find((i) => i.id === item)?.kind;
+    const anchors = kind ? PROPS[kind]?.anchors : undefined;
+    if (!anchors || anchor === "center" || anchors[anchor]) return false;
+    errors.push(`${where}: "${item}" has no anchor "${anchor}" (has: ${Object.keys(anchors).join(", ") || "none"})`);
+    return true;
+  };
   const pointOf = (ref: Vec3 | string, at: number, where: string): Vec3 | null => {
     if (Array.isArray(ref)) return ref;
     const [head, anchor] = [ref.split(".")[0], ref.slice(ref.indexOf(".") + 1)];
@@ -331,7 +339,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       const b = baseAt(other, actorDefs[other.actor], at);
       return b.anchors[hasAnchor ? anchor : "chest"] ?? b.anchors.chest;
     }
-    if (itemIds.has(head)) return itemAnchor(layout, head, hasAnchor ? anchor : "center");
+    if (itemIds.has(head)) return hasAnchor && badAnchor(head, anchor, where) ? null : itemAnchor(layout, head, hasAnchor ? anchor : "center");
     if (layout.marks[ref]) return layout.marks[ref].position;
     errors.push(`${where}: unknown target "${ref}"`);
     return null;
@@ -371,7 +379,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       pointOf: (ref, at) => pointOf(ref, at, `${where} do:${a.do}`),
       pressable,
       addProp: (at, item, set) => recipeProps.push({ at, item, set }),
-      addSfx: (at, sound, volume) => recipeSfx.push({ at, sound, volume }),
+      addSfx: (at, sound, volume) => recipeSfx.push({ at, sound, volume, where: `${where} do:${a.do}` }),
       addItem: (item) => {
         layout.items.push(item);
         itemIds.add(item.id);
@@ -393,12 +401,15 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       else {
         const [head, anchor] = ref.split(".");
         if (ep.cast[head]) on = { actor: head, anchor: anchor ?? "chest" };
-        else if (itemIds.has(head)) on = itemAnchor(layout, head, ref.includes(".") ? ref.slice(ref.indexOf(".") + 1) : "center");
+        else if (itemIds.has(head)) {
+          const anchor = ref.includes(".") ? ref.slice(ref.indexOf(".") + 1) : "center";
+          if (!badAnchor(head, anchor, where)) on = itemAnchor(layout, head, anchor);
+        }
         else if (layout.marks[ref]) on = layout.marks[ref].position;
         else errors.push(`${where}: unknown target "${ref}"`);
       }
     }
-    if (sound) recipeSfx.push({ at, sound, volume });
+    if (sound) recipeSfx.push({ at, sound, volume, where });
     return { type, at, end: at + (duration ?? FX_INFO[type].duration), data, ...(on ? { on } : {}), seed: `${ep.seed ?? ep.id}:fx${i}` };
   });
   contentEnd = Math.max(contentEnd, ...fx.map((f) => f.end));
@@ -456,16 +467,17 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       return { at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set };
     }), ...recipeProps]
     .sort((a, b) => a.at - b.at);
-  const sfx = [...ep.sfx, ...recipeSfx.map((r) => ({ at: r.at as number | string, sound: r.sound, volume: r.volume, prompt: undefined }))]
-    .map((s, i) => {
+  // Sounds from recipes and fx[].sound are validated here too; `where` names the author's entry, not a merged index.
+  const sfx = [...ep.sfx.map((s, i) => ({ ...s, where: `sfx[${i}]` })), ...recipeSfx.map((r) => ({ at: r.at as number | string, sound: r.sound, volume: r.volume, prompt: undefined, where: r.where }))]
+    .map((s) => {
       // Library name, URL, or a file relative to the video's public folder (public/videos/<id>/...).
       const isFile = !SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound);
       const src = SFX_LIBRARY[s.sound] ?? (isFile && !s.sound.startsWith("videos/") ? `videos/${ep.id}/${s.sound}` : s.sound);
       if (!SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound) && !/\.(wav|mp3|ogg|m4a)$/i.test(s.sound)) {
-        errors.push(`sfx[${i}]: "${s.sound}" is not a library sound, URL or audio file in public/`);
+        errors.push(`${s.where}: "${s.sound}" is not a library sound, URL or audio file in public/`);
       }
       const info = SFX_INFO[s.sound];
-      return { at: timeOf(s.at, `sfx[${i}]`), src, volume: s.volume ?? 1, ...(info ? { name: s.sound, license: info.license } : {}) };
+      return { at: timeOf(s.at, s.where), src, volume: s.volume ?? 1, ...(info ? { name: s.sound, license: info.license } : {}) };
     })
     .sort((a, b) => a.at - b.at);
 

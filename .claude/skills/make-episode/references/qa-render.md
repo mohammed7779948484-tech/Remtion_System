@@ -26,6 +26,7 @@ screens, puffs) is known GPU noise. Anything bigger means
 something depends on render order (state, `Math.random`, async content) — fix it.
 
 ## Fixes that came up in practice
+
 | Symptom | Fix |
 |---|---|
 | Opening frame is empty (character still out of frame) | start the action earlier / closer; the hook must be visible at frame 0 |

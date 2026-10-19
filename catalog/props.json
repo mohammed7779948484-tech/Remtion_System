@@ -272,6 +272,493 @@
       }
     }
   },
+  "giant_keyboard": {
+    "description": "Giant laptop keyboard (14.5 × 5 keys, 0.95 m pitch). Stand actors on key tops (marks `on-<key>`, y 0.42). Press keys with props cues `{ \"keys\": { \"ctrl\": true } }` (false = release) or the `press` recipe; anchors `key:<id>` (enter, ctrl, z, space, a…).",
+    "size": [
+      13.774999999999999,
+      0.42,
+      4.75
+    ],
+    "occluder": true,
+    "press": {
+      "param": "keys",
+      "travel": 0.18,
+      "keyed": true
+    },
+    "anchors": {
+      "center": [
+        0,
+        0.42,
+        0
+      ],
+      "top": [
+        0,
+        0.42,
+        0
+      ],
+      "key:backtick": [
+        -6.4125,
+        0.42,
+        -1.9
+      ],
+      "key:1": [
+        -5.4624999999999995,
+        0.42,
+        -1.9
+      ],
+      "key:2": [
+        -4.5125,
+        0.42,
+        -1.9
+      ],
+      "key:3": [
+        -3.5625,
+        0.42,
+        -1.9
+      ],
+      "key:4": [
+        -2.6125,
+        0.42,
+        -1.9
+      ],
+      "key:5": [
+        -1.6624999999999999,
+        0.42,
+        -1.9
+      ],
+      "key:6": [
+        -0.7124999999999999,
+        0.42,
+        -1.9
+      ],
+      "key:7": [
+        0.2375,
+        0.42,
+        -1.9
+      ],
+      "key:8": [
+        1.1875,
+        0.42,
+        -1.9
+      ],
+      "key:9": [
+        2.1374999999999997,
+        0.42,
+        -1.9
+      ],
+      "key:0": [
+        3.0875,
+        0.42,
+        -1.9
+      ],
+      "key:minus": [
+        4.0375,
+        0.42,
+        -1.9
+      ],
+      "key:equals": [
+        4.9875,
+        0.42,
+        -1.9
+      ],
+      "key:delete": [
+        6.175,
+        0.42,
+        -1.9
+      ],
+      "key:tab": [
+        -6.175,
+        0.42,
+        -0.95
+      ],
+      "key:q": [
+        -4.9875,
+        0.42,
+        -0.95
+      ],
+      "key:w": [
+        -4.0375,
+        0.42,
+        -0.95
+      ],
+      "key:e": [
+        -3.0875,
+        0.42,
+        -0.95
+      ],
+      "key:r": [
+        -2.1374999999999997,
+        0.42,
+        -0.95
+      ],
+      "key:t": [
+        -1.1875,
+        0.42,
+        -0.95
+      ],
+      "key:y": [
+        -0.2375,
+        0.42,
+        -0.95
+      ],
+      "key:u": [
+        0.7124999999999999,
+        0.42,
+        -0.95
+      ],
+      "key:i": [
+        1.6624999999999999,
+        0.42,
+        -0.95
+      ],
+      "key:o": [
+        2.6125,
+        0.42,
+        -0.95
+      ],
+      "key:p": [
+        3.5625,
+        0.42,
+        -0.95
+      ],
+      "key:lbracket": [
+        4.5125,
+        0.42,
+        -0.95
+      ],
+      "key:rbracket": [
+        5.4624999999999995,
+        0.42,
+        -0.95
+      ],
+      "key:backslash": [
+        6.4125,
+        0.42,
+        -0.95
+      ],
+      "key:caps": [
+        -6.0562499999999995,
+        0.42,
+        0
+      ],
+      "key:a": [
+        -4.75,
+        0.42,
+        0
+      ],
+      "key:s": [
+        -3.8,
+        0.42,
+        0
+      ],
+      "key:d": [
+        -2.8499999999999996,
+        0.42,
+        0
+      ],
+      "key:f": [
+        -1.9,
+        0.42,
+        0
+      ],
+      "key:g": [
+        -0.95,
+        0.42,
+        0
+      ],
+      "key:h": [
+        0,
+        0.42,
+        0
+      ],
+      "key:j": [
+        0.95,
+        0.42,
+        0
+      ],
+      "key:k": [
+        1.9,
+        0.42,
+        0
+      ],
+      "key:l": [
+        2.8499999999999996,
+        0.42,
+        0
+      ],
+      "key:semicolon": [
+        3.8,
+        0.42,
+        0
+      ],
+      "key:quote": [
+        4.75,
+        0.42,
+        0
+      ],
+      "key:enter": [
+        6.0562499999999995,
+        0.42,
+        0
+      ],
+      "key:shift-l": [
+        -5.81875,
+        0.42,
+        0.95
+      ],
+      "key:z": [
+        -4.2749999999999995,
+        0.42,
+        0.95
+      ],
+      "key:x": [
+        -3.3249999999999997,
+        0.42,
+        0.95
+      ],
+      "key:c": [
+        -2.375,
+        0.42,
+        0.95
+      ],
+      "key:v": [
+        -1.4249999999999998,
+        0.42,
+        0.95
+      ],
+      "key:b": [
+        -0.475,
+        0.42,
+        0.95
+      ],
+      "key:n": [
+        0.475,
+        0.42,
+        0.95
+      ],
+      "key:m": [
+        1.4249999999999998,
+        0.42,
+        0.95
+      ],
+      "key:comma": [
+        2.375,
+        0.42,
+        0.95
+      ],
+      "key:period": [
+        3.3249999999999997,
+        0.42,
+        0.95
+      ],
+      "key:slash": [
+        4.2749999999999995,
+        0.42,
+        0.95
+      ],
+      "key:shift-r": [
+        5.81875,
+        0.42,
+        0.95
+      ],
+      "key:fn": [
+        -6.4125,
+        0.42,
+        1.9
+      ],
+      "key:ctrl": [
+        -5.4624999999999995,
+        0.42,
+        1.9
+      ],
+      "key:opt-l": [
+        -4.5125,
+        0.42,
+        1.9
+      ],
+      "key:cmd-l": [
+        -3.4437499999999996,
+        0.42,
+        1.9
+      ],
+      "key:space": [
+        -0.475,
+        0.42,
+        1.9
+      ],
+      "key:cmd-r": [
+        2.49375,
+        0.42,
+        1.9
+      ],
+      "key:opt-r": [
+        3.5625,
+        0.42,
+        1.9
+      ],
+      "key:left": [
+        4.5125,
+        0.42,
+        1.9
+      ],
+      "key:updown": [
+        5.4624999999999995,
+        0.42,
+        1.9
+      ],
+      "key:right": [
+        6.4125,
+        0.42,
+        1.9
+      ]
+    },
+    "params": {
+      "keys": {
+        "type": "object",
+        "default": {},
+        "description": "Pressed keys: { <key id>: true|false }; each change animates the key from that cue's time"
+      },
+      "color": {
+        "type": "color",
+        "default": "#1c1d22",
+        "description": "Keycaps"
+      },
+      "legend": {
+        "type": "color",
+        "default": "#e7e9ee",
+        "description": "Key labels"
+      },
+      "deck": {
+        "type": "color",
+        "default": "#8d939c",
+        "description": "Aluminium deck around the keys"
+      },
+      "glow": {
+        "type": "color",
+        "default": "#ff9a3d",
+        "description": "Backlight colour showing between the keys"
+      },
+      "backlight": {
+        "type": "number",
+        "default": 0.6,
+        "description": "Backlight strength (0 = off)"
+      },
+      "highlight": {
+        "type": "list",
+        "default": [],
+        "description": "Key ids whose keycap glows (e.g. [\"ctrl\", \"z\"])"
+      }
+    }
+  },
+  "giant_screen": {
+    "description": "Giant laptop lid behind the keyboard: a 14 × 9 m screen tilted back. `screen` takes any screen preset (code, terminal, error, deploy, chat…).",
+    "size": [
+      15.6,
+      9.8,
+      0.4
+    ],
+    "occluder": true,
+    "anchors": {
+      "screen": [
+        0,
+        5.1,
+        0.25
+      ],
+      "center": [
+        0,
+        5.1,
+        0
+      ],
+      "top": [
+        0,
+        9.8,
+        -1.2
+      ]
+    },
+    "params": {
+      "screen": {
+        "type": "screen",
+        "default": {
+          "preset": "code"
+        },
+        "description": "Screen content: { preset: code|terminal|error|deploy|off, ...preset params }"
+      },
+      "bezel": {
+        "type": "color",
+        "default": "#16171b",
+        "description": "Lid frame"
+      },
+      "tilt": {
+        "type": "number",
+        "default": 14,
+        "description": "Lid tilt back (degrees)"
+      }
+    }
+  },
+  "rubber_duck": {
+    "description": "Rubber debugging duck (holdable, ~0.4 m: knee-high for a person, tiny in the real world).",
+    "size": [
+      0.34,
+      0.4,
+      0.42
+    ],
+    "occluder": false,
+    "anchors": {
+      "top": [
+        0,
+        0.4,
+        0
+      ],
+      "center": [
+        0,
+        0.2,
+        0
+      ]
+    },
+    "params": {
+      "color": {
+        "type": "color",
+        "default": "#ffd23f",
+        "description": "Body"
+      }
+    }
+  },
+  "dust_motes": {
+    "description": "Floating dust specks catching the light (pure drift; good for macro shots).",
+    "size": [
+      0,
+      0,
+      0
+    ],
+    "occluder": false,
+    "anchors": {},
+    "params": {
+      "count": {
+        "type": "number",
+        "default": 360,
+        "description": "Number of specks"
+      },
+      "area": {
+        "type": "list",
+        "default": [
+          16,
+          5,
+          10
+        ],
+        "description": "Box [w, h, d] (metres) around the item origin, from the floor up"
+      },
+      "color": {
+        "type": "color",
+        "default": "#ffd9a8",
+        "description": "Speck colour"
+      },
+      "seed": {
+        "type": "string",
+        "default": "dust",
+        "description": "Layout seed"
+      }
+    }
+  },
   "window": {
     "description": "Wall window with a procedural city skyline (lit by mood.practicals.window).",
     "size": [

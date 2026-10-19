@@ -3,7 +3,27 @@
 // Conventions: metres, +Y up, actor faces +Z; joint angles in radians (XYZ order).
 // head.x / torso.x positive = tilt forward/down; hip.x negative = leg forward; knee.x positive = bend.
 import type { ActorDefinition, Channels, ChannelSpec } from "../rig";
-import { clamp, lerp } from "../../core/time";
+import { clamp, lerp, type Vec3 } from "../../core/time";
+import { armFK, armIK, inFrame, outOfFrame, type ArmRig, type Frame } from "../ik";
+
+// Arm geometry, mirrored from Rayan.tsx (pelvis → torso (+0.06) → shoulder (±0.25, 0.38) → elbow
+// (±0.02, -0.23) → wrist (0, -0.22) → palm socket (0, -0.04, 0.04)). Keep in sync with the view.
+const armRig = (side: 1 | -1): ArmRig => ({
+  shoulder: [side * 0.25, 0.38, 0],
+  elbow: [side * 0.02, -0.23, 0],
+  hand: [0, -0.26, 0.04],
+  pole: [side * 0.6, -1, -0.25],
+});
+/** Torso frame in root space: pelvis group (y, tilt x) → torso group (+0.06, XYZ). */
+const torsoFrame = (c: Channels): Frame => {
+  const pelvis: Frame = { position: [0, c["pelvis.y"], 0], rotations: [[c["pelvis.x"], 0, 0]] };
+  return { position: outOfFrame(pelvis, [0, 0.06, 0]), rotations: [[c["pelvis.x"], 0, 0], [c["torso.x"], c["torso.y"], c["torso.z"]]] };
+};
+/** Palm position (root-local, unscaled) for the current channels: forward kinematics of the arm. */
+export const rayanHand = (c: Channels, side: "L" | "R"): Vec3 => {
+  const local = armFK(armRig(side === "L" ? 1 : -1), [c[`shoulder${side}.x`], c[`shoulder${side}.y`], c[`shoulder${side}.z`]], c[`elbow${side}.x`]);
+  return outOfFrame(torsoFrame(c), local);
+};
 
 const HALF_PI = Math.PI / 2;
 const ch = (rest: number, min: number, max: number, description?: string): ChannelSpec => ({ rest, min, max, description });
@@ -110,6 +130,10 @@ export const rayanDef: ActorDefinition = {
       set: { ...seated(0.1), "torso.x": -0.08, ...arm("L", { x: -0.75, y: -0.55, z: 0.15 }, { x: -1.65, y: 0, z: -0.4 }), ...arm("R", { x: -0.78, y: 0.55, z: -0.15 }, { x: -1.65, y: 0, z: 0.4 }) },
     },
     walk: { description: "Walk cycle in place (a `move` cue walks automatically from any standing pose).", set: STAND_ARMS },
+    crouch: {
+      description: "Squat low with a forward lean (picking something up, putting it down). Feet stay planted.",
+      set: { ...STAND_ARMS, "pelvis.y": 0.37, "hipL.x": -1.4, "hipR.x": -1.4, "kneeL.x": 2.2, "kneeR.x": 2.2, "torso.x": 0.7, "head.x": -0.05 },
+    },
   },
   emotions: {
     neutral: { description: "Calm.", set: { "browL.y": 0.085, "browL.rz": 0, "browR.y": 0.085, "browR.rz": 0, lidL: 0.01, lidR: 0.01, "mouth.open": 0.22, "mouth.wide": 1, "mouth.smile": 0, blush: 0.3 } },
@@ -120,6 +144,22 @@ export const rayanDef: ActorDefinition = {
     tired: { description: "Droopy lids, sad brows.", set: { "browL.y": 0.078, "browL.rz": -0.2, "browR.y": 0.078, "browR.rz": 0.2, lidL: 0.55, lidR: 0.55, "mouth.open": 0.2, "mouth.wide": 0.9, "mouth.smile": -0.3, blush: 0.15 } },
   },
   gestures: {
+    flinch: {
+      description: "Recoils from an impact: jolts back, arms up, brows high.",
+      duration: 0.8,
+      attack: 0.06,
+      release: 0.4,
+      set: { "torso.x": -0.18, "head.x": -0.15, "shoulderL.x": -1.1, "shoulderL.z": 0.55, "elbowL.x": -1.7, "shoulderR.x": -1.1, "shoulderR.z": -0.55, "elbowR.x": -1.7, "browL.y": 0.13, "browR.y": 0.13 },
+    },
+    stomp: {
+      description: "Small hop and a heavy landing on whatever is underfoot (lands at 45% of the gesture).",
+      duration: 0.7,
+      add: (u) => {
+        const air = u < 0.45 ? Math.sin((u / 0.45) * Math.PI) : 0;
+        const dip = u >= 0.45 ? Math.sin(((u - 0.45) / 0.55) * Math.PI) : 0;
+        return { "pelvis.y": air * 0.2 - dip * 0.12, "kneeL.x": dip * 0.65 + air * 0.5, "kneeR.x": dip * 0.65 + air * 0.5, "hipL.x": -dip * 0.35 - air * 0.3, "hipR.x": -dip * 0.35 - air * 0.3, "torso.x": dip * 0.15, "shoulderL.z": air * 0.5, "shoulderR.z": -air * 0.5 };
+      },
+    },
     wave: {
       description: "Right hand raised, waving.",
       duration: 1.6,
@@ -163,6 +203,14 @@ export const rayanDef: ActorDefinition = {
     badgeColor: { type: "color", default: "#38bdf8", description: "Glowing chest badge" },
     glasses: { type: "boolean", default: true, description: "Round glasses" },
     headphones: { type: "boolean", default: true, description: "Headphones around the neck" },
+  },
+  recipeGestures: { flinch: "flinch", stomp: "stomp", crouchPose: "crouch", stompContact: 0.45 },
+  reach: (c, target, side) => {
+    const r = armIK(armRig(side === "L" ? 1 : -1), inFrame(torsoFrame(c), target));
+    return {
+      set: { [`shoulder${side}.x`]: r.shoulder[0], [`shoulder${side}.y`]: r.shoulder[1], [`shoulder${side}.z`]: r.shoulder[2], [`elbow${side}.x`]: r.elbowX, [`elbow${side}.y`]: 0, [`elbow${side}.z`]: 0, [`wrist${side}.x`]: 0, [`wrist${side}.y`]: 0, [`wrist${side}.z`]: 0 },
+      reached: r.reached,
+    };
   },
   anchors: (c) => {
     const pelvis = c["pelvis.y"];

@@ -68,6 +68,13 @@ export const claudeDef: ActorDefinition = {
     tired: { description: "Half-closed low eyes, deflated.", set: { ...eyes({ sy: 0.32, y: -0.005 }, { sy: 0.32, y: -0.005 }), "squash.emotion": -0.06 } },
   },
   gestures: {
+    flinch: {
+      description: "Startled squash backwards with huge eyes.",
+      duration: 0.6,
+      attack: 0.05,
+      release: 0.35,
+      set: { "body.z": -0.03, "body.rx": -0.2, squash: 0.86, "eyeL.sy": 1.45, "eyeR.sy": 1.45 },
+    },
     hop: {
       description: "A single bouncy hop with anticipation squash.",
       duration: 0.7,
@@ -90,6 +97,16 @@ export const claudeDef: ActorDefinition = {
   appearance: {
     bodyColor: { type: "color", default: "#e56b3e", description: "Body" },
     eyeColor: { type: "color", default: "#141418", description: "Eyes and feet shading" },
+  },
+  recipeGestures: { flinch: "flinch", stomp: "hop", stompContact: 0.85 },
+  // No arms: "reaching" is leaning the whole body toward the target (and pressing is a hop onto it).
+  reach: (c, target) => {
+    const up = target[1] - c["body.y"];
+    const forward = Math.max(0, target[2]);
+    return {
+      set: { "body.rx": clamp(Math.atan2(forward, Math.max(0.05, 0.12 - up)) * 0.6, -0.4, 0.75), "body.rz": clamp(-target[0] * 2.5, -0.45, 0.45), "body.z": clamp(target[2] * 0.25, -0.04, 0.06), squash: 1.06 },
+      reached: Math.hypot(target[0], target[2]) < 0.25,
+    };
   },
   anchors: (c) => {
     const y = c["body.y"];

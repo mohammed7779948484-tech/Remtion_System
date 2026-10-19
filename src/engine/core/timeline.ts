@@ -8,9 +8,10 @@ import type { FocusTarget, MoveSpec, Shot } from "../camera/solve";
 import { MOODS, type MoodCue, type MoodRef } from "../lighting/moods";
 import { ENVIRONMENTS } from "../world/environments";
 import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropCue, type SetOverrides } from "../world/layout";
-import { PROPS } from "../world/props.data";
+import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
-import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeShot } from "./schema";
+import { baseAt, expandRecipe, type SubAction } from "./recipes";
+import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeAction, type EpisodeShot } from "./schema";
 import type { Vec3 } from "./time";
 
 export type ResolvedLine = {
@@ -251,13 +252,15 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const moveFree = new Map(actors.map((a) => [a.id, -Infinity]));
   let contentEnd = 0;
   const sortedActions = [...ep.actions].map((a, i) => ({ a, i, t: timeOf(a.at, `actions[${i}]`) })).sort((x, y) => x.t - y.t || x.i - y.i);
-  for (const { a, i, t } of sortedActions) {
-    const where = `actions[${i}] (${a.actor} @ ${t.toFixed(2)}s)`;
+  // Cues produced by recipes (merged with the authored props/sfx below).
+  const recipeProps: PropCue[] = [];
+  const recipeSfx: { at: number; sound: string }[] = [];
+  const applyAction = (a: Omit<EpisodeAction, "at">, t: number, where: string) => {
     contentEnd = Math.max(contentEnd, t + (a.transition ?? 0));
     const ra = actorById.get(a.actor);
     if (!ra) {
       errors.push(`${where}: unknown cast member "${a.actor}"`);
-      continue;
+      return;
     }
     const def = actorDefs[ra.actor];
     if (a.pose) {
@@ -283,7 +286,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       const duration = a.move.duration ?? Math.max(0.2, dist / speed);
       const start = Math.max(t, moveFree.get(ra.id)!);
       if (start > t + 1e-6) warnings.push(`${where}: move starts before the previous move ends; it waits until ${start.toFixed(2)}s`);
-      ra.moves.push({ at: t, to, duration, face: a.move.face });
+      ra.moves.push({ at: t, to, duration, face: a.move.face, ...(a.move.ease ? { ease: a.move.ease } : {}) });
       lastPos.set(ra.id, to);
       moveFree.set(ra.id, start + duration);
       contentEnd = Math.max(contentEnd, start + duration);
@@ -311,6 +314,65 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       ra.overrides.push({ at: t, set: a.joints, duration: a.duration, blend: a.transition, mode: a.mode });
       if (a.duration !== undefined) contentEnd = Math.max(contentEnd, t + a.duration + (a.transition ?? 0.25));
     }
+  };
+
+  const pointOf = (ref: Vec3 | string, at: number, where: string): Vec3 | null => {
+    if (Array.isArray(ref)) return ref;
+    const [head, anchor] = [ref.split(".")[0], ref.slice(ref.indexOf(".") + 1)];
+    const hasAnchor = ref.includes(".");
+    const other = actorById.get(head);
+    if (other && actorDefs[other.actor]) {
+      const b = baseAt(other, actorDefs[other.actor], at);
+      return b.anchors[hasAnchor ? anchor : "chest"] ?? b.anchors.chest;
+    }
+    if (itemIds.has(head)) return itemAnchor(layout, head, hasAnchor ? anchor : "center");
+    if (layout.marks[ref]) return layout.marks[ref].position;
+    errors.push(`${where}: unknown target "${ref}"`);
+    return null;
+  };
+  const pressable = (ref: string) => {
+    const [item, anchor] = [ref.split(".")[0], ref.slice(ref.indexOf(".") + 1)];
+    const it = layout.items.find((i) => i.id === item);
+    const press = it && PROPS[it.kind]?.press;
+    if (!it || !press) return null;
+    if (press.keyed) {
+      if (!anchor.startsWith("key:")) return null;
+      const key = anchor.slice(4);
+      return { item, travel: press.travel * (it.scale ?? 1), set: (down: boolean) => ({ [press.param]: { [key]: down } }) };
+    }
+    return { item, travel: press.travel * (it.scale ?? 1), set: (down: boolean) => ({ [press.param]: down }) };
+  };
+
+  for (const { a, i, t } of sortedActions) {
+    const where = `actions[${i}] (${a.actor} @ ${t.toFixed(2)}s)`;
+    if (!a.do) {
+      applyAction(a, t, where);
+      continue;
+    }
+    const ra = actorById.get(a.actor);
+    const def = ra && actorDefs[ra.actor];
+    if (!ra || !def) {
+      errors.push(`${where}: unknown cast member "${a.actor}"`);
+      continue;
+    }
+    if (a.emotion) applyAction({ actor: a.actor, emotion: a.emotion, transition: a.transition }, t, where);
+    const end = expandRecipe(a, t, {
+      ra,
+      def,
+      layout,
+      where: `${where} do:${a.do}`,
+      apply: (sub: SubAction) => applyAction({ ...sub, actor: a.actor }, sub.at, `${where} do:${a.do}`),
+      pointOf: (ref, at) => pointOf(ref, at, `${where} do:${a.do}`),
+      pressable,
+      addProp: (at, item, set) => recipeProps.push({ at, item, set }),
+      addSfx: (at, sound) => recipeSfx.push({ at, sound }),
+      addItem: (item) => {
+        layout.items.push(item);
+        itemIds.add(item.id);
+      },
+      error: (msg) => errors.push(msg),
+    });
+    contentEnd = Math.max(contentEnd, end);
   }
 
   // ---- end time: the latest-ending thing in the episode (not just the last array entry).
@@ -359,14 +421,14 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       return { at: timeOf(l.at, `lighting[${i}]`), mood: l.mood as MoodRef, transition: l.transition };
     })
     .sort((a, b) => a.at - b.at);
-  const props: PropCue[] = ep.props
+  const props: PropCue[] = [...ep.props
     .map((p, i) => {
       if (!itemIds.has(p.item)) errors.push(`props[${i}]: unknown set item "${p.item}"`);
       else checkItemParams(layout.items.find((it) => it.id === p.item)!.kind, p.set, `props[${i}] (${p.item})`, ctx.screens ?? [], warnings);
       return { at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set };
-    })
+    }), ...recipeProps]
     .sort((a, b) => a.at - b.at);
-  const sfx = ep.sfx
+  const sfx = [...ep.sfx, ...recipeSfx.map((r) => ({ at: r.at as number | string, sound: r.sound, volume: undefined, prompt: undefined }))]
     .map((s, i) => {
       // Library name, URL, or a file relative to the video's public folder (public/videos/<id>/...).
       const isFile = !SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound);
@@ -468,7 +530,7 @@ const checkItemParams = (kind: string, params: Record<string, unknown>, where: s
   const meta = PROPS[kind];
   if (!meta) return; // custom components define their own params
   for (const [k, v] of Object.entries(params)) {
-    const spec = meta.params[k];
+    const spec = meta.params[k] ?? COMMON_ITEM_PARAMS[k];
     if (!spec) {
       warnings.push(`${where}: "${kind}" has no param "${k}" (has: ${Object.keys(meta.params).join(", ")})`);
       continue;

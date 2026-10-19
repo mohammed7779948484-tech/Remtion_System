@@ -207,7 +207,11 @@ export const ScreenSurface: React.FC<{
     ctx.save();
     ctx.textBaseline = "alphabetic";
     const fn = draw ?? SCREEN_PRESETS[content.preset]?.draw ?? SCREEN_PRESETS.off.draw;
-    fn({ ctx, w: canvas.width, h: canvas.height, t, since }, content);
+    // Above 1024 px the drawing is scaled, so presets keep their 1024-wide layout but render sharper
+    // (giant screens). At 1024 and below nothing changes.
+    const k = resolution > 1024 ? resolution / 1024 : 1;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    fn({ ctx, w: canvas.width / k, h: canvas.height / k, t, since }, content);
     ctx.restore();
     texture.needsUpdate = true;
   });

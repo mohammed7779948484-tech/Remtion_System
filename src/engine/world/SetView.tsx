@@ -61,9 +61,11 @@ export const SetView: React.FC<SetViewProps> = ({ layout, t, practicals, cues = 
       if (!View) return null;
       const w = itemWorld(layout, item.id);
       const { params, since } = itemParamsAt(item, cues, t);
+      if (params.visible === false) return null;
+      const own = cues.filter((c) => c.item === item.id);
       return (
         <group key={item.id} name={item.id} position={w.position} rotation={[0, w.yaw, 0]} scale={w.scale}>
-          <View id={item.id} params={params} since={since} t={t} practicals={practicals} screens={screens} />
+          <View id={item.id} params={params} since={since} t={t} practicals={practicals} screens={screens} cues={own} />
         </group>
       );
     })}

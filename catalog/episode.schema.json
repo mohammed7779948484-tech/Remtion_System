@@ -556,6 +556,18 @@
                     "type": "number"
                   }
                 ]
+              },
+              "ease": {
+                "type": "string",
+                "enum": [
+                  "linear",
+                  "in",
+                  "out",
+                  "inOut",
+                  "smooth",
+                  "backOut",
+                  "snap"
+                ]
               }
             },
             "required": [
@@ -642,6 +654,57 @@
           "speed": {
             "type": "number",
             "exclusiveMinimum": 0
+          },
+          "do": {
+            "type": "string",
+            "enum": [
+              "press",
+              "point",
+              "pick-up",
+              "place",
+              "react",
+              "sit-down",
+              "stand-up"
+            ]
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "items": false,
+                "minItems": 3,
+                "maxItems": 3
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "item": {
+            "type": "string"
+          },
+          "hand": {
+            "type": "string"
+          },
+          "weight": {
+            "type": "boolean"
+          },
+          "sound": {
+            "type": "string"
+          },
+          "rotation": {
+            "type": "number"
           }
         },
         "required": [

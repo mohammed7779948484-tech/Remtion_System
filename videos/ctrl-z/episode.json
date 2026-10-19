@@ -1,0 +1,103 @@
+{
+  "$schema": "../../catalog/episode.schema.json",
+  "id": "ctrl-z",
+  "title": "Ctrl+Z",
+  "format": { "preset": "portrait" },
+  "seed": "ctrl-z",
+  "set": {
+    "environment": "micro-keyboard",
+    "move": { "duck": { "position": [-4.512, 0.42, 1.9] } },
+    "add": [{ "id": "duck-on-ctrl", "kind": "rubber_duck", "on": "keyboard", "position": [-5.462, 0.24, 1.9], "rotation": -20, "params": { "visible": false } }],
+    "params": { "screen": { "screen": { "preset": "code", "title": "release.ts", "code": "// friday 23:58\nexport const release = async () => {\n  await build();\n  // TODO: ask someone first\n  return deploy(\"production\");\n};", "speed": 0 } } }
+  },
+  "cast": {
+    "rayan": {
+      "actor": "rayan",
+      "at": "drop-enter",
+      "pose": "celebrate",
+      "emotion": "shocked",
+      "voice": { "system": "Microsoft David Desktop", "rate": 1, "elevenlabs": { "voiceId": "TX3LPaxmHKxFdv7VOQHJ" } }
+    },
+    "claude": {
+      "actor": "claude",
+      "at": [4.75, 0.42, 0],
+      "scale": 2,
+      "voice": { "system": "Microsoft Zira Desktop", "pitch": "+30%", "rate": 1, "elevenlabs": { "voiceId": "cgSgspJ2msm6clMCkdW9" } }
+    }
+  },
+  "dialogue": [
+    { "id": "l1", "speaker": "rayan", "text": "[panicked] Wait. Did I just deploy... on a Friday?", "at": 1.25 },
+    { "id": "l2", "speaker": "claude", "text": "[cheerfully] Relax! Just press Control Z.", "gap": 0.25 },
+    { "id": "l3", "speaker": "claude", "text": "[sighs] I weigh nothing. I'm literally a cloud.", "at": "l2.end+5.0" },
+    { "id": "l4", "speaker": "rayan", "text": "[determined] Duck. Now.", "gap": 0.3 },
+    { "id": "l5", "speaker": "claude", "text": "[proudly] Oh, and I redeployed it for you.", "at": "l4.end+4.4" }
+  ],
+  "actions": [
+    { "at": 0.25, "actor": "rayan", "move": { "to": "on-enter", "duration": 0.4, "ease": "in", "face": "keep" } },
+    { "at": 0.65, "actor": "rayan", "pose": "stand_idle", "transition": 0.12 },
+    { "at": 0.7, "actor": "rayan", "gesture": "double_take", "speed": 1.4 },
+    { "at": 0.1, "actor": "claude", "look": "rayan" },
+
+    { "at": "l1.end", "actor": "claude", "gesture": "hop" },
+    { "at": "l1.end+0.2", "actor": "rayan", "look": "claude", "emotion": "skeptical" },
+    { "at": "l2.start", "actor": "claude", "emotion": "happy", "pose": "explaining" },
+    { "at": "l2.word:3", "actor": "claude", "gesture": "nod" },
+
+    { "at": "l2.end+0.15", "actor": "rayan", "look": null, "emotion": "angry", "move": { "to": [-4.275, 0.42, 0.95], "duration": 2.4 } },
+    { "at": "l2.end+0.25", "actor": "claude", "pose": "stand_idle", "look": null, "move": { "to": [-5.462, 0.42, 1.9], "duration": 2.6 } },
+    { "at": "l2.end+2.55", "actor": "rayan", "turn": 0, "transition": 0.25 },
+    { "at": "l2.end+2.85", "actor": "claude", "turn": 15, "transition": 0.25 },
+    { "at": "l2.end+3.05", "actor": "rayan", "move": { "to": [-4.275, 0.24, 0.95], "duration": 0.07, "face": "keep" } },
+    { "at": "l2.end+3.4", "actor": "claude", "gesture": "hop", "emotion": "curious" },
+    { "at": "l2.end+4.0", "actor": "claude", "gesture": "hop" },
+    { "at": "l2.end+4.6", "actor": "rayan", "look": "claude", "emotion": "skeptical" },
+
+    { "at": "l3.start", "actor": "claude", "emotion": "pleading", "look": "rayan" },
+    { "at": "l4.start", "actor": "rayan", "emotion": "angry", "look": "duck" },
+
+    { "at": "l4.end+0.2", "actor": "rayan", "look": "duck", "move": { "to": [-4.43, 0.42, 1.4], "duration": 0.5 } },
+    { "at": "l4.end+0.2", "actor": "claude", "look": "rayan", "move": { "to": [-6.412, 0.42, 1.9], "duration": 0.6 } },
+    { "at": "l4.end+1.1", "actor": "rayan", "hold": { "handR": "duck" } },
+    { "at": "l4.end+1.4", "actor": "rayan", "look": "keyboard.key:ctrl", "move": { "to": [-5.01, 0.42, 1.68], "duration": 0.55 } },
+    { "at": "l4.end+2.1", "actor": "rayan", "hold": { "handR": null } },
+    { "at": "l4.end+2.5", "actor": "rayan", "look": null, "move": { "to": [-4.275, 0.42, 0.95], "duration": 0.5 } },
+    { "at": "l4.end+3.05", "actor": "rayan", "turn": 0, "transition": 0.2 },
+    { "at": "l4.end+3.1", "actor": "rayan", "move": { "to": [-4.275, 0.24, 0.95], "duration": 0.07, "face": "keep" } },
+    { "at": "l4.end+3.3", "actor": "rayan", "pose": "celebrate", "emotion": "happy" },
+    { "at": "l4.end+3.4", "actor": "claude", "gesture": "wiggle", "emotion": "happy" },
+
+    { "at": "l5.start", "actor": "claude", "pose": "proud_puff", "look": "camera" },
+    { "at": "l5.end+0.1", "actor": "rayan", "pose": "stand_idle", "emotion": "tired", "gesture": "facepalm", "transition": 0.2 }
+  ],
+  "props": [
+    { "at": 0.65, "item": "keyboard", "set": { "keys": { "enter": true } } },
+    { "at": 0.65, "item": "screen", "set": { "screen": { "preset": "deploy", "label": "Deploying to PRODUCTION…", "duration": 2.2 } } },
+    { "at": "l2.end+0.15", "item": "keyboard", "set": { "keys": { "enter": false } } },
+    { "at": "l2.end+3.05", "item": "keyboard", "set": { "keys": { "z": true } } },
+    { "at": "l2.end+4.6", "item": "screen", "set": { "screen": { "preset": "error", "title": "UNDO FAILED", "message": "Hold CTRL + Z together", "lines": ["ctrl: not pressed", "z: pressed"] } } },
+    { "at": "l4.end+0.2", "item": "keyboard", "set": { "keys": { "z": false } } },
+    { "at": "l4.end+2.1", "item": "duck-on-ctrl", "set": { "visible": true } },
+    { "at": "l4.end+2.1", "item": "keyboard", "set": { "keys": { "ctrl": true } } },
+    { "at": "l4.end+3.1", "item": "keyboard", "set": { "keys": { "z": true } } },
+    { "at": "l4.end+3.1", "item": "screen", "set": { "screen": { "preset": "terminal", "title": "undo — production", "lines": ["$ git revert HEAD", "+ Undo successful", "+ production restored", "$ _"], "interval": 0.3 } } },
+    { "at": "l5.word:4", "item": "screen", "set": { "screen": { "preset": "deploy", "label": "Redeploying to PRODUCTION…", "duration": 1.6 } } }
+  ],
+  "camera": [
+    { "at": 0, "shot": "custom", "position": [7.9, 0.95, 3.2], "target": [6.05, 1.55, 0], "fov": 46 },
+    { "at": 1.05, "shot": "close", "subject": "rayan", "angle": -10 },
+    { "at": "l1.end+0.05", "shot": "medium", "subject": "claude", "angle": 15 },
+    { "at": "l2.end+0.15", "shot": "establishing", "spot": "overhead" },
+    { "at": "l2.end+1.35", "shot": "full", "subject": "rayan", "follow": { "lag": 0.35 } },
+    { "at": "l2.end+2.75", "shot": "two-shot", "subject": ["rayan", "claude"] },
+    { "at": "l2.end+4.6", "shot": "insert", "item": "screen", "anchor": "screen" },
+    { "at": "l3.start", "shot": "close", "subject": "claude", "angle": 20 },
+    { "at": "l4.start", "shot": "close", "subject": "rayan" },
+    { "at": "l4.end+0.2", "shot": "full", "subject": "rayan", "track": true },
+    { "at": "l4.end+2.0", "shot": "custom", "position": [-4.1, 1.05, 3.7], "target": [-5.3, 0.55, 1.8], "fov": 40 },
+    { "at": "l4.end+2.5", "shot": "two-shot", "subject": ["rayan", "claude"], "height": "low" },
+    { "at": "l5.start", "shot": "close", "subject": "claude" },
+    { "at": "l5.end+0.1", "shot": "close", "subject": "rayan" }
+  ],
+  "captions": { "style": "pop" },
+  "end": "l5.end+2.6"
+}

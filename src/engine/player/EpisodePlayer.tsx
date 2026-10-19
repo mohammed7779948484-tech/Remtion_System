@@ -112,7 +112,7 @@ export const EpisodePlayer: React.FC<{ resolved: ResolvedEpisode; children?: Rea
     <AbsoluteFill style={{ backgroundColor: scene.mood.background }}>
       <ThreeCanvas width={width} height={height} shadows="percentage" dpr={1} gl={{ antialias: false, preserveDrawingBuffer: true }}>
         <EpisodeContext.Provider value={state}>
-          <Lighting mood={scene.mood} t={t} />
+          <Lighting mood={scene.mood} t={t} shadowRadius={resolved.layout.shadowRadius} />
           <SetView layout={resolved.layout} t={t} practicals={scene.mood.practicals} cues={resolved.props} hidden={held} components={components} screens={screens} />
           {scene.actors.map((a, i) => {
             const ra = resolved.actors[i];

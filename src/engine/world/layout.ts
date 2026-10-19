@@ -44,6 +44,8 @@ export type EnvironmentDef = {
   /** Region the camera may occupy (auto-corrections keep derived cameras inside). */
   bounds: { min: Vec3; max: Vec3 };
   defaultMood: string;
+  /** Half-size (metres) of the key light's shadow area around the origin (default 4.5; big sets need more). */
+  shadowRadius?: number;
 };
 
 export type SetOverrides = {
@@ -132,6 +134,7 @@ export const resolveLayout = (env: EnvironmentDef, o: SetOverrides = {}, problem
     marks: { ...env.marks, ...o.marks },
     cameras: { ...env.cameras, ...o.cameras },
     bounds: env.bounds,
+    ...(env.shadowRadius ? { shadowRadius: env.shadowRadius } : {}),
   };
 };
 

@@ -76,8 +76,11 @@ const reachAt = (h: RecipeHost, at: number, point: Vec3, side?: "L" | "R") => {
   return { side: s, ...h.def.reach(b.layered, local, s) };
 };
 
-/** Walks next to `point` (if farther than `reach`) and returns the arrival time. */
-const approach = (h: RecipeHost, t: number, point: Vec3, reach: number): number => {
+/**
+ * Walks next to `point` (if farther than `reach`) and returns the arrival time. When no walk is needed the actor
+ * only turns toward it, and turns back afterwards (`turnBack`), so a seated actor doesn't stay swivelled.
+ */
+const approach = (h: RecipeHost, t: number, point: Vec3, reach: number, turnBackAt?: number): number => {
   const b = baseAt(h.ra, h.def, t);
   const [px, py, pz] = b.placement.position;
   const dx = point[0] - px;
@@ -85,6 +88,7 @@ const approach = (h: RecipeHost, t: number, point: Vec3, reach: number): number 
   const dist = Math.hypot(dx, dz);
   if (dist <= reach) {
     h.apply({ at: t, turn: point, transition: 0.25 });
+    if (turnBackAt !== undefined) h.apply({ at: t + 0.2 + turnBackAt, turn: (b.placement.yaw * 180) / Math.PI, transition: 0.35 });
     return t + 0.2;
   }
   const k = (dist - reach * 0.85) / dist;
@@ -183,7 +187,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
         h.apply({ at: tA + 0.35, hold: { [socket]: item } });
         return tA + 0.7;
       }
-      const tA = approach(h, t, center, humanoidReach);
+      const tA = approach(h, t, center, humanoidReach, 0.8);
       const before = poseAt(h.ra, def, tA);
       const low = isLow(h, tA, grip[1]);
       h.apply({ at: tA, look: grip, transition: 0.2 });
@@ -210,7 +214,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const press = typeof a.target === "string" ? h.pressable(a.target) : null;
       const weight = !!press && a.weight !== false;
       const rest: Vec3 = [point[0], point[1] - (weight ? press!.travel : 0), point[2]];
-      const tA = approach(h, t, point, handSockets(def).length ? humanoidReach : 0.2 * scale);
+      const tA = approach(h, t, point, handSockets(def).length ? humanoidReach : 0.2 * scale, 0.8);
       const before = poseAt(h.ra, def, tA);
       const low = isLow(h, tA, point[1]);
       h.apply({ at: tA, look: point, transition: 0.2 });
@@ -238,6 +242,30 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       h.apply({ at: t, gesture: flinch, intensity: a.intensity, ...(a.emotion ? {} : def.emotions.shocked ? { emotion: "shocked" } : {}), ...(a.target !== undefined ? { look: a.target } : {}) });
       if (a.sound) h.addSfx(t, a.sound, a.volume);
       return t + def.gestures[flinch].duration;
+    }
+
+    case "facepalm":
+    case "sip": {
+      const sockets = handSockets(def);
+      if (!def.selfReach || !sockets.length) {
+        // Armless actors: the closest equivalent is an emotion + their own gesture.
+        if (a.do === "facepalm" && def.emotions.tired) h.apply({ at: t, emotion: "tired", ...(def.gestures.shake ? { gesture: "shake" } : {}) });
+        else return h.error(`${h.where}: ${def.id} has no hands for "${a.do}"`), t;
+        if (a.sound) h.addSfx(t, a.sound, a.volume);
+        return t + 1;
+      }
+      let socket = a.hand;
+      if (a.do === "sip") {
+        socket = socket ?? sockets.find((s) => heldAt(h.ra, s, t));
+        if (!socket || !heldAt(h.ra, socket, t)) return h.error(`${h.where}: sip needs something in a hand (pick-up first)`), t;
+      }
+      const side = (socket ?? "handR") === "handL" ? "L" : "R";
+      const hold = a.duration ?? (a.do === "facepalm" ? 1.6 : 1.1);
+      const r = def.selfReach(baseAt(h.ra, def, t).layered, a.do, side);
+      if (a.do === "facepalm" && def.emotions.tired && !a.emotion) h.apply({ at: t, emotion: "tired", transition: 0.3 });
+      h.apply({ at: t, look: null, joints: r.set, duration: hold, transition: a.do === "facepalm" ? 0.3 : 0.35 });
+      if (a.sound) h.addSfx(t + 0.25, a.sound, a.volume);
+      return t + hold + 0.3;
     }
 
     case "sit-down": {

@@ -1,6 +1,8 @@
 // Interaction recipes expand into ordinary cues, deterministically, for different anatomies.
 import { describe, expect, it } from "vitest";
 import { buildTracks, makeQuery, evaluateScene } from "../src/engine/player/scene";
+import { rayanDef, rayanHand } from "../src/engine/actors/rayan/rayan.data";
+import { restChannels } from "../src/engine/actors/rig";
 import { resolveEpisode } from "../src/engine/core/timeline";
 import { keyTop } from "../src/engine/world/micro-keyboard/keys";
 
@@ -127,5 +129,55 @@ describe("recipes in a seated scene", () => {
   it("unknown code languages warn instead of crashing", () => {
     const r = resolveEpisode({ id: "l", title: "l", set: { environment: "dev-office", params: { "monitor-main": { screen: { preset: "code", lang: "rust", code: "fn main() {}" } } } }, cast: { rayan: { actor: "rayan" } }, camera: [{ at: 0, shot: "establishing" }] }, null);
     expect(r.warnings.join("\n")).toMatch(/lang "rust" isn't highlighted/);
+  });
+});
+
+describe("hand-to-self recipes", () => {
+  const office = (actions: object[], pose = "sit_idle") => ({
+    id: "fp",
+    title: "fp",
+    set: { environment: "dev-office" },
+    cast: { rayan: { actor: "rayan", at: "chair-seat", pose }, claude: { actor: "claude", at: "desk-mascot", scale: 1.5 } },
+    actions,
+    camera: [{ at: 0, shot: "establishing" }],
+    end: 8,
+  });
+
+  it("facepalm puts the palm on the face, seated and standing", () => {
+    for (const pose of ["sit_idle", "stand_idle"]) {
+      const r = resolveEpisode(office([{ at: 1, actor: "rayan", do: "facepalm" }], pose), null);
+      const rayan = r.actors.find((a) => a.id === "rayan")!;
+      const o = rayan.overrides.at(-1)!;
+      expect(o.set["head.x"]).toBeGreaterThan(0.3);
+      const c = { ...restChannels(rayanDef), ...rayanDef.poses[pose].set, ...o.set };
+      const hand = rayanHand(c, "R");
+      const face = rayanDef.anchors(c).face;
+      expect(Math.hypot(hand[0] - face[0], hand[1] - face[1], hand[2] - face[2]), pose).toBeLessThan(0.2);
+      expect(rayan.emotions.at(-1)!.emotion).toBe("tired");
+    }
+  });
+
+  it("sip needs a held cup and brings it to the mouth", () => {
+    expect(() => resolveEpisode(office([{ at: 1, actor: "rayan", do: "sip" }]), null)).toThrow(/sip needs something in a hand/);
+    const r = resolveEpisode(office([{ at: 0.5, actor: "rayan", do: "pick-up", item: "mug" }, { at: 2.5, actor: "rayan", do: "sip" }]), null);
+    const rayan = r.actors.find((a) => a.id === "rayan")!;
+    const sip = rayan.overrides.at(-1)!;
+    const side = rayan.holds.find((h) => h.item === "mug")!.socket === "handL" ? "L" : "R";
+    expect(Object.keys(sip.set)).toContain(`shoulder${side}.x`);
+    expect(sip.set["head.x"]).toBeLessThan(0);
+  });
+
+  it("a seated pick-up turns back to its original facing", () => {
+    const r = resolveEpisode(office([{ at: 0.5, actor: "rayan", do: "pick-up", item: "mug" }]), null);
+    const turns = r.actors.find((a) => a.id === "rayan")!.turns;
+    expect(turns).toHaveLength(2);
+    expect(turns[1].yaw).toBeCloseTo(0);
+  });
+
+  it("the armless mascot gets a tired shake instead of a facepalm", () => {
+    const r = resolveEpisode(office([{ at: 1, actor: "claude", do: "facepalm" }]), null);
+    const claude = r.actors.find((a) => a.id === "claude")!;
+    expect(claude.emotions.at(-1)!.emotion).toBe("tired");
+    expect(claude.gestures.map((g) => g.gesture)).toEqual(["shake"]);
   });
 });

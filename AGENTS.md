@@ -18,7 +18,7 @@ npm run cli -- voice <slug>                          # free offline voices (draf
 npm run cli -- voice --check                         # free: ElevenLabs plan, credits, models, voices
 npm run cli -- voice <slug> --provider elevenlabs    # paid (Eleven v4); never implied by a key in .env
 npm run cli -- validate <slug>                       # beat sheet, ✖ errors, ⚠ camera/pacing/audio/licensing
-npm run cli -- stills <slug> [--frames 0,90] [--verify] [--guides]   # → out/<slug>/contact.png
+npm run cli -- stills <slug> [--frames 0,90] [--verify] [--guides]   # → out/<slug>/contact.png (--frames: contact-frames.png)
 npm run cli -- render <slug> [--master] [--draft]    # → out/<slug>.mp4 (--master: -14 LUFS)
 npm run cli -- review <slug>                         # after render: frame sheet + loudness/mix report
 npm run dev        # Remotion Studio preview
@@ -55,8 +55,8 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
 ## Gotchas learned building the first videos
 
 - Seated actors need seated poses (`sit_idle`, `sit_typing`, `sit_explaining`, `sit_arms_crossed`); standing
-  poses bring standing legs. The stock `facepalm` gesture is tuned for seated Rayan — standing, use a `joints`
-  override computed with `reach` (cookbook §12).
+  poses bring standing legs. The stock `facepalm` gesture stops at chest height; for a palm on the face use the
+  `do: "facepalm"` recipe (seated or standing). `do: "sip"` brings a held mug to the mouth.
 - In `dev-office` the monitors sit at the seated actor's left and the mascot spot at their right: front-ish
   angles see faces; strong side angles get blocked (validate will tell you).
 - The Claude mascot is ~0.27 m at scale 1; use `scale` 1.5–1.8 on a desk, ~2 on giant keys, ~4 standing next to Rayan.

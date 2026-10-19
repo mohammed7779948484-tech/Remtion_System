@@ -9,16 +9,20 @@ Prints a beat sheet (everything in time order) and then:
 - `⚠ voice clip is stale` / `no voice clip` — run `voice`; final renders refuse these.
 - `⚠ free plan` / `unknown rights` — licensing notes for the report; prefer CC0 kit sounds.
 - `⚠ … has no param …` / `unknown screen preset` — typo; the item would silently ignore it.
+- `⚠ shot N … sees the back of <actor>` — that actor faces away from the camera mid-shot (looking at someone, turned by
+  a recipe). Author an `angle`, add `look: "camera"`, or cut elsewhere.
 
 ## stills
 `stills <slug> --guides` renders the middle of every shot into `out/<slug>/contact.png`, shading the vertical-video
-UI zones. Use `--frames a,b,c` to look at accents (pick their `at` × 30 + a few frames). Check:
+UI zones. Use `--frames a,b,c` to look at accents (pick their `at` × 30 + a few frames); those go to
+`contact-frames.png`, so the per-shot `contact.png` stays. Check:
 - faces visible and lit; nobody cropped at the head; the subject of the beat is big enough to read
 - text readable at thumbnail size and outside the shaded zones; no two overlays fighting for the same spot
 - the gag reads without sound (a viewer scrolling muted)
 
-`stills … --verify` renders the same frames in a second order and compares: byte-identical is normal; a few pixels
-off by 1–3/255 on translucent things (dust, holo screens, puffs) is known GPU noise. Anything bigger means
+`stills … --verify` renders the same frames in a second order and compares, printing the largest difference and how
+many pixels differ. Byte-identical is normal; up to ~4/255 on a few hundred pixels of translucent things (dust, holo
+screens, puffs) is known GPU noise. Anything bigger means
 something depends on render order (state, `Math.random`, async content) — fix it.
 
 ## Fixes that came up in practice
@@ -28,7 +32,9 @@ something depends on render order (state, `Math.random`, async content) — fix 
 | A gag happens in a wide shot where the actor is tiny | cut to a `medium` on that actor for the gag |
 | Pointing/hand gestures disappear | shoot from the side the arm moves across (`angle` ±60–70), not along the lens |
 | Custom shot crops the head | prefer a semantic shot (`full`, `medium`) with `angle` |
-| Facepalm doesn't reach the face standing | `joints` override computed with `reach` (cookbook §12) |
+| Facepalm doesn't reach the face | `do: "facepalm"` (the stock `facepalm` gesture stops at chest height) |
+| Back of a head in a shot | author `angle` or `look: "camera"` on that actor |
+| A toast or caption covers a face | shot `offset: [0, -0.12]`, or move the accent (`position`, `width`) |
 | Screen text too small on a phone | repeat it in a `window` or `text` accent |
 | UI ping lands on a word | put it in a pause: `"lN.word:K.end+0.03"` |
 | Hit much louder than voices (`review` ⚠) | `volume` 0.4–0.6 on that sound / recipe |

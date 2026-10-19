@@ -185,7 +185,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   // Two lines of the same speaker at once is almost always a timing mistake (interruptions use two speakers).
   for (let i = 0; i < lines.length; i++)
     for (let j = i + 1; j < lines.length; j++)
-      if (lines[i].speaker === lines[j].speaker && lines[j].start < lines[i].end - 0.05 && lines[i].start < lines[j].end - 0.05)
+      // Measured to the last spoken word: starting a line in the previous clip's trailing silence is fine.
+      if (lines[i].speaker === lines[j].speaker && lines[j].start < spokenEnd(lines[i]) - 0.05 && lines[i].start < spokenEnd(lines[j]) - 0.05)
         warnings.push(`dialogue ${lines[j].id} overlaps ${lines[i].id} (same speaker ${lines[i].speaker})`);
   if (anyUnvoiced && ep.dialogue.length) warnings.push(`some lines have no generated voice (timing estimated) — run \`npm run cli -- voice ${ep.id}\``);
 
@@ -554,6 +555,8 @@ const toShot = (
 };
 
 export { lineHash };
+
+const spokenEnd = (l: ResolvedLine) => (l.words.length ? l.start + l.words[l.words.length - 1].end : l.end);
 
 /** Warn (never fail) on params a catalog prop doesn't read, and on unknown screen presets/params. */
 const checkItemParams = (kind: string, params: Record<string, unknown>, where: string, customScreens: string[], warnings: string[]) => {

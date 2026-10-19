@@ -81,9 +81,9 @@ const Action = z.strictObject({
   speed: z.number().positive().optional(),
   /**
    * Interaction recipe, expanded into ordinary cues: press | point | pick-up | place | react | sit-down |
-   * stand-up. Only `emotion` is applied alongside it.
+   * stand-up | facepalm | sip. Only `emotion` is applied alongside it.
    */
-  do: z.enum(["press", "point", "pick-up", "place", "react", "sit-down", "stand-up"]).optional(),
+  do: z.enum(["press", "point", "pick-up", "place", "react", "sit-down", "stand-up", "facepalm", "sip"]).optional(),
   /** Recipe target: "item.anchor" (e.g. "keyboard.key:ctrl"), an item, actor[.anchor], mark or [x,y,z]. */
   target: Place.optional(),
   /** Recipe item (pick-up / place). */

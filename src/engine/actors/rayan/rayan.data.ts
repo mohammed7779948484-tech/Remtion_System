@@ -205,6 +205,16 @@ export const rayanDef: ActorDefinition = {
     headphones: { type: "boolean", default: true, description: "Headphones around the neck" },
   },
   recipeGestures: { flinch: "flinch", stomp: "stomp", crouchPose: "crouch", stompContact: 0.45 },
+  selfReach: (c0, what, side) => {
+    // Bow into the palm / tilt back to drink, then reach the hand there (works seated and standing).
+    const bow = what === "facepalm" ? { head: 0.45, torso: 0.2 } : { head: -0.12, torso: 0.05 };
+    const c = { ...c0, "head.x": c0["head.x"] + bow.head, "torso.x": c0["torso.x"] + bow.torso };
+    const face = rayanDef.anchors(c).face;
+    const s = side === "L" ? 1 : -1;
+    const target: Vec3 = what === "facepalm" ? [face[0] + s * 0.11, face[1] - 0.07, face[2] - 0.06] : [face[0] + s * 0.03, face[1] - 0.2, face[2] + 0.05];
+    const r = rayanDef.reach!(c, target, side);
+    return { set: { ...r.set, "head.x": c["head.x"], "torso.x": c["torso.x"], ...(what === "facepalm" ? { lidL: 0.85, lidR: 0.85 } : {}) }, reached: r.reached };
+  },
   reach: (c, target, side) => {
     const r = armIK(armRig(side === "L" ? 1 : -1), inFrame(torsoFrame(c), target));
     return {

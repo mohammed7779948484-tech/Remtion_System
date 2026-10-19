@@ -161,3 +161,17 @@ describe("resolveEpisode", () => {
     expect(r.duration).toBeCloseTo(r.lines[2].end + 1.5);
   });
 });
+
+describe("same-speaker overlap", () => {
+  it("starting a line in the previous clip's trailing silence is not an overlap", () => {
+    const v: VoiceManifest = {
+      version: 1,
+      lines: {
+        l1: { ...voice.lines.l1, words: [{ text: "Okay.", start: 0.1, end: 0.5 }, { text: "Final", start: 0.9, end: 1.2 }, { text: "deploy.", start: 1.25, end: 1.3 }] },
+      },
+    };
+    // l1 lasts 2 s but its last word ends at 1.3 s; l2 (same speaker) starts at 1.5 s into it.
+    const ep = { ...base, dialogue: [base.dialogue[0], { id: "l2", speaker: "rayan", text: "Also this.", at: "l1.word:3.end+0.2" }] };
+    expect(resolveEpisode(ep, v).warnings.join("\n")).not.toMatch(/overlaps/);
+  });
+});

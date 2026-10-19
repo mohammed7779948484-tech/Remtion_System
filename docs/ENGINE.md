@@ -98,6 +98,8 @@ nothing new runs per frame and every anatomy uses its own channels (`reach`, `re
 | `place` | `target` | walks close, reaches, releases; the carried item reappears there (a copy toggled visible, so camera occluders stay static). On a pressable anchor its weight presses it. |
 | `react` | `target?` | flinch + shocked + look at the source. |
 | `sit-down` / `stand-up` | `target?` (seat mark / where to walk) | walk + slow pose blend. |
+| `facepalm` | — | palm on the face, head bowed, eyes shut (seated or standing, via the actor's `selfReach`); armless actors get `tired` + a head shake. |
+| `sip` | a held item | brings it to the mouth (`hand` picks which). |
 
 Every recipe takes `sound` (played at the moment of contact). Only `emotion` is applied alongside a `do`. For
 choreography the recipes can't express, use `joints` or a custom `scene` component.

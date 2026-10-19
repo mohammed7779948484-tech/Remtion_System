@@ -5,7 +5,8 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
 
 ## Contents
 1. Skeleton · 2. Cast & voices · 3. Dialogue & time refs · 4. Actions · 5. Recipes · 6. Accents (fx)
-7. Screens & props cues · 8. Set overrides · 9. Camera · 10. Sound · 11. Mood · 12. Escape hatches
+7. Screens & props cues · 8. Set overrides · 9. Camera · 10. Sound · 11. Mood · 12. Custom locations
+13. Escape hatches
 
 ## 1. Skeleton
 ```json
@@ -41,7 +42,8 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
 { "id": "l3", "speaker": "claude", "text": "[sighs] I weigh nothing.", "at": "l2.end+5.9" }
 ```
 Refs: `"l2.start"`, `"l2.end+0.3"`, `"l3.word:2"` (2nd spoken word; tags don't count), `"l3.word:2.end-0.1"`.
-Lines can only reference earlier lines. A pause between words is the right spot for a UI ping:
+Lines can only reference earlier lines, and refs only point at dialogue lines: beats before the first line use
+absolute seconds. A pause between words is the right spot for a UI ping:
 `"l1.word:1.end+0.03"`.
 
 ## 4. Actions
@@ -67,12 +69,20 @@ A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
 { "at": "l4.end+1.75", "actor": "rayan",  "do": "place", "target": "keyboard.key:ctrl", "rotation": -20, "sound": "impact-soft", "volume": 0.45 },
 { "at": 0.48,          "actor": "rayan",  "do": "react", "target": "claude" },
 { "at": 1,             "actor": "rayan",  "do": "sit-down", "target": "chair-seat" },
-{ "at": 9,             "actor": "rayan",  "do": "stand-up", "target": "beside-desk" }
+{ "at": 9,             "actor": "rayan",  "do": "stand-up", "target": "beside-desk" },
+{ "at": 6,             "actor": "rayan",  "do": "sip", "duration": 1.2 },
+{ "at": "l5.end+0.4",  "actor": "rayan",  "do": "facepalm", "duration": 1.8 }
 ```
+- `facepalm` (palm on the face, head bowed, eyes shut) and `sip` (held cup to the mouth) work seated and standing.
+  `sip` needs a `pick-up` first; the armless mascot's `facepalm` becomes a tired head shake.
 - `press` while standing on the key = stomp/hop and the actor sinks with the key; otherwise a hand tap. Keys stay
   down unless you give `duration`. Release a key you stood on by moving off it and a props cue `{ "keys": { "z": false } }`.
 - `place` on a pressable anchor presses it (the weight); the carried item reappears there.
-- Recipes walk the actor close first when the target is out of reach; budget ~1.5 s for pick-up/place.
+- Recipes walk the actor close first when the target is out of reach; budget ~1.5 s for pick-up/place. Within
+  reach they just turn toward it and turn back afterwards (a seated actor doesn't stay swivelled).
+- Walk in and sit: `move` to a mark next to the chair (`beside-desk`), then `do: "sit-down"` with
+  `target: "chair-seat"`. Moves are straight lines (no pathfinding): pick marks with a clear path. Frame the walk with
+  `follow` or cut it in two; a semantic shot on a moving subject frames its whole path and comes out wide.
 
 ## 6. Accents (`fx`)
 ```json
@@ -130,8 +140,11 @@ giant_keyboard` lists `key:<id>` anchors (y 0.42; pressed keys sink 0.18).
 { "at": 12, "shot": "insert", "item": "monitor-main", "anchor": "screen" },
 { "at": 27, "shot": "close", "subject": "rayan", "angle": -15, "move": { "type": "push-in", "amount": 0.15 } }
 ```
-`angle` is degrees around the subject from its facing (+ = its left). Authored values are used exactly; solver
-warnings in `validate` mean a blocked or out-of-frame shot. In `dev-office` the monitors block many angles on the seated
+`angle` is degrees around the subject from its facing in the middle of the shot (+ = its left); for a `two-shot`
+it is measured from the side of the line between the two heads that the first subject faces. Authored values are
+used exactly; solver warnings in `validate` mean a blocked or out-of-frame shot, or a shot that sees the back of a head.
+`offset: [x, y]` moves the subject on screen in half-frame units (+x right, +y up), e.g. `[0, -0.12]` drops a face
+below a top toast. `fov` is vertical, as in three.js. In `dev-office` the monitors block many angles on the seated
 actor — try a few (`validate` is instant) before rendering stills. Close shots of the desk mascot work best from the front.
 
 ## 10. Sound
@@ -147,14 +160,29 @@ Episode-specific files: put them in `public/videos/<slug>/` and use the relative
 `"mood": "macro-warm"` or inline `{ "base": "macro-warm", "fill": { "color": "#7f97ff", "intensity": 0.8, "position": [-6, 4, 9] } }`;
 change over time with `"lighting": [{ "at": "l2.end", "mood": "red-alert", "transition": 0.2 }]`. `list moods`.
 
-## 12. Escape hatches
+## 12. Custom locations (`new --env custom`)
+Facts you'd otherwise dig out of engine source:
+- `shell.floor: "none"` removes the built-in floor (sky, space); otherwise a 40 × 40 m floor sits at y = 0.
+- The key light aims at the origin and casts shadows within ±`shadowRadius` m (default 4.5): keep the stage near the
+  origin or set `shadowRadius` on the environment.
+- The camera far plane is 80 m: domes and backdrops must sit inside it.
+- A custom item has anchors only through `size` (the centre of its size box); add `marks` for look and move targets
+  (`"look": "cloud-top"`). `size` also makes it a camera occluder.
+- Components get `{ id, params, since, t, practicals, screens, cues }`; animate only from those. `useEvent(name)`
+  returns the latest event with that name, so a repeated beat can reuse one name. `ScreenSurface` draws any screen
+  preset or your own draw function onto a plane.
+- The scaffold casts Rayan and Claude on its two marks; remove whoever the story doesn't need.
+
+## 13. Escape hatches
 - **Exact joint poses** (`joints`, released after `duration`):
   `{ "at": 27.8, "actor": "rayan", "joints": { "shoulderR.x": -1.99, "elbowR.x": -1.14, "head.x": 0.45 }, "transition": 0.3 }`.
-  To compute arm values that put a hand on a point, run the actor's `reach` once in a scratch script
-  (`node --import tsx scratch/x.ts`; target is root-local metres, +Z forward, +X = his left; hands reach ~0.5 m):
+  `facepalm` and `sip` cover the common hand-to-face moves. For any other hand target, run the actor's `reach` once
+  in a scratch script kept outside the repo (your session scratchpad, `node --import tsx x.ts`, engine imported by
+  `file:///` URL). Targets are root-local metres, +Z forward, +X = his left; hands reach ~0.5 m; for a seated actor
+  start from `rayanDef.poses.sit_idle.set`:
   ```ts
-  import { rayanDef, rayanHand } from "../src/engine/actors/rayan/rayan.data";
-  import { restChannels } from "../src/engine/actors/rig";
+  import { rayanDef } from "file:///D:/Remtion_System/src/engine/actors/rayan/rayan.data.ts";
+  import { restChannels } from "file:///D:/Remtion_System/src/engine/actors/rig.ts";
   const c = { ...restChannels(rayanDef), ...rayanDef.poses.stand_idle.set, "torso.x": 0.2, "head.x": 0.45 };
   const face = rayanDef.anchors(c).face;                       // anchors: feet waist chest head face top
   const r = rayanDef.reach!(c, [face[0] - 0.11, face[1] - 0.07, face[2] - 0.06], "R");

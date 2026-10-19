@@ -25,7 +25,8 @@ star for every later decision, not a form. Read `references/creative-direction.m
 camera grammar, mobile readability and sound design before writing the beats.
 
 `--env custom` creates a video-local location (`video.data.ts` + components), the pattern to copy when the story
-needs a place that doesn't exist yet. Don't edit shared engine data for one video.
+needs a place that doesn't exist yet; "Custom locations" in the cookbook lists the engine facts you'll need (floor,
+shadows, far plane, anchors). Don't edit shared engine data for one video.
 
 ## 2. Discover what exists (don't read engine source unless you're extending the engine)
 
@@ -44,13 +45,15 @@ npm run cli -- show environment micro-keyboard
 Patterns for everything below are in `references/direction-cookbook.md` (copy-paste JSON). Essentials:
 
 - **Time everything off dialogue** (`"l2.end+0.3"`, `"l3.word:2"`) so re-voicing keeps the beats aligned.
-- **Interactions**: `"do": "press" | "point" | "pick-up" | "place" | "react" | "sit-down" | "stand-up"` expand into
-  ordinary cues for each actor's anatomy (the mascot hops/leans, Rayan reaches with his arms). `"weight": false`
-  makes a press fail on purpose. `sound` + `volume` play at the moment of contact.
+- **Interactions**: `"do": "press" | "point" | "pick-up" | "place" | "react" | "sit-down" | "stand-up" | "facepalm" |
+  "sip"` expand into ordinary cues for each actor's anatomy (the mascot hops/leans, Rayan reaches with his arms,
+  seated or standing). `"weight": false` makes a press fail on purpose. `sound` + `volume` play at the moment of contact.
 - **Accents** (`"fx"`): punch text, UI windows (chat / terminal / dialog / notification toast), callouts pinned to
   3D things, impacts, camera shake, glitch, flash/dip. They are what makes a beat land on a phone.
 - **Camera**: prefer semantic shots (`close`, `medium`, `full`, `two-shot`, `over-shoulder`, `insert`) with a
   `subject`; the solver frames for 9:16 and avoids occluders. Use `custom` only for deliberate compositions.
+  `angle` is measured from where the subject faces in the middle of the shot; looks, turns and recipes change that,
+  so a character looking at someone else can show you the back of their head (`validate` warns).
 - **Screens** (`props` cues on monitors/the giant screen): `code`, `terminal`, `error`, `deploy`, `window`, plus a
   `popup` on any of them. Text on in-world screens is small on phones — repeat the key words in a `window`/`text` fx.
 
@@ -80,7 +83,8 @@ npm run cli -- voice <slug> --provider elevenlabs    # paid, Eleven v4 (~1 credi
 Draft with offline voices; switch to ElevenLabs once the script is locked (it prints the character count first).
 Offline (SAPI) clips leave ~0.7 s of silence after each line, so drafts run long and captions linger: time the next
 beat off the last spoken word (`"l2.word:5.end+0.2"`) rather than `"l2.end"`, and keep `gap`s small. That timing
-also survives the switch to v4, whose clips are tighter.
+also survives the switch to v4, whose clips are tighter. SAPI also pauses ~0.5–0.9 s at commas and full stops inside
+a line. `voice.rate` N speeds it up by roughly 6N % (below 3 it barely changes; 4 ≈ 10 % faster).
 Inline tags like `[sighs]`, `[panicked]`, `[proudly]` are performed by v4 and stripped from captions and word refs.
 Unchanged lines are cached, so editing one line only re-buys that line. Free-plan clips are non-commercial and the
 post title must credit "elevenlabs.io" — `validate` reminds you; mention it in your report.
@@ -90,7 +94,7 @@ post title must credit "elevenlabs.io" — `validate` reminds you; mention it in
 ```
 npm run cli -- validate <slug>          # fix every ✖; read every ⚠ (camera, pacing, audio, licensing); beat sheet
 npm run cli -- stills <slug> --guides   # then LOOK at out/<slug>/contact.png
-npm run cli -- stills <slug> --frames 18,360 --verify   # frames where fx are active: render-order determinism
+npm run cli -- stills <slug> --frames 18,360 --verify   # spot checks → contact-frames.png + render-order determinism
 ```
 
 Look at the contact sheet like a viewer on a phone: faces visible and lit, the gag readable in each shot, text big

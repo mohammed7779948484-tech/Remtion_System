@@ -20,10 +20,12 @@ const Shell: React.FC<{ layout: Layout }> = ({ layout }) => {
   const s = layout.shell;
   return (
     <group name="shell">
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color={s.floor} roughness={0.9} />
-      </mesh>
+      {s.floor === "none" ? null : (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+          <planeGeometry args={[40, 40]} />
+          <meshStandardMaterial color={s.floor} roughness={0.9} />
+        </mesh>
+      )}
       {s.walls.back ? (
         <group>
           <mesh position={[0, s.height / 2, s.back - 0.05]} receiveShadow>

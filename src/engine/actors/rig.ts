@@ -81,6 +81,11 @@ export type ActorDefinition = {
    * other anatomies lean/stretch toward it. Used by the reach-based recipes (point, press, pick-up, place).
    */
   reach?: (c: Channels, target: Vec3, side: "L" | "R") => { set: Channels; reached: boolean };
+  /**
+   * Optional: hand-to-self moves for the `facepalm` and `sip` recipes (palm on the face with the head bowed; a held
+   * cup at the mouth). Returns the channel values to hold, from the current channels.
+   */
+  selfReach?: (c: Channels, what: "facepalm" | "sip", side: "L" | "R") => { set: Channels; reached: boolean };
   /** Optional: gesture names the recipes use for this anatomy (defaults: flinch, stomp/hop). */
   recipeGestures?: { flinch?: string; stomp?: string; crouchPose?: string; /** Fraction of the stomp gesture where it lands (default 0.5). */ stompContact?: number };
 };

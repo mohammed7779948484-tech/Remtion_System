@@ -138,7 +138,7 @@ const BRIEF = (title: string, preset: string, env: string) => `# ${title} — br
 > episode.json and custom code are the executable direction.
 
 **Concept (one line):**
-**Platform / format:** ${preset === "portrait" ? "9:16 Shorts / Reels / TikTok" : preset === "square" ? "1:1 feed" : "16:9 YouTube"} · target ~25–35 s
+**Platform / format:** ${preset === "portrait" ? "9:16 Shorts / Reels / TikTok" : preset === "square" ? "1:1 feed" : "16:9 YouTube"} · target ~15–35 s
 **Audience:** developers and AI-curious viewers
 
 ## Hook (0–2 s)
@@ -231,7 +231,7 @@ const newVideo = () => {
     set: { environment: envId },
     cast: {
       rayan: { actor: "rayan", at: hero?.[0] ?? [-0.6, 0, 0], pose: seated ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop" } },
-      claude: { actor: "claude", at: partner?.[0] ?? [0.7, 0, 0.2], scale: raised ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%" } },
+      claude: { actor: "claude", at: partner?.[0] ?? [0.7, 0, 0.2], scale: raised ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+30%" } },
     },
     dialogue: [
       { id: "l1", speaker: "rayan", text: "Hello world." },
@@ -242,8 +242,8 @@ const newVideo = () => {
       { at: "l2.start", actor: "rayan", look: "claude", emotion: "happy", ...(seated ? { pose: "sit_idle" } : {}) },
     ],
     camera: [
-      { at: 0, shot: "wide", subject: ["rayan", "claude"] },
-      { at: "l1.start", shot: "close", subject: "rayan" },
+      { at: 0, shot: "close", subject: "rayan" },
+      { at: "l1.end", shot: "medium", subject: "claude" },
       { at: "l2.start", shot: "over-shoulder", subject: "claude", over: "rayan" },
     ],
   };
@@ -316,6 +316,16 @@ const validate = async () => {
         if (!p) continue;
         const n = project(f, p, aspect);
         if (n.depth <= 0 || Math.abs(n.x) > 1 || Math.abs(n.y) > 1) notes.push(`${label}: ${id}'s face is out of frame at ${t.toFixed(2)}s`);
+        // Back of the head: the body faces away from the camera (looks/turns during the shot change this).
+        const head = q.anchor(id, "head", t);
+        if (head && u === 0.5 && shot.type !== "over-shoulder") {
+          const fx = p[0] - head[0];
+          const fz = p[2] - head[2];
+          const cx = f.position[0] - p[0];
+          const cz = f.position[2] - p[2];
+          const cos = (fx * cx + fz * cz) / Math.max(1e-6, Math.hypot(fx, fz) * Math.hypot(cx, cz));
+          if (cos < -0.2) notes.push(`${label}: the camera sees the back of ${id} at ${t.toFixed(2)}s — author an \`angle\`, add \`look: "camera"\`, or cut elsewhere`);
+        }
       }
     }
   });
@@ -352,7 +362,8 @@ const stills = async () => {
     files.forEach((f, i) => fs.copyFileSync(path.join(ROOT, out, f), path.join(tmp, `${String(i).padStart(4, "0")}.png`)));
     const cols = Math.min(4, files.length);
     const rows = Math.ceil(files.length / cols);
-    const sheet = path.join("out", slug, "contact.png");
+    // Spot checks (--frames) get their own sheet so the one-per-shot contact.png stays intact.
+    const sheet = path.join("out", slug, flag("frames") ? "contact-frames.png" : "contact.png");
     // --guides: shade where vertical-video platforms put their UI (top bar, caption/description area,
     // right-hand action rail) so faces, captions and titles can be checked against it.
     const guides = has("guides") && r.height > r.width ? "drawbox=x=0:y=0:w=iw:h=ih*0.10:color=red@0.3:t=fill,drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.20:color=red@0.3:t=fill,drawbox=x=iw*0.86:y=ih*0.40:w=iw*0.14:h=ih*0.40:color=red@0.3:t=fill," : "";
@@ -376,7 +387,13 @@ const stills = async () => {
         continue;
       }
       const psnr = hasFfmpeg() ? spawnSync("ffmpeg", ["-hide_banner", "-i", path.join(out, f), "-i", path.join(vout, f), "-lavfi", "psnr", "-f", "null", "-"], { encoding: "utf8", shell: true }).stderr.match(/average:([\w.]+)/)?.[1] : "?";
-      diffs.push(`${f}: PSNR ${psnr} dB`);
+      // How big and how widespread: max channel difference and number of differing pixels.
+      const stat = (extra: string) =>
+        hasFfmpeg() ? spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-i", path.join(out, f), "-i", path.join(vout, f), "-filter_complex", `"[0:v][1:v]blend=all_mode=difference,format=gray${extra},signalstats,metadata=mode=print:file=-"`, "-f", "null", "-"], { encoding: "utf8", shell: true }).stdout : "";
+      const max = stat("").match(/YMAX=(\d+)/)?.[1] ?? "?";
+      const frac = Number(stat(",geq=lum='gt(lum(X\,Y)\,0)*255'").match(/YAVG=([\d.]+)/)?.[1] ?? NaN);
+      const px = Number.isNaN(frac) ? "?" : String(Math.round((frac / 255) * r.width * r.height));
+      diffs.push(`${f}: PSNR ${psnr} dB, max difference ${max}/255 on ${px} pixels${Number(max) <= 4 ? " (harmless GPU noise)" : ""}`);
     }
     console.log(`✔ determinism: ${identical}/${files.length} frames byte-identical across render orders`);
     for (const d of diffs) console.log(`⚠ ${d}`);

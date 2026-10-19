@@ -24,6 +24,7 @@ export type CameraSpot = { position: Vec3; target: Vec3; fov: number; descriptio
 export type Box = { id: string; center: Vec3; half: Vec3; yaw: number };
 
 export type Shell = {
+  /** Floor colour, or "none" for places without ground (sky, space): build your own surfaces. */
   floor: string;
   wall: string;
   trim: string;

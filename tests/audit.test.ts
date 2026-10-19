@@ -1,7 +1,10 @@
 // Final-render audio readiness: drafts may be silent/estimated, final renders may not.
+import fs from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { SFX_KIT } from "../src/engine/audio/sfx.data";
 import { auditAudio } from "../src/engine/audio/audit";
-import { lineHash, type VoiceManifest } from "../src/engine/audio/speech";
+import { lineHash, SFX_LIBRARY, type VoiceManifest } from "../src/engine/audio/speech";
 import { resolveEpisode } from "../src/engine/core/timeline";
 
 const castVoice = { system: "Microsoft David Desktop" };
@@ -39,5 +42,24 @@ describe("auditAudio", () => {
   it("blocks missing local dialogue and sfx files", () => {
     const a = auditAudio(resolveEpisode(ep, manifest()), (f) => !f.endsWith(".wav"));
     expect(a.errors).toEqual(["missing audio file public/videos/t/voice/l1.wav", "missing audio file public/videos/t/sfx/pop.wav"]);
+  });
+});
+
+describe("sfx library", () => {
+  it("every kit sound is a committed local CC0 file with provenance", () => {
+    for (const [id, m] of Object.entries(SFX_KIT)) {
+      expect(fs.existsSync(path.join("public", m.file)), id).toBe(true);
+      expect(m.license, id).toBe("CC0-1.0");
+      expect(m.source, id).toMatch(/^https:\/\//);
+      expect(SFX_LIBRARY[id], id).toBe(m.file);
+    }
+  });
+
+  it("warns when an episode uses sounds with unknown rights", () => {
+    const r = resolveEpisode({ ...ep, sfx: [{ at: 1, sound: "vine-boom" }, { at: 2, sound: "key-clack" }] }, manifest());
+    const a = auditAudio(r, all);
+    expect(a.warnings.join("\n")).toMatch(/unknown rights.*vine-boom/);
+    expect(a.warnings.join("\n")).not.toMatch(/key-clack/);
+    expect(a.files).toContain("sfx/key-clack.wav");
   });
 });

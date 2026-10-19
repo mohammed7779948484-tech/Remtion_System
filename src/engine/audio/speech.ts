@@ -4,6 +4,7 @@
 // opens the mouth. It is not phoneme lip-sync (no visemes); a phoneme track (e.g. from Rhubarb)
 // would be the upgrade path, consumed the same way through an actor's `life` signals.
 import type { Caption } from "@remotion/captions";
+import { SFX_INFO } from "./sfx.data";
 
 export type Word = { text: string; start: number; end: number };
 export type Envelope = { rate: number; values: number[] };
@@ -227,13 +228,5 @@ export const wordsFromAlignment = (a: { characters: string[]; character_start_ti
   return words;
 };
 
-/** Curated short sound effects hosted by Remotion (see the Remotion sfx skill). */
-export const SFX_LIBRARY: Record<string, string> = Object.fromEntries(
-  [
-    "whoosh", "whip", "page-turn", "switch", "mouse-click", "shutter-modern", "shutter-old", "ding", "bruh", "vine-boom",
-    "windows-xp-error", "fah", "spongebob-fail", "omg-hell-nah", "price-is-right-fail", "romance-meme", "bone-crack",
-    "anime-wow", "yippee", "loading-lag", "wilhelm-scream", "mac-quack", "skedaddle", "snapchat-notification",
-    "nelly-ahh", "sanctuary-guardian-what", "minecraft-hurt", "oh-my-god-vine", "illuminati-confirmed",
-    "dramatic-boomer", "triggered", "record-scratch",
-  ].map((n) => [n, `https://remotion.media/${n}.wav`]),
-);
+/** Sound library by name → public-relative file (local CC0 kit) or URL (remote legacy). Details: SFX_INFO. */
+export const SFX_LIBRARY: Record<string, string> = Object.fromEntries(Object.entries(SFX_INFO).map(([k, v]) => [k, v.file]));

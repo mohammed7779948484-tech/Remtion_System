@@ -103,7 +103,11 @@ const list = async () => {
     moves: () => Object.entries((cat["camera.json"] as { moves: Record<string, string> }).moves).forEach(([k, v]) => console.log(`  ${k.padEnd(14)} ${v}`)),
     moods: () => Object.entries(cat["moods.json"] as Record<string, { description: string }>).forEach(([k, v]) => console.log(`  ${k.padEnd(14)} ${v.description}`)),
     screens: () => Object.entries(cat["screens.json"] as Record<string, { description: string; params: object }>).forEach(([k, v]) => console.log(`  ${k.padEnd(14)} ${v.description}  [${Object.keys(v.params).join(", ")}]`)),
-    sfx: () => console.log(`  ${Object.keys(cat["sfx.json"]).join(", ")}`),
+    sfx: () => {
+      const all = Object.entries(cat["sfx.json"] as Record<string, { license: string; tags: string[]; description: string; meanDb?: number }>);
+      for (const [k, v] of all.filter(([, v]) => v.license !== "unknown")) console.log(`  ${k.padEnd(14)} ${v.description}  [${v.tags.join(", ")}]${v.meanDb !== undefined ? ` ${v.meanDb} dB` : ""}  ${v.license}`);
+      console.log(`  remote, unknown rights (avoid in monetized work): ${all.filter(([, v]) => v.license === "unknown").map(([k]) => k).join(", ")}`);
+    },
     fx: () => Object.entries(cat["fx.json"] as Record<string, { layer: string; description: string; pickWhen: string; params: string[] }>).forEach(([k, v]) => console.log(`  ${k.padEnd(9)} [${v.layer}] ${v.description}
             use for: ${v.pickWhen}
             params: ${v.params.join(", ")}`)),

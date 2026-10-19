@@ -30,6 +30,8 @@ export const auditAudio = (r: ResolvedEpisode, exists: (publicPath: string) => b
   if (free) warnings.push(`${free} dialogue clip(s) come from the ElevenLabs free plan: non-commercial use only (also after upgrading), and the published title must credit "elevenlabs.io"`);
   const unknownTier = r.lines.filter((l) => l.provider === "elevenlabs" && (!l.tier || l.tier === "unknown")).length;
   if (unknownTier) warnings.push(`${unknownTier} ElevenLabs clip(s) have no recorded plan: check the license before publishing commercially`);
+  const unknownRights = [...new Set(r.sfx.filter((s) => s.license === "unknown").map((s) => s.name))];
+  if (unknownRights.length) warnings.push(`sounds with unknown rights (meme clips — avoid in monetized videos; see \`list sfx\` for CC0 ones): ${unknownRights.join(", ")}`);
   const sources = [...r.sfx.map((s, i) => ({ src: s.src, what: `sfx at ${s.at.toFixed(2)}s (#${i})` })), ...(r.music ? [{ src: r.music.src, what: "music" }] : [])];
   const remote = new Set<string>();
   for (const s of sources) {

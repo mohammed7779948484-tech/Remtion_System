@@ -10,6 +10,7 @@ import { ENVIRONMENTS } from "../world/environments";
 import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropCue, type SetOverrides } from "../world/layout";
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
+import { SFX_INFO } from "../audio/sfx.data";
 import { FX_INFO, type ResolvedFx } from "./fx";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
 import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeAction, type EpisodeShot } from "./schema";
@@ -68,7 +69,7 @@ export type ResolvedEpisode = {
   lines: ResolvedLine[];
   shots: Shot[];
   props: PropCue[];
-  sfx: { at: number; src: string; volume: number }[];
+  sfx: { at: number; src: string; volume: number; /** Library name and its license, when it is a library sound. */ name?: string; license?: string }[];
   events: { name: string; at: number; end: number; data: Record<string, unknown> }[];
   fx: ResolvedFx[];
   /** Post effects this episode needs (fixed for the whole render, so passes never change mid-render). */
@@ -462,7 +463,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       if (!SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound) && !/\.(wav|mp3|ogg|m4a)$/i.test(s.sound)) {
         errors.push(`sfx[${i}]: "${s.sound}" is not a library sound, URL or audio file in public/`);
       }
-      return { at: timeOf(s.at, `sfx[${i}]`), src, volume: s.volume ?? 1 };
+      const info = SFX_INFO[s.sound];
+      return { at: timeOf(s.at, `sfx[${i}]`), src, volume: s.volume ?? 1, ...(info ? { name: s.sound, license: info.license } : {}) };
     })
     .sort((a, b) => a.at - b.at);
 

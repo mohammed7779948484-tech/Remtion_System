@@ -10,6 +10,7 @@ import { ENVIRONMENTS } from "../world/environments";
 import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropCue, type SetOverrides } from "../world/layout";
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
+import { FX_INFO, type ResolvedFx } from "./fx";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
 import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeAction, type EpisodeShot } from "./schema";
 import type { Vec3 } from "./time";
@@ -69,6 +70,9 @@ export type ResolvedEpisode = {
   props: PropCue[];
   sfx: { at: number; src: string; volume: number }[];
   events: { name: string; at: number; end: number; data: Record<string, unknown> }[];
+  fx: ResolvedFx[];
+  /** Post effects this episode needs (fixed for the whole render, so passes never change mid-render). */
+  post: { chroma: boolean };
   music?: { src: string; volume: number; duck: number };
   captions: { style: "subtitle" | "pop" | "none"; pageSeconds: number };
   warnings: string[];
@@ -254,7 +258,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const sortedActions = [...ep.actions].map((a, i) => ({ a, i, t: timeOf(a.at, `actions[${i}]`) })).sort((x, y) => x.t - y.t || x.i - y.i);
   // Cues produced by recipes (merged with the authored props/sfx below).
   const recipeProps: PropCue[] = [];
-  const recipeSfx: { at: number; sound: string }[] = [];
+  const recipeSfx: { at: number; sound: string; volume?: number }[] = [];
   const applyAction = (a: Omit<EpisodeAction, "at">, t: number, where: string) => {
     contentEnd = Math.max(contentEnd, t + (a.transition ?? 0));
     const ra = actorById.get(a.actor);
@@ -375,6 +379,28 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     contentEnd = Math.max(contentEnd, end);
   }
 
+  // ---- accents (fx): times, 3D targets, and their sounds
+  const fx: ResolvedFx[] = ep.fx.map((f, i) => {
+    const at = timeOf(f.at, `fx[${i}]`);
+    const { type, at: _at, duration, sound, volume, ...data } = f as typeof f & { on?: Vec3 | string };
+    const where = `fx[${i}] (${type})`;
+    let on: ResolvedFx["on"];
+    const ref = (f as { on?: Vec3 | string }).on;
+    if (ref !== undefined) {
+      if (Array.isArray(ref)) on = ref;
+      else {
+        const [head, anchor] = ref.split(".");
+        if (ep.cast[head]) on = { actor: head, anchor: anchor ?? "chest" };
+        else if (itemIds.has(head)) on = itemAnchor(layout, head, ref.includes(".") ? ref.slice(ref.indexOf(".") + 1) : "center");
+        else if (layout.marks[ref]) on = layout.marks[ref].position;
+        else errors.push(`${where}: unknown target "${ref}"`);
+      }
+    }
+    if (sound) recipeSfx.push({ at, sound, volume });
+    return { type, at, end: at + (duration ?? FX_INFO[type].duration), data, ...(on ? { on } : {}), seed: `${ep.seed ?? ep.id}:fx${i}` };
+  });
+  contentEnd = Math.max(contentEnd, ...fx.map((f) => f.end));
+
   // ---- end time: the latest-ending thing in the episode (not just the last array entry).
   const events = ep.events.map((e, i) => {
     const at = timeOf(e.at, `events[${i}]`);
@@ -428,7 +454,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       return { at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set };
     }), ...recipeProps]
     .sort((a, b) => a.at - b.at);
-  const sfx = [...ep.sfx, ...recipeSfx.map((r) => ({ at: r.at as number | string, sound: r.sound, volume: undefined, prompt: undefined }))]
+  const sfx = [...ep.sfx, ...recipeSfx.map((r) => ({ at: r.at as number | string, sound: r.sound, volume: r.volume, prompt: undefined }))]
     .map((s, i) => {
       // Library name, URL, or a file relative to the video's public folder (public/videos/<id>/...).
       const isFile = !SFX_LIBRARY[s.sound] && !/^https?:\/\//.test(s.sound);
@@ -463,6 +489,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     props,
     sfx,
     events,
+    fx,
+    post: { chroma: fx.some((f) => f.type === "glitch") },
     music: ep.music ? { src: ep.music.src, volume: ep.music.volume ?? 0.35, duck: ep.music.duck ?? 0.35 } : undefined,
     captions: { style: ep.captions?.style ?? "subtitle", pageSeconds: ep.captions?.pageSeconds ?? 1.6 },
     warnings,

@@ -95,7 +95,7 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | 0 Safety + baseline | ✅ done | key moved to ignored `.env` (never printed); `.env.example` restored + `tests/secrets.test.ts`; exposure scan: 0/6 commits, nothing staged, no other files (key appeared only in a local session log → rotation recommended, low urgency). Baseline stills in `out/baseline/`. |
 | 1 V1 defect fixes | ✅ done | 11 confirmed defects fixed; each new regression test failed on the old code. 86 tests. Stills vs baseline: video 1 12/12 byte-identical; video 2 3/8 identical, others max diff 4/255 on ~0.001% of pixels (≈26 px, the known translucent-holo GPU noise) — harmless. |
 | 2 Eleven v4 live | ✅ done | live smoke test passed on the free plan (23 credits, 9,977 left). See log. |
-| 3 Showcase slice | ⏳ | |
+| 3 Showcase slice | ⏳ in progress | done: brief-first scaffolding, micro-keyboard world, recipes, fx engine, AppWindow + KineticText, screen popup/window preset. Left: see "Resume here". |
 | 4 Regressions | ⏳ | |
 | 5 Docs + skill | ⏳ | |
 
@@ -127,3 +127,20 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
   Response captured as `tests/fixtures/elevenlabs-v4.json` (no headers/key). Temporary video removed.
   Not verified: v4 request stitching (off for v4 by default). Free-plan clips are non-commercial forever and need
   "elevenlabs.io" in the title → `validate`/`render` warn.
+- Phase 3 progress: micro-keyboard environment (giant keyboard/screen/duck/dust, macro-warm mood); recipes
+  (`do`: press, point, pick-up, place, react, sit-down, stand-up) with closed-form reach (FK(IK) < 1 cm);
+  `fx` cues (text, window, callout, impact, shake, glitch, flash, dip; catalog/fx.json, `list fx`);
+  reusable components AppWindow (one model, DOM + Canvas2D renderers; patterns adapted from Remocn/Onda, MIT —
+  no code copied) and KineticText (fitText via @remotion/layout-utils 4.0.536); `window` screen preset and
+  `popup` param on any screen. ctrl-z draft episode + BRIEF.md (renders; stills reviewed once).
+
+## Resume here (next session)
+1. Write THIRD_PARTY_NOTICES.md (Remocn / Onda pattern credit, Kenney CC0 once sounds are added).
+2. Render-check the new fx/components in stills (not yet seen in a render): `stills ctrl-z --guides`, `stills --verify`.
+3. Upgrade ctrl-z/episode.json to use recipes + fx (fixes found in the draft: land Rayan earlier in shot 1;
+   replace the overhead run shot with a shot along the keyboard; use `window` fx for the undo-failed popup
+   (phone-readable); `place` hides the original duck; tighter final two-shot; brighten Claude's face).
+4. SFX kit: Kenney CC0 files into public/sfx/ + SFX_LIBRARY metadata (license/source); mark remote meme sounds unknown.
+5. Second usage of AppWindow/KineticText outside ctrl-z (prove reuse); tests for fx resolution.
+6. Voice ctrl-z with `--provider elevenlabs` (~200 credits), validate, render, editorial review in this file.
+7. Phase 4 regressions (both videos: stills vs out/baseline, re-render), Phase 5 docs + make-episode skill + eval.

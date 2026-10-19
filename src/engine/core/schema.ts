@@ -1,6 +1,7 @@
 // Episode direction schema (zod). Strict objects so typos fail validation instead of being
 // silently ignored. `npm run catalog` exports this as catalog/episode.schema.json.
 import { z } from "zod";
+import { FxEntry } from "./fx";
 
 /** Seconds, or a reference: "l2.start", "l2.end+0.3", "l3.word:4" (4th word start), "l3.word:4.end-0.1". */
 export const TIME_REF_RE = /^([A-Za-z][\w-]*)\.(start|end|word:(\d+)(?:\.(start|end))?)([+-]\d+(?:\.\d+)?)?$/;
@@ -179,6 +180,8 @@ export const EpisodeSchema = z.strictObject({
   sfx: z.array(z.strictObject({ at: TimeRef, sound: z.string(), volume: z.number().min(0).optional(), prompt: z.string().optional() })).default([]),
   music: z.strictObject({ src: z.string(), volume: z.number().min(0).optional(), duck: z.number().min(0).max(1).optional() }).optional(),
   events: z.array(z.strictObject({ at: TimeRef, name: z.string(), duration: z.number().min(0).optional(), data: z.record(z.string(), z.unknown()).optional() })).default([]),
+  /** Accents: text | window | callout | impact | shake | glitch | flash | dip (catalog/fx.json). */
+  fx: z.array(FxEntry).default([]),
   captions: z
     .strictObject({
       style: z.enum(["subtitle", "pop", "none"]).optional(),

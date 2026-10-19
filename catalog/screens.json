@@ -33,6 +33,22 @@
       "failAt": "0..1 progress where it fails (omit = success)"
     }
   },
+  "window": {
+    "description": "A technical UI window filling the screen: AI chat (typing dots, streaming replies), terminal, dialog or notification — same params as the `window` fx.",
+    "params": {
+      "kind": "chat|terminal|dialog|notification",
+      "title": "window title",
+      "messages": "chat: [{ from: user|ai, text }]",
+      "lines": "terminal: string[] ('!' red, '+' green, '$' typed)",
+      "message": "dialog/notification text",
+      "icon": "dialog/notification icon",
+      "buttons": "dialog buttons",
+      "theme": "dark|light",
+      "accent": "accent colour",
+      "cps": "typing speed",
+      "interval": "seconds between lines/messages"
+    }
+  },
   "off": {
     "description": "Screen off (dark glass).",
     "params": {}

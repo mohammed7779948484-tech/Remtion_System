@@ -24,6 +24,11 @@ export const SCREEN_META: Record<string, ScreenMeta> = {
     params: { label: "text above the bar", duration: "seconds to 100% (default 3)", failAt: "0..1 progress where it fails (omit = success)" },
     glow: "#58a6ff",
   },
+  window: {
+    description: "A technical UI window filling the screen: AI chat (typing dots, streaming replies), terminal, dialog or notification — same params as the `window` fx.",
+    params: { kind: "chat|terminal|dialog|notification", title: "window title", messages: "chat: [{ from: user|ai, text }]", lines: "terminal: string[] ('!' red, '+' green, '$' typed)", message: "dialog/notification text", icon: "dialog/notification icon", buttons: "dialog buttons", theme: "dark|light", accent: "accent colour", cps: "typing speed", interval: "seconds between lines/messages" },
+    glow: "#d97757",
+  },
   off: {
     description: "Screen off (dark glass).",
     params: {},
@@ -32,4 +37,7 @@ export const SCREEN_META: Record<string, ScreenMeta> = {
 };
 
 /** Params every preset accepts (drawn by ScreenSurface on top of any preset). */
-export const COMMON_SCREEN_PARAMS: Record<string, string> = { preset: "preset name" };
+export const COMMON_SCREEN_PARAMS: Record<string, string> = {
+  preset: "preset name",
+  popup: "{ kind: dialog|notification, title, message, icon, buttons, theme, accent } drawn over the content when this screen value is set",
+};

@@ -18,6 +18,7 @@ export const beatSheet = (r: ResolvedEpisode): Beat[] => {
     for (const o of a.overrides) beats.push({ at: o.at, end: o.at + (o.duration ?? 0.5), kind: "action", text: `${a.id} joints` });
   }
   for (const s of r.sfx) beats.push({ at: s.at, end: s.at + 0.3, kind: "sfx", text: `sfx ${s.src.replace(/^.*\//, "")}` });
+  for (const f of r.fx ?? []) beats.push({ at: f.at, end: f.end, kind: "fx", text: `fx ${f.type}${typeof f.data.text === "string" ? ` "${f.data.text}"` : typeof f.data.kind === "string" ? ` ${f.data.kind}` : ""}` });
   for (const e of r.events) beats.push({ at: e.at, end: e.end, kind: "event", text: `event ${e.name}` });
   for (const p of r.props) beats.push({ at: p.at, end: p.at + 0.5, kind: "props", text: `${p.item} ← ${Object.keys(p.set).join(", ")}` });
   for (const m of r.moods) beats.push({ at: m.at, end: m.at + (m.transition ?? 0), kind: "light", text: `mood ${typeof m.mood === "string" ? m.mood : "custom"}` });

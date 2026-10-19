@@ -1,5 +1,5 @@
 // Agent-facing CLI:  npm run cli -- <command> [...]
-//   list [actors|props|environments|shots|moves|moods|screens|sfx|videos]
+//   list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos]
 //   show <actor|prop|environment|mood|screen> <id>
 //   new <slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title "..."]  (writes BRIEF.md)
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
@@ -104,6 +104,9 @@ const list = async () => {
     moods: () => Object.entries(cat["moods.json"] as Record<string, { description: string }>).forEach(([k, v]) => console.log(`  ${k.padEnd(14)} ${v.description}`)),
     screens: () => Object.entries(cat["screens.json"] as Record<string, { description: string; params: object }>).forEach(([k, v]) => console.log(`  ${k.padEnd(14)} ${v.description}  [${Object.keys(v.params).join(", ")}]`)),
     sfx: () => console.log(`  ${Object.keys(cat["sfx.json"]).join(", ")}`),
+    fx: () => Object.entries(cat["fx.json"] as Record<string, { layer: string; description: string; pickWhen: string; params: string[] }>).forEach(([k, v]) => console.log(`  ${k.padEnd(9)} [${v.layer}] ${v.description}
+            use for: ${v.pickWhen}
+            params: ${v.params.join(", ")}`)),
     videos: () => fs.readdirSync(path.join(ROOT, "videos"), { withFileTypes: true }).filter((d) => d.isDirectory()).forEach((d) => console.log(`  ${d.name}`)),
   };
   if (kind && !sections[kind]) fail(`unknown list kind "${kind}" (${Object.keys(sections).join(", ")})`);
@@ -119,8 +122,8 @@ const show = () => {
   const [, kind, id] = positional;
   const cat = buildCatalog() as Record<string, Record<string, unknown>>;
   const key = kind === "actor" ? `actors/${id}.json` : kind === "environment" ? `environments/${id}.json` : null;
-  const value = key ? cat[key] : kind === "prop" ? cat["props.json"][id] : kind === "mood" ? cat["moods.json"][id] : kind === "screen" ? cat["screens.json"][id] : undefined;
-  if (!value) fail(`nothing for "${kind} ${id}" (kinds: actor, prop, environment, mood, screen)`);
+  const value = key ? cat[key] : kind === "prop" ? cat["props.json"][id] : kind === "mood" ? cat["moods.json"][id] : kind === "screen" ? cat["screens.json"][id] : kind === "fx" ? cat["fx.json"][id] : kind === "sfx" ? cat["sfx.json"][id] : undefined;
+  if (!value) fail(`nothing for "${kind} ${id}" (kinds: actor, prop, environment, mood, screen, fx, sfx)`);
   console.log(JSON.stringify(value, null, 2));
 };
 

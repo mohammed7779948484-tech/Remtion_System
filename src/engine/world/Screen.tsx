@@ -11,6 +11,8 @@ import jsonLang from "shiki/langs/json.mjs";
 import darkTheme from "shiki/themes/github-dark.mjs";
 import { FONTS } from "../fonts";
 import { clamp01 } from "../core/time";
+import { drawWindow } from "../ui/drawWindow";
+import type { WindowParams } from "../ui/window";
 import { SCREEN_META, type ScreenMeta } from "./screens.data";
 
 export type DrawContext = { ctx: CanvasRenderingContext2D; w: number; h: number; t: number; since: number };
@@ -165,6 +167,16 @@ export const SCREEN_PRESETS: Record<string, ScreenMeta & { draw: DrawFn }> = {
       ctx.fillText(failed ? "✖ FAILED" : u >= 1 ? "✔ LIVE" : `${Math.floor(u * 100)}%`, 60, h * 0.7);
     },
   },
+  window: {
+    ...SCREEN_META.window,
+    draw: (d, p) => {
+      const { ctx, w, h, t, since } = d;
+      ctx.fillStyle = "#0b0c10";
+      ctx.fillRect(0, 0, w, h);
+      const m = Math.round(w * 0.04);
+      drawWindow(ctx, p as WindowParams, t - since + 0.25, m, m, w - 2 * m, h - 2 * m);
+    },
+  },
   off: {
     ...SCREEN_META.off,
     draw: ({ ctx, w, h }) => {
@@ -212,6 +224,16 @@ export const ScreenSurface: React.FC<{
     const k = resolution > 1024 ? resolution / 1024 : 1;
     ctx.setTransform(k, 0, 0, k, 0, 0);
     fn({ ctx, w: canvas.width / k, h: canvas.height / k, t, since }, content);
+    // Any preset can show a popup (error dialog / notification) over its content.
+    const popup = content.popup as (WindowParams & { kind?: "dialog" | "notification" }) | undefined;
+    if (popup && typeof popup === "object") {
+      const lw = canvas.width / k;
+      const lh = canvas.height / k;
+      const kind = popup.kind ?? "dialog";
+      const pw = lw * (kind === "notification" ? 0.62 : 0.6);
+      const ph = kind === "notification" ? lh * 0.17 : Math.min(lh * 0.62, pw * 0.62);
+      drawWindow(ctx, { ...popup, kind }, t - since, (lw - pw) / 2, kind === "notification" ? lh * 0.06 : (lh - ph) / 2, pw, ph);
+    }
     ctx.restore();
     texture.needsUpdate = true;
   });

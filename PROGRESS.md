@@ -85,3 +85,23 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 - SFX use Remotion-hosted files fetched at render time (slow on this network); could be cached under public/.
 - Residual sub-perceptual pixel noise (≤3/255 on a few hundred pixels) on translucent/reflective effects.
 - No drei `Text3D` (no typeface files offline); 3D titles use canvas-text planes.
+
+---
+
+# V2 (started 2026-10-18) — plan: stabilize V1 → live Eleven v4 → episode-driven slice ("Ctrl+Z", 9:16) → make-episode skill
+
+| Phase | State | Notes |
+|---|---|---|
+| 0 Safety + baseline | ✅ done | key moved to ignored `.env` (never printed); `.env.example` restored + `tests/secrets.test.ts`; exposure scan: 0/6 commits, nothing staged, no other files (key appeared only in a local session log → rotation recommended, low urgency). Baseline stills in `out/baseline/`. |
+| 1 V1 defect fixes | ⏳ | |
+| 2 Eleven v4 live | ⏳ | |
+| 3 Showcase slice | ⏳ | |
+| 4 Regressions | ⏳ | |
+| 5 Docs + skill | ⏳ | |
+
+## V2 log
+- Voice cost safety: ElevenLabs runs only with explicit `--provider elevenlabs` (a key alone never switches; an
+  ElevenLabs-voiced manifest needs the flag before buying changed lines); `--provider` values validated; character
+  count printed before paid generation; manifest written after every clip (a failure keeps paid clips).
+- Cache key is now a fingerprint of the *effective* request (`voiceRequest` + `voiceFingerprint` in `speech.ts`,
+  scheme 2). Legacy (scheme 1) clips stay valid while their old hash matches → both existing videos untouched.

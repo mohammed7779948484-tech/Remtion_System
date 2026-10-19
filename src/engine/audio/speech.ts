@@ -8,15 +8,27 @@ import type { Caption } from "@remotion/captions";
 export type Word = { text: string; start: number; end: number };
 export type Envelope = { rate: number; values: number[] };
 
+export type VoiceProvider = "elevenlabs" | "system" | "fixture";
+export const VOICE_PROVIDERS: VoiceProvider[] = ["elevenlabs", "system", "fixture"];
+
 export type VoiceLine = {
   /** Path relative to public/. */
   file: string;
+  /** Scheme 2: fingerprint of the effective request (see voiceFingerprint). Legacy: lineHash. */
   hash: string;
-  provider: "elevenlabs" | "system" | "fixture";
+  scheme?: 2;
+  provider: VoiceProvider;
   text: string;
   duration: number;
   words: Word[];
   envelope: Envelope;
+  /** Provenance (scheme 2). */
+  model?: string;
+  voiceId?: string;
+  format?: string;
+  /** ElevenLabs plan tier at generation time ("free" clips are non-commercial). */
+  tier?: string;
+  generatedAt?: string;
 };
 export type VoiceManifest = { version: 1; lines: Record<string, VoiceLine> };
 
@@ -30,7 +42,70 @@ export const hashString = (s: string) => {
   return (h >>> 0).toString(16).padStart(8, "0");
 };
 
+/** Legacy (scheme 1) cache key: text + raw cast overrides + provider. Kept to recognise old clips. */
 export const lineHash = (text: string, voice: unknown, provider: string) => hashString(`${provider}|${text}|${JSON.stringify(voice ?? {})}`);
+
+// ---------------------------------------------------------------- effective voice requests
+
+/** Cast voice settings as written in episode.json (mirrors the schema's Voice object). */
+export type CastVoice = {
+  elevenlabs?: { voiceId: string; model?: string; settings?: Record<string, number> };
+  system?: string;
+  rate?: number;
+  pitch?: string;
+};
+
+/** Premade ElevenLabs voices used when a cast member has no voiceId (override per cast `voice.elevenlabs.voiceId`). */
+export const DEFAULT_ELEVEN_VOICES = ["JBFqnCBsd6RMkjVDRZzb", "EXAVITQu4vr4xnSDxMaL", "pNInz6obpgDQGcFmaJgB", "XB0fDUnXU5powFXDhCwa"];
+export const DEFAULT_ELEVEN_MODEL = "eleven_multilingual_v2";
+export const ELEVEN_FORMAT = "wav_24000";
+export const DEFAULT_ELEVEN_SETTINGS: Record<string, number> = { stability: 0.45, similarity_boost: 0.75, style: 0.3 };
+export const DEFAULT_SYSTEM_VOICES = ["Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Mark"];
+
+export type VoiceRequest =
+  | { provider: "elevenlabs"; text: string; voiceId: string; model: string; settings: Record<string, number>; format: string }
+  | { provider: "system"; text: string; voice: string; rate: number; pitch?: string }
+  | { provider: "fixture"; text: string; speakerIndex: number };
+
+/** Exactly what a provider will be asked to synthesise, with every default filled in. Pure. */
+export const voiceRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number): VoiceRequest => {
+  if (provider === "elevenlabs") {
+    const el = voice?.elevenlabs;
+    return {
+      provider,
+      text,
+      voiceId: el?.voiceId ?? DEFAULT_ELEVEN_VOICES[speakerIndex % DEFAULT_ELEVEN_VOICES.length],
+      model: el?.model ?? DEFAULT_ELEVEN_MODEL,
+      settings: { ...DEFAULT_ELEVEN_SETTINGS, ...(el?.settings ?? {}) },
+      format: ELEVEN_FORMAT,
+    };
+  }
+  if (provider === "system") return { provider, text, voice: voice?.system ?? DEFAULT_SYSTEM_VOICES[speakerIndex % DEFAULT_SYSTEM_VOICES.length], rate: voice?.rate ?? 0, ...(voice?.pitch ? { pitch: voice.pitch } : {}) };
+  return { provider, text, speakerIndex };
+};
+
+const stable = (v: unknown): string =>
+  v && typeof v === "object" && !Array.isArray(v)
+    ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(",")}}`
+    : JSON.stringify(v);
+
+/** Scheme-2 cache key: changes exactly when the synthesised audio would change. */
+export const voiceFingerprint = (req: VoiceRequest) => hashString(`v2|${stable(req)}`);
+
+/** Why a cached clip no longer matches the episode, or null when it is fresh. */
+export const voiceStaleReason = (entry: VoiceLine, text: string, voice: CastVoice | undefined, speakerIndex: number): string | null => {
+  if (entry.text !== text) return "text changed";
+  if (entry.scheme === 2) {
+    const req = voiceRequest(entry.provider, text, voice, speakerIndex);
+    if (voiceFingerprint(req) === entry.hash) return null;
+    if (req.provider === "elevenlabs") {
+      if (entry.model && entry.model !== req.model) return `model changed (${entry.model} → ${req.model})`;
+      if (entry.voiceId && entry.voiceId !== req.voiceId) return `voice changed (${entry.voiceId} → ${req.voiceId})`;
+    }
+    return `${entry.provider} voice settings changed`;
+  }
+  return entry.hash === lineHash(text, voice, entry.provider) ? null : `${entry.provider} voice settings changed`;
+};
 
 /** Split text into display words (keeps punctuation attached). */
 export const splitWords = (text: string) => text.split(/\s+/).filter(Boolean);

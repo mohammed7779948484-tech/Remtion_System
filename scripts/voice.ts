@@ -7,9 +7,24 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { parseEpisode, type Episode, type EpisodeVoice } from "../src/engine/core/schema";
-import { envelopeFromSamples, hashString, lineHash, splitWords, wordsFromAlignment, type VoiceLine, type VoiceManifest, type Word } from "../src/engine/audio/speech";
+import {
+  DEFAULT_ELEVEN_VOICES,
+  envelopeFromSamples,
+  hashString,
+  splitWords,
+  VOICE_PROVIDERS,
+  voiceFingerprint,
+  voiceRequest,
+  voiceStaleReason,
+  wordsFromAlignment,
+  type VoiceLine,
+  type VoiceManifest,
+  type VoiceProvider,
+  type VoiceRequest,
+  type Word,
+} from "../src/engine/audio/speech";
 
-export type Provider = "elevenlabs" | "system" | "fixture";
+export type Provider = VoiceProvider;
 
 // ---------------------------------------------------------------- WAV helpers
 
@@ -72,30 +87,55 @@ const pcmToWav = (pcm: Buffer, sampleRate: number) => {
 // ---------------------------------------------------------------- providers
 
 type Clip = { wav: Buffer; words: Word[] };
-type LineJob = { id: string; text: string; voice: EpisodeVoice | undefined; speakerIndex: number; previous?: string; next?: string };
+export type LineJob = { id: string; text: string; voice: EpisodeVoice | undefined; speakerIndex: number; previous?: string; next?: string };
 
-/** Premade ElevenLabs voices used when a cast member has no voiceId (override per cast `voice.elevenlabs.voiceId`). */
-export const DEFAULT_ELEVEN_VOICES = ["JBFqnCBsd6RMkjVDRZzb", "EXAVITQu4vr4xnSDxMaL", "pNInz6obpgDQGcFmaJgB", "XB0fDUnXU5powFXDhCwa"];
-const DEFAULT_SYSTEM_VOICES = ["Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Mark"];
+export { DEFAULT_ELEVEN_VOICES };
+
+/** Thrown for ElevenLabs HTTP errors; carries only status + API error code (never request headers). */
+export class ElevenLabsError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    detail: string,
+  ) {
+    super(`ElevenLabs ${status}${code ? ` ${code}` : ""}: ${detail}`);
+  }
+}
+
+const elevenError = async (res: Response, what: string) => {
+  const body = await res.text();
+  let code = "";
+  let message = body.slice(0, 300);
+  try {
+    const j = JSON.parse(body) as { detail?: { status?: string; code?: string; message?: string } | string };
+    if (typeof j.detail === "object" && j.detail) {
+      code = j.detail.status ?? j.detail.code ?? "";
+      message = (j.detail.message ?? message).slice(0, 300);
+    } else if (typeof j.detail === "string") message = j.detail.slice(0, 300);
+  } catch {
+    /* not JSON */
+  }
+  return new ElevenLabsError(res.status, code, `${what}: ${message}`);
+};
 
 export const elevenLabsRequest = (job: LineJob, apiKey: string) => {
-  const voiceId = job.voice?.elevenlabs?.voiceId ?? DEFAULT_ELEVEN_VOICES[job.speakerIndex % DEFAULT_ELEVEN_VOICES.length];
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}/with-timestamps?output_format=wav_24000`;
+  const req = voiceRequest("elevenlabs", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "elevenlabs" }>;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${req.voiceId}/with-timestamps?output_format=${req.format}`;
   const body = {
-    text: job.text,
-    model_id: job.voice?.elevenlabs?.model ?? "eleven_multilingual_v2",
-    voice_settings: { stability: 0.45, similarity_boost: 0.75, style: 0.3, ...(job.voice?.elevenlabs?.settings ?? {}) },
+    text: req.text,
+    model_id: req.model,
+    voice_settings: req.settings,
     seed: parseInt(hashString(job.text).slice(0, 7), 16),
     previous_text: job.previous,
     next_text: job.next,
   };
-  return { url, init: { method: "POST", headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) } };
+  return { url, req, init: { method: "POST", headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) } };
 };
 
 export const elevenLabsClip = async (job: LineJob, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<Clip> => {
   const { url, init } = elevenLabsRequest(job, apiKey);
   const res = await fetchImpl(url, init);
-  if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw await elevenError(res, `text-to-speech (${job.id})`);
   const json = (await res.json()) as { audio_base64: string; alignment?: Parameters<typeof wordsFromAlignment>[0] | null; normalized_alignment?: Parameters<typeof wordsFromAlignment>[0] | null };
   const raw = Buffer.from(json.audio_base64, "base64");
   const wav = raw.toString("ascii", 0, 4) === "RIFF" ? raw : pcmToWav(raw, 24000);
@@ -109,7 +149,7 @@ export const elevenLabsSfx = async (prompt: string, apiKey: string, fetchImpl: t
     headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "audio/mpeg" },
     body: JSON.stringify({ text: prompt, prompt_influence: 0.4 }),
   });
-  if (!res.ok) throw new Error(`ElevenLabs SFX ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  if (!res.ok) throw await elevenError(res, "sound-generation");
   return Buffer.from(await res.arrayBuffer());
 };
 
@@ -133,9 +173,8 @@ const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 export const systemClip = (job: LineJob, tmpDir: string): Clip => {
   if (process.platform !== "win32") throw new Error("system voices need Windows (use --provider fixture or elevenlabs)");
-  const voice = job.voice?.system ?? DEFAULT_SYSTEM_VOICES[job.speakerIndex % DEFAULT_SYSTEM_VOICES.length];
-  const rate = job.voice?.rate ?? 0;
-  const prosody = `<prosody rate="${rate >= 0 ? "+" : ""}${rate * 6}%"${job.voice?.pitch ? ` pitch="${xml(job.voice.pitch)}"` : ""}>${xml(job.text)}</prosody>`;
+  const { voice, rate, pitch } = voiceRequest("system", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "system" }>;
+  const prosody = `<prosody rate="${rate >= 0 ? "+" : ""}${rate * 6}%"${pitch ? ` pitch="${xml(pitch)}"` : ""}>${xml(job.text)}</prosody>`;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${prosody}</speak>`;
   const out = path.join(tmpDir, `sapi-${hashString(job.id + job.text)}.wav`);
   const scriptFile = path.join(tmpDir, "sapi.ps1");
@@ -215,11 +254,34 @@ export type VoiceOptions = {
   root?: string;
   fetchImpl?: typeof fetch;
   apiKey?: string;
+  /** ElevenLabs plan tier recorded as clip provenance (from `voice --check`). */
+  tier?: string;
   log?: (msg: string) => void;
 };
 
-export const pickProvider = (opts: VoiceOptions): Provider =>
-  opts.provider ?? (opts.apiKey ?? process.env.ELEVENLABS_API_KEY ? "elevenlabs" : process.platform === "win32" ? "system" : "fixture");
+/** Offline default for this machine. */
+const localProvider = (): Provider => (process.platform === "win32" ? "system" : "fixture");
+
+export const parseProvider = (value: string | undefined): Provider | undefined => {
+  if (value === undefined) return undefined;
+  if (!(VOICE_PROVIDERS as string[]).includes(value)) throw new Error(`unknown provider "${value}" (use ${VOICE_PROVIDERS.join(", ")})`);
+  return value as Provider;
+};
+
+/**
+ * Sticky provider choice. Paid ElevenLabs generation only happens when asked for explicitly
+ * (`--provider elevenlabs`): a key in .env alone never switches an episode to paid voices. Without a
+ * flag an episode keeps the provider its manifest already uses (a paid manifest still needs the flag
+ * before buying new lines — see generateVoices), else the local offline voice.
+ */
+export const pickProvider = (opts: VoiceOptions, manifest: VoiceManifest | null = null): Provider => {
+  if (opts.provider) return parseProvider(opts.provider)!;
+  const used = Object.values(manifest?.lines ?? {}).map((l) => l.provider);
+  if (!used.length) return localProvider();
+  const counts = new Map<Provider, number>();
+  for (const p of used) counts.set(p, (counts.get(p) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0];
+};
 
 export const loadEpisodeFile = (root: string, slug: string): Episode => {
   const file = path.join(root, "videos", slug, "episode.json");
@@ -234,68 +296,97 @@ export const readManifest = (root: string, slug: string): VoiceManifest | null =
   return fs.existsSync(file) ? (JSON.parse(fs.readFileSync(file, "utf8")) as VoiceManifest) : null;
 };
 
+const writeManifest = (dir: string, manifest: VoiceManifest) => {
+  const file = path.join(dir, "voice.json");
+  fs.writeFileSync(`${file}.tmp`, JSON.stringify(manifest));
+  fs.renameSync(`${file}.tmp`, file);
+};
+
 export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
   const root = opts.root ?? process.cwd();
   const log = opts.log ?? console.log;
   const ep = loadEpisodeFile(root, slug);
-  const provider = pickProvider(opts);
+  const old = readManifest(root, slug);
+  const provider = pickProvider(opts, old);
+  const explicit = opts.provider !== undefined;
   const apiKey = opts.apiKey ?? process.env.ELEVENLABS_API_KEY ?? "";
-  if (provider === "elevenlabs" && !apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
   const dir = voiceDir(root, slug);
   fs.mkdirSync(path.join(dir, "voice"), { recursive: true });
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "voice-"));
-  const old = readManifest(root, slug);
-  const manifest: VoiceManifest = { version: 1, lines: {} };
   const speakers = Object.keys(ep.cast);
+  const speakerIndex = (id: string) => Math.max(0, speakers.indexOf(id));
+
+  // Which lines need audio? Fresh = same provider, file present, unchanged effective request.
+  const todo = new Set(
+    ep.dialogue
+      .filter((line) => {
+        const prev = old?.lines[line.id];
+        if (opts.force || !prev || prev.provider !== provider) return true;
+        if (!fs.existsSync(path.join(root, "public", prev.file))) return true;
+        return voiceStaleReason(prev, line.text, ep.cast[line.speaker]?.voice, speakerIndex(line.speaker)) !== null;
+      })
+      .map((l) => l.id),
+  );
+  if (provider === "elevenlabs" && todo.size) {
+    if (!explicit) throw new Error(`${todo.size} line(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs (or --provider system for free offline voices).`);
+    if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
+    const chars = ep.dialogue.filter((l) => todo.has(l.id)).reduce((n, l) => n + l.text.length, 0);
+    log(`  elevenlabs: ${todo.size} line(s), ${chars} characters to generate (credits depend on model/plan; \`voice --check\` shows the balance)`);
+  }
+
+  // Start from the old manifest so an interrupted run never forgets clips it already paid for.
+  const manifest: VoiceManifest = { version: 1, lines: { ...(old?.lines ?? {}) } };
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "voice-"));
   let generated = 0;
-  let skipped = 0;
-
-  for (let i = 0; i < ep.dialogue.length; i++) {
-    const line = ep.dialogue[i];
-    const voice = ep.cast[line.speaker]?.voice;
-    const hash = lineHash(line.text, voice, provider);
-    const prev = old?.lines[line.id];
-    if (!opts.force && prev && prev.hash === hash && fs.existsSync(path.join(root, "public", prev.file))) {
-      manifest.lines[line.id] = prev;
-      skipped++;
-      continue;
+  try {
+    for (let i = 0; i < ep.dialogue.length; i++) {
+      const line = ep.dialogue[i];
+      if (!todo.has(line.id)) continue;
+      const voice = ep.cast[line.speaker]?.voice;
+      const job: LineJob = { id: line.id, text: line.text, voice, speakerIndex: speakerIndex(line.speaker), previous: ep.dialogue[i - 1]?.text, next: ep.dialogue[i + 1]?.text };
+      const req = voiceRequest(provider, line.text, voice, job.speakerIndex);
+      const hash = voiceFingerprint(req);
+      log(`  ${provider}: ${line.id} (${line.speaker}) "${line.text.slice(0, 60)}"`);
+      const clip = provider === "elevenlabs" ? await elevenLabsClip(job, apiKey, opts.fetchImpl) : provider === "system" ? systemClip(job, tmp) : fixtureClip(job);
+      const { samples, sampleRate } = readWav(clip.wav);
+      const file = `videos/${slug}/voice/${line.id}-${hash}.wav`;
+      fs.writeFileSync(path.join(root, "public", file), clip.wav);
+      const duration = samples.length / sampleRate;
+      const words = clip.words.length ? clip.words : evenWords(line.text, duration);
+      const prev = manifest.lines[line.id];
+      const entry: VoiceLine = { file, hash, scheme: 2, provider, text: line.text, duration, words, envelope: envelopeFromSamples(samples, sampleRate, 60), generatedAt: new Date().toISOString() };
+      if (req.provider === "elevenlabs") Object.assign(entry, { model: req.model, voiceId: req.voiceId, format: req.format, tier: opts.tier ?? "unknown" });
+      manifest.lines[line.id] = entry;
+      writeManifest(dir, manifest); // after every clip: a later failure keeps this one
+      if (prev && prev.file !== file) fs.rmSync(path.join(root, "public", prev.file), { force: true });
+      generated++;
     }
-    const job: LineJob = { id: line.id, text: line.text, voice, speakerIndex: Math.max(0, speakers.indexOf(line.speaker)), previous: ep.dialogue[i - 1]?.text, next: ep.dialogue[i + 1]?.text };
-    log(`  ${provider}: ${line.id} (${line.speaker}) "${line.text.slice(0, 60)}"`);
-    const clip = provider === "elevenlabs" ? await elevenLabsClip(job, apiKey, opts.fetchImpl) : provider === "system" ? systemClip(job, tmp) : fixtureClip(job);
-    const { samples, sampleRate } = readWav(clip.wav);
-    const file = `videos/${slug}/voice/${line.id}-${hash}.wav`;
-    if (prev && prev.file !== file) fs.rmSync(path.join(root, "public", prev.file), { force: true });
-    fs.writeFileSync(path.join(root, "public", file), clip.wav);
-    const duration = samples.length / sampleRate;
-    const words = clip.words.length ? clip.words : evenWords(line.text, duration);
-    const entry: VoiceLine = { file, hash, provider, text: line.text, duration, words, envelope: envelopeFromSamples(samples, sampleRate, 60) };
-    manifest.lines[line.id] = entry;
-    generated++;
+
+    // Generated sound effects (sfx entries with a `prompt`), cached next to the voices.
+    for (const s of ep.sfx) {
+      if (!s.prompt) continue;
+      const target = path.join(dir, s.sound.replace(/^videos\/[^/]+\//, ""));
+      if (fs.existsSync(target) && !opts.force) continue;
+      if (provider !== "elevenlabs") {
+        log(`  ! sfx "${s.sound}" needs ElevenLabs to generate (prompt: ${s.prompt}); add the file manually or set a key`);
+        continue;
+      }
+      fs.mkdirSync(path.dirname(target), { recursive: true });
+      fs.writeFileSync(target, await elevenLabsSfx(s.prompt, apiKey, opts.fetchImpl));
+      log(`  sfx: ${s.sound}`);
+    }
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
   }
 
-  // Generated sound effects (sfx entries with a `prompt`), cached next to the voices.
-  for (const s of ep.sfx) {
-    if (!s.prompt) continue;
-    const target = path.join(dir, s.sound.replace(/^videos\/[^/]+\//, ""));
-    if (fs.existsSync(target) && !opts.force) continue;
-    if (provider !== "elevenlabs") {
-      log(`  ! sfx "${s.sound}" needs ElevenLabs to generate (prompt: ${s.prompt}); add the file manually or set a key`);
-      continue;
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, await elevenLabsSfx(s.prompt, apiKey, opts.fetchImpl));
-    log(`  sfx: ${s.sound}`);
-  }
-
-  // Drop clips of lines that no longer exist.
+  // Forget lines that no longer exist, then drop clips nothing references.
+  const ids = new Set(ep.dialogue.map((l) => l.id));
+  for (const id of Object.keys(manifest.lines)) if (!ids.has(id)) delete manifest.lines[id];
+  writeManifest(dir, manifest);
   for (const f of fs.readdirSync(path.join(dir, "voice"))) {
     const keep = Object.values(manifest.lines).some((l) => l.file.endsWith(`/${f}`));
     if (!keep) fs.rmSync(path.join(dir, "voice", f), { force: true });
   }
-  fs.writeFileSync(path.join(dir, "voice.json"), JSON.stringify(manifest));
-  fs.rmSync(tmp, { recursive: true, force: true });
-  return { provider, generated, skipped, manifest };
+  return { provider, generated, skipped: ep.dialogue.length - generated, manifest };
 };
 
 const evenWords = (text: string, duration: number): Word[] => {
@@ -303,3 +394,4 @@ const evenWords = (text: string, duration: number): Word[] => {
   const per = (duration - 0.2) / Math.max(1, words.length);
   return words.map((w, i) => ({ text: w, start: 0.1 + i * per, end: 0.1 + (i + 0.85) * per }));
 };
+

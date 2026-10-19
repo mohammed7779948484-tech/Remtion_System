@@ -2,8 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { envelopeFromSamples, lineCaptions, wordsFromAlignment } from "../src/engine/audio/speech";
-import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, readWav, writeWav } from "../scripts/voice";
+import { envelopeFromSamples, lineCaptions, lineHash, voiceFingerprint, voiceRequest, voiceStaleReason, wordsFromAlignment } from "../src/engine/audio/speech";
+import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, parseProvider, readWav, writeWav } from "../scripts/voice";
 
 const tmpRepo = (episode: object) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rs-voice-"));
@@ -83,6 +83,75 @@ describe("ElevenLabs (mocked HTTP, documented response shape)", () => {
   it("surfaces API errors", async () => {
     const fakeFetch = (async () => new Response("quota exceeded", { status: 401 })) as unknown as typeof fetch;
     await expect(elevenLabsClip({ id: "x", text: "a", voice: undefined, speakerIndex: 0 }, "KEY", fakeFetch)).rejects.toThrow(/401/);
+  });
+});
+
+describe("cost safety", () => {
+  const lines = [{ id: "l1", speaker: "rayan", text: "Hello there." }];
+  const neverFetch = (async () => {
+    throw new Error("network must not be used");
+  }) as unknown as typeof fetch;
+
+  it("a key alone never switches to paid voices", async () => {
+    const root = tmpRepo(episode(lines));
+    const r = await generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} });
+    expect(r.provider).not.toBe("elevenlabs");
+  });
+
+  it("rejects an unknown provider instead of falling back to fixture", () => {
+    expect(() => parseProvider("elevenlab")).toThrow(/unknown provider/);
+    expect(() => parseProvider("")).toThrow(/unknown provider/);
+    expect(parseProvider(undefined)).toBeUndefined();
+  });
+
+  it("an ElevenLabs-voiced episode needs the explicit flag before buying changed lines", async () => {
+    const root = tmpRepo(episode(lines));
+    const fake = (async () => {
+      const chars = [..."Hello there."];
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.01), character_end_times_seconds: chars.map((_, i) => i * 0.01 + 0.01) } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: fake, log: () => {} });
+    // Unchanged: no flag needed, nothing bought.
+    expect(await generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).toMatchObject({ provider: "elevenlabs", generated: 0 });
+    fs.writeFileSync(path.join(root, "videos", "demo", "episode.json"), JSON.stringify(episode([{ ...lines[0], text: "Hello again." }])));
+    await expect(generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/explicit flag/);
+  });
+
+  it("keeps already-generated clips in the manifest when a later line fails", async () => {
+    const two = [lines[0], { id: "l2", speaker: "claude", text: "Second line." }];
+    const root = tmpRepo(episode(two));
+    let calls = 0;
+    const flaky = (async () => {
+      if (calls++ > 0) return new Response(JSON.stringify({ detail: { status: "quota_exceeded", message: "out of credits" } }), { status: 401 });
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64") }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await expect(generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: flaky, log: () => {} })).rejects.toThrow(/401 quota_exceeded/);
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "public", "videos", "demo", "voice.json"), "utf8"));
+    expect(Object.keys(manifest.lines)).toEqual(["l1"]);
+    expect(fs.existsSync(path.join(root, "public", manifest.lines.l1.file))).toBe(true);
+  });
+});
+
+describe("voice fingerprint", () => {
+  it("changes with effective defaults, not with other providers' fields", () => {
+    const base = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" } }, 0);
+    const otherModel = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A", model: "eleven_v4" } }, 0);
+    const systemEdit = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" }, system: "Microsoft Zira Desktop", pitch: "+30%" }, 0);
+    expect(voiceFingerprint(base)).not.toBe(voiceFingerprint(otherModel));
+    expect(voiceFingerprint(base)).toBe(voiceFingerprint(systemEdit));
+    // Default voice follows cast order: reordering the cast changes the audio, so the key changes.
+    expect(voiceFingerprint(voiceRequest("elevenlabs", "Hi", undefined, 0))).not.toBe(voiceFingerprint(voiceRequest("elevenlabs", "Hi", undefined, 1)));
+  });
+
+  it("names why a cached clip is stale and accepts legacy clips that still match", () => {
+    const req = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" } }, 0);
+    const entry = { file: "x.wav", hash: voiceFingerprint(req), scheme: 2 as const, provider: "elevenlabs" as const, text: "Hi", duration: 1, words: [], envelope: { rate: 60, values: [] }, model: req.provider === "elevenlabs" ? req.model : "" };
+    expect(voiceStaleReason(entry, "Hi", { elevenlabs: { voiceId: "A" } }, 0)).toBeNull();
+    expect(voiceStaleReason(entry, "Hi", { elevenlabs: { voiceId: "A", model: "eleven_v4" } }, 0)).toMatch(/model changed/);
+    expect(voiceStaleReason(entry, "Hello", { elevenlabs: { voiceId: "A" } }, 0)).toBe("text changed");
+    const legacy = { file: "y.wav", hash: lineHash("Hi", { system: "David" }, "system"), provider: "system" as const, text: "Hi", duration: 1, words: [], envelope: { rate: 60, values: [] } };
+    expect(voiceStaleReason(legacy, "Hi", { system: "David" }, 0)).toBeNull();
+    expect(voiceStaleReason(legacy, "Hi", { system: "Zira" }, 0)).toMatch(/settings changed/);
   });
 });
 

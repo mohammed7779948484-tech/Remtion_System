@@ -16,7 +16,7 @@ import { resolveEpisode, type ResolvedEpisode } from "../src/engine/core/timelin
 import type { VideoData } from "../src/engine/player/defineVideo";
 import { buildTracks, makeQuery } from "../src/engine/player/scene";
 import { buildCatalog, writeCatalog } from "./catalog";
-import { generateVoices, readManifest, type Provider } from "./voice";
+import { generateVoices, parseProvider, readManifest } from "./voice";
 
 const ROOT = process.cwd();
 if (fs.existsSync(path.join(ROOT, ".env"))) process.loadEnvFile(path.join(ROOT, ".env"));
@@ -167,7 +167,7 @@ const newVideo = () => {
 
 const voice = async () => {
   const slug = positional[1] ?? fail("usage: voice <slug>");
-  const r = await generateVoices(slug, { provider: flag("provider") as Provider | undefined, force: has("force") });
+  const r = await generateVoices(slug, { provider: parseProvider(flag("provider")), force: has("force") });
   console.log(`✔ voice (${r.provider}): ${r.generated} generated, ${r.skipped} cached → public/videos/${slug}/voice.json`);
 };
 
@@ -179,7 +179,7 @@ const validate = async () => {
   for (const l of r.lines) if (l.file && !fs.existsSync(path.join(ROOT, "public", l.file))) problems.push(`line ${l.id}: audio file missing (${l.file})`);
   for (const s of r.sfx) if (!/^https?:/.test(s.src) && !fs.existsSync(path.join(ROOT, "public", s.src))) problems.push(`sfx at ${s.at.toFixed(2)}s: file missing public/${s.src}`);
   const manifest = readManifest(ROOT, slug);
-  if (process.env.ELEVENLABS_API_KEY && manifest && Object.values(manifest.lines).some((l) => l.provider !== "elevenlabs")) notes.push("ELEVENLABS_API_KEY is set but some clips use local voices — run `voice --provider elevenlabs` for final quality");
+  if (process.env.ELEVENLABS_API_KEY && manifest && Object.values(manifest.lines).some((l) => l.provider !== "elevenlabs")) notes.push("info: clips use offline voices; `voice <slug> --provider elevenlabs` would re-voice them (paid, changes timing)");
 
   const tracks = buildTracks(r);
   const q = makeQuery(r, tracks);

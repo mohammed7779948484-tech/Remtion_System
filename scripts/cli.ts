@@ -1,10 +1,10 @@
 // Agent-facing CLI:  npm run cli -- <command> [...]
 //   list [actors|props|environments|shots|moves|moods|screens|sfx|videos]
 //   show <actor|prop|environment|mood|screen> <id>
-//   new <slug> [--preset landscape|portrait|square] [--env dev-office] [--title "..."]
+//   new <slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title "..."]  (writes BRIEF.md)
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
 //   validate <slug>
-//   stills <slug> [--frames 0,90,180] [--verify]
+//   stills <slug> [--frames 0,90,180] [--verify] [--guides]
 //   render <slug> [--out out/<slug>.mp4] [--draft] [--timeout ms]
 //   catalog
 import { spawnSync } from "node:child_process";
@@ -13,7 +13,9 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { auditAudio, isMissingFile } from "../src/engine/audio/audit";
 import { cameraAt, project, shotLayout } from "../src/engine/camera/solve";
+import { beatSheet, pacingNotes } from "../src/engine/core/pacing";
 import { resolveEpisode, type ResolvedEpisode } from "../src/engine/core/timeline";
+import { ENVIRONMENTS } from "../src/engine/world/environments";
 import type { VideoData } from "../src/engine/player/defineVideo";
 import { buildTracks, makeQuery } from "../src/engine/player/scene";
 import { buildCatalog, writeCatalog } from "./catalog";
@@ -122,25 +124,106 @@ const show = () => {
   console.log(JSON.stringify(value, null, 2));
 };
 
+const BRIEF = (title: string, preset: string, env: string) => `# ${title} — brief
+
+> Write this before episode.json, keep it short, and update it as the idea changes. It is the intent;
+> episode.json and custom code are the executable direction.
+
+**Concept (one line):**
+**Platform / format:** ${preset === "portrait" ? "9:16 Shorts / Reels / TikTok" : preset === "square" ? "1:1 feed" : "16:9 YouTube"} · target ~25–35 s
+**Audience:** developers and AI-curious viewers
+
+## Hook (0–2 s)
+What stops the scroll in the first second? (visual surprise, a sound hit, a line that raises a question)
+
+## Beats
+1. Setup —
+2. Escalation —
+3. Twist / payoff —
+
+## Characters & performance
+- Rayan:
+- Claude:
+
+## Setting & look
+Environment: \`${env}\`. Mood, key props, screens, camera style (cuts, inserts, moves), on-screen graphics.
+
+## Sound
+Voices (provider, tags like [laughs]), SFX hits on the jokes, music (or none), silence used on purpose.
+
+## Reuse vs custom
+Reused: environments / props / recipes / fx / sfx from the engine. Custom: anything new in this folder.
+
+## Payoff check
+Why would someone rewatch or share it? What is the last image?
+`;
+
+const CUSTOM_DATA = (slug: string) => `// Pure data for this video's own location (the CLI loads it for validate/stills). Edit freely:
+// shell, items (catalog props or the custom kinds below), marks for the cast, camera spots, bounds.
+import type { EnvironmentDef, VideoData } from "../../src/engine";
+
+const stage: EnvironmentDef = {
+  id: "${slug}-stage",
+  description: "TODO: describe this place.",
+  shell: { floor: "#1f2433", wall: "#151a26", trim: "#10141d", back: -3, left: -7, height: 5, walls: { back: false, left: false } },
+  items: [{ id: "backdrop", kind: "backdrop", position: [0, 0, -2.6], size: [12, 5, 0.2] }],
+  marks: {
+    hero: { position: [-0.6, 0, 0], yaw: 15, description: "Main character spot" },
+    sidekick: { position: [0.7, 0, 0.2], yaw: -20, description: "Second character spot" },
+  },
+  cameras: { wide: { position: [0, 1.6, 6.5], target: [0, 1.0, 0], fov: 40, description: "Whole stage" } },
+  bounds: { min: [-6, 0.1, -2.4], max: [6, 5, 12] },
+  defaultMood: "soft-studio",
+};
+
+const data: VideoData = { environments: { [stage.id]: stage }, componentKinds: ["backdrop"] };
+export default data;
+`;
+
+const CUSTOM_INDEX = `import { defineVideo, type PropViewProps } from "../../src/engine";
+import episode from "./episode.json";
+import data from "./video.data";
+
+// Custom set item kinds for this location (placed in video.data.ts). Animate only from props.t.
+const Backdrop: React.FC<PropViewProps> = () => (
+  <mesh position={[0, 2.5, 0]} receiveShadow>
+    <boxGeometry args={[12, 5, 0.2]} />
+    <meshStandardMaterial color="#232a3d" roughness={0.9} />
+  </mesh>
+);
+
+// More escape hatches: screens (custom screen presets), actors, scene (extra 3D), overlay (extra 2D).
+export default defineVideo({ episode, ...data, components: { backdrop: Backdrop } });
+`;
+
 const newVideo = () => {
   const slug = positional[1];
-  if (!slug || !/^[a-z0-9][a-z0-9-]*$/.test(slug)) fail("usage: new <kebab-case-slug>");
+  if (!slug || !/^[a-z0-9][a-z0-9-]*$/.test(slug)) fail("usage: new <kebab-case-slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title ...]");
   const dir = videoDir(slug);
   if (fs.existsSync(dir)) fail(`videos/${slug} already exists`);
-  const preset = flag("preset") ?? "landscape";
-  const env = flag("env") ?? "dev-office";
-  // The starter places the cast on dev-office marks; other sets get plain positions.
-  const office = env === "dev-office";
+  const preset = flag("preset") ?? "portrait";
+  if (!["portrait", "landscape", "square"].includes(preset)) fail(`unknown preset "${preset}"`);
+  const envFlag = flag("env") ?? "dev-office";
+  const custom = envFlag === "custom";
+  const envId = custom ? `${slug}-stage` : envFlag;
+  const env = custom ? null : ENVIRONMENTS[envId];
+  if (!custom && !env) fail(`unknown environment "${envId}" (${Object.keys(ENVIRONMENTS).join(", ")}, or "custom" for a new location in the video folder)`);
+  // Cast on the environment's first two marks: "seat"/"chair" marks get a seated pose; a mascot on a
+  // raised mark (a desk, a key) stays small, on the floor it is scaled up to stand next to Rayan.
+  const marks = custom ? [["hero", { position: [-0.6, 0, 0] }], ["sidekick", { position: [0.7, 0, 0.2] }]] : Object.entries(env!.marks);
+  const [hero, partner] = [marks[0], marks[1]] as [string, { position: number[] }][];
+  const seated = !!hero && /seat|chair/.test(hero[0]);
+  const raised = !!partner && partner[1].position[1] > 0.3;
   fs.mkdirSync(dir, { recursive: true });
   const episode = {
     $schema: "../../catalog/episode.schema.json",
     id: slug,
     title: flag("title") ?? slug,
     format: { preset },
-    set: { environment: env },
+    set: { environment: envId },
     cast: {
-      rayan: { actor: "rayan", at: office ? "chair-seat" : [-0.6, 0, 0], pose: office ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop" } },
-      claude: { actor: "claude", at: office ? "desk-mascot" : [0.7, 0, 0.2], scale: office ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%" } },
+      rayan: { actor: "rayan", at: hero?.[0] ?? [-0.6, 0, 0], pose: seated ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop" } },
+      claude: { actor: "claude", at: partner?.[0] ?? [0.7, 0, 0.2], scale: raised ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%" } },
     },
     dialogue: [
       { id: "l1", speaker: "rayan", text: "Hello world." },
@@ -148,25 +231,32 @@ const newVideo = () => {
     ],
     actions: [
       { at: "l1.start", actor: "claude", look: "rayan" },
-      { at: "l2.start", actor: "rayan", look: "claude", emotion: "happy", ...(office ? { pose: "sit_idle" } : {}) },
+      { at: "l2.start", actor: "rayan", look: "claude", emotion: "happy", ...(seated ? { pose: "sit_idle" } : {}) },
     ],
     camera: [
-      office ? { at: 0, shot: "establishing" } : { at: 0, shot: "wide", subject: ["rayan", "claude"] },
+      { at: 0, shot: "wide", subject: ["rayan", "claude"] },
       { at: "l1.start", shot: "close", subject: "rayan" },
       { at: "l2.start", shot: "over-shoulder", subject: "claude", over: "rayan" },
     ],
   };
   fs.writeFileSync(path.join(dir, "episode.json"), JSON.stringify(episode, null, 2) + "\n");
-  fs.writeFileSync(
-    path.join(dir, "index.tsx"),
-    `import { defineVideo } from "../../src/engine";\nimport episode from "./episode.json";\n\n// Add custom code here: components (custom set items), screens, actors, scene, overlay.\nexport default defineVideo({ episode });\n`,
-  );
+  fs.writeFileSync(path.join(dir, "BRIEF.md"), BRIEF(flag("title") ?? slug, preset, envId));
+  if (custom) {
+    fs.writeFileSync(path.join(dir, "video.data.ts"), CUSTOM_DATA(slug));
+    fs.writeFileSync(path.join(dir, "index.tsx"), CUSTOM_INDEX);
+  } else {
+    fs.writeFileSync(
+      path.join(dir, "index.tsx"),
+      `import { defineVideo } from "../../src/engine";\nimport episode from "./episode.json";\n\n// Add custom code here: components (custom set items), screens, actors, scene, overlay.\nexport default defineVideo({ episode });\n`,
+    );
+  }
   const reg = path.join(ROOT, "videos", "registry.ts");
   const ident = slug.replace(/-([a-z0-9])/g, (_, c: string) => c.toUpperCase()).replace(/^[0-9]/, (c) => `v${c}`);
   let src = fs.readFileSync(reg, "utf8");
   src = src.replace(/(\nexport const VIDEOS)/, `import ${ident} from "./${slug}";\n$1`).replace(/(VIDEOS: VideoModule\[\] = \[)([^\]]*)\]/, (_, a: string, b: string) => `${a}${b.trim() ? `${b.trim()}, ` : ""}${ident}]`);
   fs.writeFileSync(reg, src);
-  console.log(`✔ created videos/${slug}/ (episode.json, index.tsx) and registered it.\nNext: edit episode.json → npm run cli -- voice ${slug} → validate → stills → render`);
+  console.log(`✔ created videos/${slug}/ (BRIEF.md, episode.json, index.tsx${custom ? ", video.data.ts" : ""}) and registered it.`);
+  console.log(`Next: fill BRIEF.md (hook, beats, payoff) → direct episode.json → npm run cli -- voice ${slug} → validate → stills → render`);
 };
 
 const voiceCheck = async () => {
@@ -193,7 +283,8 @@ const validate = async () => {
   const slug = positional[1] ?? fail("usage: validate <slug>");
   const r = await resolve(slug);
   const problems: string[] = [];
-  const notes: string[] = [...r.warnings];
+  const notes: string[] = [...r.warnings, ...pacingNotes(r)];
+  if (!fs.existsSync(path.join(videoDir(slug), "BRIEF.md"))) notes.push("no BRIEF.md: write the hook, beats and payoff before directing (npm run cli -- new writes a template)");
   // Missing files are errors even for drafts; unvoiced/stale lines only block final renders.
   const audio = auditAudio(r, publicExists);
   for (const e of audio.errors) (isMissingFile(e) ? problems : notes).push(e);
@@ -222,7 +313,8 @@ const validate = async () => {
   });
 
   console.log(`${r.title} — ${r.width}×${r.height} @ ${r.fps}fps, ${r.duration.toFixed(2)}s (${r.durationInFrames} frames), ${r.shots.length} shots, ${r.lines.length} lines`);
-  for (const l of r.lines) console.log(`  ${l.voiced ? "♪" : "·"} ${l.id.padEnd(6)} ${l.start.toFixed(2).padStart(6)}–${l.end.toFixed(2).padEnd(6)} ${l.speaker}: ${l.text}`);
+  // Beat sheet: everything that happens, in time order (review pacing without rendering).
+  for (const b of beatSheet(r)) console.log(`  ${b.at.toFixed(2).padStart(6)}${b.kind === "line" ? `–${b.end!.toFixed(2).padEnd(6)}` : " ".repeat(7)} ${b.kind.padEnd(6)} ${b.text}`);
   for (const n of notes) console.log(`⚠ ${n}`);
   for (const p of problems) console.log(`✖ ${p}`);
   if (problems.length) process.exit(1);
@@ -253,7 +345,10 @@ const stills = async () => {
     const cols = Math.min(4, files.length);
     const rows = Math.ceil(files.length / cols);
     const sheet = path.join("out", slug, "contact.png");
-    spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", path.join(tmp, "%04d.png"), "-vf", `scale=480:-1,tile=${cols}x${rows}:padding=4:color=black`, "-frames:v", "1", sheet], { stdio: "inherit", shell: true });
+    // --guides: shade where vertical-video platforms put their UI (top bar, caption/description area,
+    // right-hand action rail) so faces, captions and titles can be checked against it.
+    const guides = has("guides") && r.height > r.width ? "drawbox=x=0:y=0:w=iw:h=ih*0.10:color=red@0.3:t=fill,drawbox=x=0:y=ih*0.80:w=iw:h=ih*0.20:color=red@0.3:t=fill,drawbox=x=iw*0.86:y=ih*0.40:w=iw*0.14:h=ih*0.40:color=red@0.3:t=fill," : "";
+    spawnSync("ffmpeg", ["-hide_banner", "-loglevel", "error", "-y", "-i", path.join(tmp, "%04d.png"), "-vf", `"${guides}scale=480:-1,tile=${cols}x${rows}:padding=4:color=black"`, "-frames:v", "1", sheet], { stdio: "inherit", shell: true });
     fs.rmSync(tmp, { recursive: true, force: true });
     console.log(`✔ contact sheet → ${sheet} (shots in order, left→right, top→bottom)`);
   } else console.log("  (install ffmpeg on PATH for a contact sheet)");

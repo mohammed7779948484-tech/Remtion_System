@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { actorBase, actorFinal, emptyTrack, evaluateActor, type ActorDefinition, type ActorTrack } from "../src/engine/actors/rig";
-import { rayanDef } from "../src/engine/actors/rayan/rayan.data";
+import { actorBase, actorFinal, emptyTrack, evaluateActor, restChannels, type ActorDefinition, type ActorTrack } from "../src/engine/actors/rig";
+import { rayanDef, rayanHand } from "../src/engine/actors/rayan/rayan.data";
 import { claudeDef } from "../src/engine/actors/claude/claude.data";
 
 const busyTrack = (def: ActorDefinition): ActorTrack => {
@@ -97,5 +97,40 @@ describe("look-at", () => {
     const base = actorBase(track, 1);
     const frame = actorFinal(track, base, 1, { anchorOf: (a) => (a === "rayan" ? [-2, 1.5, 1] : undefined) });
     expect(frame.channels["body.ry"]).toBeLessThan(-0.2);
+  });
+});
+
+describe("reach (resolve-time arm solving)", () => {
+  const base = (pose: string) => ({ ...restChannels(rayanDef), ...rayanDef.poses[pose].set });
+  it("Rayan's hand lands within 1 cm of reachable targets, standing and crouched, both hands", () => {
+    const cases: [string, "L" | "R", [number, number, number]][] = [
+      ["stand_idle", "R", [-0.3, 1.2, 0.35]],
+      ["stand_idle", "L", [0.35, 1.0, 0.3]],
+      ["stand_idle", "R", [-0.15, 1.35, 0.35]],
+      ["crouch", "R", [-0.15, 0.35, 0.45]],
+      ["crouch", "L", [0.2, 0.35, 0.45]],
+    ];
+    for (const [pose, side, target] of cases) {
+      const c = base(pose);
+      const r = rayanDef.reach!(c, target, side);
+      expect(r.reached, `${pose} ${side} ${target}`).toBe(true);
+      const hand = rayanHand({ ...c, ...r.set }, side);
+      expect(Math.hypot(hand[0] - target[0], hand[1] - target[1], hand[2] - target[2]), `${pose} ${side}`).toBeLessThan(0.01);
+      for (const [k, v] of Object.entries(r.set)) expect(v, k).toBeGreaterThanOrEqual(rayanDef.channels[k].min);
+    }
+  });
+
+  it("points a straight arm at targets out of reach", () => {
+    const c = base("stand_idle");
+    const r = rayanDef.reach!(c, [-3, 1.4, 4], "R");
+    expect(r.reached).toBe(false);
+    const hand = rayanHand({ ...c, ...r.set }, "R");
+    const shoulder = rayanHand({ ...c, "shoulderR.x": 0, "shoulderR.y": 0, "shoulderR.z": 0, "elbowR.x": 0 }, "R");
+    expect(hand[2]).toBeGreaterThan(shoulder[2] + 0.3); // arm swung forward toward the target
+  });
+
+  it("the mascot leans instead of reaching", () => {
+    const r = claudeDef.reach!(restChannels(claudeDef), [0, 0.05, 0.3], "R");
+    expect(r.set["body.rx"]).toBeGreaterThan(0.1);
   });
 });

@@ -36,6 +36,10 @@
     "tired": "Half-closed low eyes, deflated."
   },
   "gestures": {
+    "flinch": {
+      "description": "Startled squash backwards with huge eyes.",
+      "duration": 0.6
+    },
     "hop": {
       "description": "A single bouncy hop with anticipation squash.",
       "duration": 0.7

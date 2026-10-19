@@ -75,6 +75,19 @@ export type ActorDefinition = {
   anchors: (c: Channels) => Record<string, Vec3>;
   /** Maps automatic life signals onto this actor's channels (mutates `c`). */
   life: (c: Channels, s: LifeSignals) => void;
+  /**
+   * Optional: channel values that put this actor's `side` effector on `target` (root-local, unscaled
+   * metres; +Z forward, +X = actor's left) given its current channels `c`. Humanoids solve their arm;
+   * other anatomies lean/stretch toward it. Used by the reach-based recipes (point, press, pick-up, place).
+   */
+  reach?: (c: Channels, target: Vec3, side: "L" | "R") => { set: Channels; reached: boolean };
+  /**
+   * Optional: hand-to-self moves for the `facepalm` and `sip` recipes (palm on the face with the head bowed; a held
+   * cup at the mouth). Returns the channel values to hold, from the current channels.
+   */
+  selfReach?: (c: Channels, what: "facepalm" | "sip", side: "L" | "R") => { set: Channels; reached: boolean };
+  /** Optional: gesture names the recipes use for this anatomy (defaults: flinch, stomp/hop). */
+  recipeGestures?: { flinch?: string; stomp?: string; crouchPose?: string; /** Fraction of the stomp gesture where it lands (default 0.5). */ stompContact?: number };
 };
 
 // ---------------------------------------------------------------- track (resolved direction)

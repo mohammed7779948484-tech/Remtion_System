@@ -24,7 +24,7 @@ export const Lighting: React.FC<{ mood: Mood; t: number; shadowRadius?: number }
         shadow-camera-top={shadowRadius}
         shadow-camera-bottom={-shadowRadius}
         shadow-camera-near={0.5}
-        shadow-camera-far={20}
+        shadow-camera-far={Math.max(20, Math.hypot(...key.position) + shadowRadius * 2)}
       />
       <directionalLight position={mood.fill.position} color={mood.fill.color} intensity={mood.fill.intensity * e} />
       <directionalLight position={mood.rim.position} color={mood.rim.color} intensity={mood.rim.intensity * e} />

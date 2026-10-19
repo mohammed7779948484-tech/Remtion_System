@@ -8,9 +8,14 @@ import tsLang from "shiki/langs/typescript.mjs";
 import pyLang from "shiki/langs/python.mjs";
 import bashLang from "shiki/langs/bash.mjs";
 import jsonLang from "shiki/langs/json.mjs";
+import cssLang from "shiki/langs/css.mjs";
+import htmlLang from "shiki/langs/html.mjs";
 import darkTheme from "shiki/themes/github-dark.mjs";
 import { FONTS } from "../fonts";
 import { clamp01 } from "../core/time";
+import { drawWindow } from "../ui/drawWindow";
+import type { WindowParams } from "../ui/window";
+import { SCREEN_META, type ScreenMeta } from "./screens.data";
 
 export type DrawContext = { ctx: CanvasRenderingContext2D; w: number; h: number; t: number; since: number };
 export type DrawFn = (d: DrawContext, params: Record<string, unknown>) => void;
@@ -18,7 +23,7 @@ export type ScreenContent = { preset: string } & Record<string, unknown>;
 
 const highlighter = createHighlighterCoreSync({
   themes: [darkTheme],
-  langs: [tsLang, pyLang, bashLang, jsonLang],
+  langs: [tsLang, pyLang, bashLang, jsonLang, cssLang, htmlLang],
   engine: createJavaScriptRegexEngine(),
 });
 const tokenCache = new Map<string, { content: string; color?: string }[][]>();
@@ -26,7 +31,10 @@ const tokensFor = (code: string, lang: string) => {
   const key = `${lang}\u0000${code}`;
   let tokens = tokenCache.get(key);
   if (!tokens) {
-    tokens = highlighter.codeToTokensBase(code, { lang: lang as "typescript", theme: "github-dark" });
+    // Unknown languages render as plain text instead of crashing the render (validate warns about them).
+    tokens = (highlighter.getLoadedLanguages() as string[]).includes(lang)
+      ? highlighter.codeToTokensBase(code, { lang: lang as "typescript", theme: "github-dark" })
+      : code.split("\n").map((line) => [{ content: line }]);
     tokenCache.set(key, tokens);
   }
   return tokens;
@@ -54,11 +62,9 @@ const chrome = (d: DrawContext, title: string, accent = "#58a6ff") => {
   ctx.fillText(title, 150, 42);
 };
 
-export const SCREEN_PRESETS: Record<string, { description: string; params: Record<string, string>; glow: string; draw: DrawFn }> = {
+export const SCREEN_PRESETS: Record<string, ScreenMeta & { draw: DrawFn }> = {
   code: {
-    description: "Code editor that types itself out (syntax highlighted).",
-    params: { code: "source text", lang: "typescript|python|bash|json", title: "tab title", speed: "chars per second (default 30; 0 = show all)" },
-    glow: "#6ea8ff",
+    ...SCREEN_META.code,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0d1117";
@@ -97,9 +103,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   terminal: {
-    description: "Terminal printing lines one by one. Prefix a line with '!' for red, '+' for green.",
-    params: { lines: "string[]", interval: "seconds between lines (default 0.5)", title: "window title" },
-    glow: "#7ee787",
+    ...SCREEN_META.terminal,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0b0f14";
@@ -123,9 +127,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   error: {
-    description: "Flashing red failure screen.",
-    params: { title: "headline (default BUILD FAILED)", message: "detail line", lines: "string[] of stack-trace lines" },
-    glow: "#ff3b3b",
+    ...SCREEN_META.error,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       const flash = 0.5 + 0.5 * Math.sin((t - since) * Math.PI * 2 * 1.6);
@@ -147,9 +149,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   deploy: {
-    description: "Deploy progress bar; optionally fails part way.",
-    params: { label: "text above the bar", duration: "seconds to 100% (default 3)", failAt: "0..1 progress where it fails (omit = success)" },
-    glow: "#58a6ff",
+    ...SCREEN_META.deploy,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0d1117";
@@ -172,10 +172,18 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
       ctx.fillText(failed ? "✖ FAILED" : u >= 1 ? "✔ LIVE" : `${Math.floor(u * 100)}%`, 60, h * 0.7);
     },
   },
+  window: {
+    ...SCREEN_META.window,
+    draw: (d, p) => {
+      const { ctx, w, h, t, since } = d;
+      ctx.fillStyle = "#0b0c10";
+      ctx.fillRect(0, 0, w, h);
+      const m = Math.round(w * 0.04);
+      drawWindow(ctx, p as WindowParams, t - since + 0.25, m, m, w - 2 * m, h - 2 * m);
+    },
+  },
   off: {
-    description: "Screen off (dark glass).",
-    params: {},
-    glow: "#000000",
+    ...SCREEN_META.off,
     draw: ({ ctx, w, h }) => {
       const g = ctx.createLinearGradient(0, 0, w, h);
       g.addColorStop(0, "#15171c");
@@ -216,7 +224,21 @@ export const ScreenSurface: React.FC<{
     ctx.save();
     ctx.textBaseline = "alphabetic";
     const fn = draw ?? SCREEN_PRESETS[content.preset]?.draw ?? SCREEN_PRESETS.off.draw;
-    fn({ ctx, w: canvas.width, h: canvas.height, t, since }, content);
+    // Above 1024 px the drawing is scaled, so presets keep their 1024-wide layout but render sharper
+    // (giant screens). At 1024 and below nothing changes.
+    const k = resolution > 1024 ? resolution / 1024 : 1;
+    ctx.setTransform(k, 0, 0, k, 0, 0);
+    fn({ ctx, w: canvas.width / k, h: canvas.height / k, t, since }, content);
+    // Any preset can show a popup (error dialog / notification) over its content.
+    const popup = content.popup as (WindowParams & { kind?: "dialog" | "notification" }) | undefined;
+    if (popup && typeof popup === "object") {
+      const lw = canvas.width / k;
+      const lh = canvas.height / k;
+      const kind = popup.kind ?? "dialog";
+      const pw = lw * (kind === "notification" ? 0.62 : 0.6);
+      const ph = kind === "notification" ? lh * 0.17 : Math.min(lh * 0.62, pw * 0.62);
+      drawWindow(ctx, { ...popup, kind }, t - since, (lw - pw) / 2, kind === "notification" ? lh * 0.06 : (lh - ph) / 2, pw, ph);
+    }
     ctx.restore();
     texture.needsUpdate = true;
   });

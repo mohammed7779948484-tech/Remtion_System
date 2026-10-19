@@ -1,6 +1,7 @@
 // Episode direction schema (zod). Strict objects so typos fail validation instead of being
 // silently ignored. `npm run catalog` exports this as catalog/episode.schema.json.
 import { z } from "zod";
+import { FxEntry } from "./fx";
 
 /** Seconds, or a reference: "l2.start", "l2.end+0.3", "l3.word:4" (4th word start), "l3.word:4.end-0.1". */
 export const TIME_REF_RE = /^([A-Za-z][\w-]*)\.(start|end|word:(\d+)(?:\.(start|end))?)([+-]\d+(?:\.\d+)?)?$/;
@@ -63,6 +64,8 @@ const Action = z.strictObject({
       duration: z.number().positive().optional(),
       speed: z.number().positive().optional(),
       face: z.union([z.literal("path"), z.literal("keep"), z.number()]).optional(),
+      /** Timing curve: smooth (default), in (accelerate — falls), out (decelerate — lands softly), linear, snap, backOut, inOut. */
+      ease: z.enum(["linear", "in", "out", "inOut", "smooth", "backOut", "snap"]).optional(),
     })
     .optional(),
   /** Turn to a yaw (degrees) or toward a place/actor. */
@@ -76,6 +79,24 @@ const Action = z.strictObject({
   transition: z.number().min(0).optional(),
   intensity: z.number().min(0).optional(),
   speed: z.number().positive().optional(),
+  /**
+   * Interaction recipe, expanded into ordinary cues: press | point | pick-up | place | react | sit-down |
+   * stand-up | facepalm | sip. Only `emotion` is applied alongside it.
+   */
+  do: z.enum(["press", "point", "pick-up", "place", "react", "sit-down", "stand-up", "facepalm", "sip"]).optional(),
+  /** Recipe target: "item.anchor" (e.g. "keyboard.key:ctrl"), an item, actor[.anchor], mark or [x,y,z]. */
+  target: Place.optional(),
+  /** Recipe item (pick-up / place). */
+  item: z.string().optional(),
+  /** Recipe hand/socket (default: the hand on the target's side). */
+  hand: z.string().optional(),
+  /** press/place: false = too light to push the target down (the gag). */
+  weight: z.boolean().optional(),
+  /** Sound played at the recipe's moment of contact (library name or file), and its volume. */
+  sound: z.string().optional(),
+  volume: z.number().min(0).optional(),
+  /** place: yaw (degrees) of the put-down item. */
+  rotation: z.number().optional(),
 });
 
 const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld"]);
@@ -160,6 +181,8 @@ export const EpisodeSchema = z.strictObject({
   sfx: z.array(z.strictObject({ at: TimeRef, sound: z.string(), volume: z.number().min(0).optional(), prompt: z.string().optional() })).default([]),
   music: z.strictObject({ src: z.string(), volume: z.number().min(0).optional(), duck: z.number().min(0).max(1).optional() }).optional(),
   events: z.array(z.strictObject({ at: TimeRef, name: z.string(), duration: z.number().min(0).optional(), data: z.record(z.string(), z.unknown()).optional() })).default([]),
+  /** Accents: text | window | callout | impact | shake | glitch | flash | dip (catalog/fx.json). */
+  fx: z.array(FxEntry).default([]),
   captions: z
     .strictObject({
       style: z.enum(["subtitle", "pop", "none"]).optional(),

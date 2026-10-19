@@ -25,7 +25,8 @@
     "sit_typing": "Seated, leaning in, hands on a keyboard; fingers type automatically.",
     "sit_explaining": "Seated, turned-in torso, both forearms up explaining; hands animate while talking.",
     "sit_arms_crossed": "Seated, leaning back with arms folded.",
-    "walk": "Walk cycle in place (a `move` cue walks automatically from any standing pose)."
+    "walk": "Walk cycle in place (a `move` cue walks automatically from any standing pose).",
+    "crouch": "Squat low with a forward lean (picking something up, putting it down). Feet stay planted."
   },
   "emotions": {
     "neutral": "Calm.",
@@ -36,6 +37,14 @@
     "tired": "Droopy lids, sad brows."
   },
   "gestures": {
+    "flinch": {
+      "description": "Recoils from an impact: jolts back, arms up, brows high.",
+      "duration": 0.8
+    },
+    "stomp": {
+      "description": "Small hop and a heavy landing on whatever is underfoot (lands at 45% of the gesture).",
+      "duration": 0.7
+    },
     "wave": {
       "description": "Right hand raised, waving.",
       "duration": 1.6

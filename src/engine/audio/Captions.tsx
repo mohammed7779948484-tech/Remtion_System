@@ -9,17 +9,25 @@ import { lineCaptions } from "./speech";
 
 type Page = TikTokPage & { speaker: string; endMs: number };
 
+/**
+ * Caption pages for all lines in time order. A line's last page lingers 0.2 s, but never past the
+ * start of the next page, so a following line's first words are never hidden.
+ */
+export const captionPages = (resolved: Pick<ResolvedEpisode, "lines" | "captions">): Page[] => {
+  const out: Page[] = [];
+  for (const l of resolved.lines) {
+    const { pages: ps } = createTikTokStyleCaptions({ captions: lineCaptions(l.words, l.start), combineTokensWithinMilliseconds: resolved.captions.pageSeconds * 1000 });
+    ps.forEach((p, i) => out.push({ ...p, speaker: l.speaker, endMs: i < ps.length - 1 ? ps[i + 1].startMs : Math.round((l.end + 0.2) * 1000) }));
+  }
+  out.sort((a, b) => a.startMs - b.startMs);
+  for (let i = 0; i < out.length - 1; i++) out[i].endMs = Math.min(out[i].endMs, out[i + 1].startMs);
+  return out;
+};
+
 export const Captions: React.FC<{ resolved: ResolvedEpisode }> = ({ resolved }) => {
   const frame = useCurrentFrame();
   const { fps, width, height } = useVideoConfig();
-  const pages = useMemo(() => {
-    const out: Page[] = [];
-    for (const l of resolved.lines) {
-      const { pages: ps } = createTikTokStyleCaptions({ captions: lineCaptions(l.words, l.start), combineTokensWithinMilliseconds: resolved.captions.pageSeconds * 1000 });
-      ps.forEach((p, i) => out.push({ ...p, speaker: l.speaker, endMs: i < ps.length - 1 ? ps[i + 1].startMs : Math.round((l.end + 0.2) * 1000) }));
-    }
-    return out;
-  }, [resolved]);
+  const pages = useMemo(() => captionPages(resolved), [resolved]);
 
   const style = resolved.captions.style;
   if (style === "none") return null;

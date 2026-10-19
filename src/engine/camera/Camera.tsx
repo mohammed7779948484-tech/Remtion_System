@@ -2,10 +2,10 @@
 // field follows the frame's focus distance.
 import { PerspectiveCamera } from "@react-three/drei";
 import { useThree } from "@react-three/fiber";
-import { Bloom, DepthOfField, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
+import { Bloom, ChromaticAberration, DepthOfField, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode, type EffectComposer as Composer } from "postprocessing";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { useCurrentFrame, useDelayRender } from "remotion";
+import { cancelRender, getRemotionEnvironment, useCurrentFrame, useDelayRender } from "remotion";
 import * as THREE from "three";
 import type { CameraFrame } from "./solve";
 
@@ -42,7 +42,14 @@ const ComposerGate: React.FC<{ composer: React.RefObject<Composer | null> }> = (
     let tries = 0;
     let done = false;
     const poll = () => {
-      if (ready() || tries++ > 600) {
+      const ok = ready();
+      if (!ok && tries > 600 && getRemotionEnvironment().isRendering) {
+        // Never emit a frame without post (blank/ungraded): fail the render loudly instead.
+        done = true;
+        cancelRender(new Error(`Postprocessing passes were not ready for frame ${frame} after 600 polls`));
+        return;
+      }
+      if (ok || tries++ > 600) {
         advance(performance.now());
         done = true;
         continueRender(handle);
@@ -63,6 +70,11 @@ export type PostFXProps = {
   focus: CameraFrame["focus"];
   bloom?: number;
   vignette?: number;
+  /**
+   * Chromatic-aberration glitch strength at this frame, or undefined when the episode never glitches.
+   * Whether it is mounted must not change during a render (it is decided per episode).
+   */
+  chroma?: number;
 };
 
 /**
@@ -70,13 +82,14 @@ export type PostFXProps = {
  * composer buffers (synchronous); SMAA was dropped because its lookup textures load
  * asynchronously, which made the first frame of each render tab differ.
  */
-export const PostFX: React.FC<PostFXProps> = ({ focus, bloom = 0.6, vignette = 0.55 }) => {
+export const PostFX: React.FC<PostFXProps> = ({ focus, bloom = 0.6, vignette = 0.55, chroma }) => {
   const composer = useRef<Composer | null>(null);
   return (
     <>
       <EffectComposer multisampling={4} ref={composer}>
         <DepthOfField focusDistance={focus?.distance ?? 10} focusRange={focus?.range ?? 100} bokehScale={focus ? focus.bokeh : 0} />
         <Bloom luminanceThreshold={0.95} luminanceSmoothing={0.2} intensity={bloom} mipmapBlur />
+        {chroma !== undefined ? <ChromaticAberration offset={[chroma * 0.012, chroma * -0.006]} radialModulation={false} modulationOffset={0} /> : <></>}
         <Vignette offset={0.32} darkness={vignette} />
         <ToneMapping mode={ToneMappingMode.NEUTRAL} />
       </EffectComposer>

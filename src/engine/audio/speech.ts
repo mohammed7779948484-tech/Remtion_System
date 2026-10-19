@@ -4,19 +4,32 @@
 // opens the mouth. It is not phoneme lip-sync (no visemes); a phoneme track (e.g. from Rhubarb)
 // would be the upgrade path, consumed the same way through an actor's `life` signals.
 import type { Caption } from "@remotion/captions";
+import { SFX_INFO } from "./sfx.data";
 
 export type Word = { text: string; start: number; end: number };
 export type Envelope = { rate: number; values: number[] };
 
+export type VoiceProvider = "elevenlabs" | "system" | "fixture";
+export const VOICE_PROVIDERS: VoiceProvider[] = ["elevenlabs", "system", "fixture"];
+
 export type VoiceLine = {
   /** Path relative to public/. */
   file: string;
+  /** Scheme 2: fingerprint of the effective request (see voiceFingerprint). Legacy: lineHash. */
   hash: string;
-  provider: "elevenlabs" | "system" | "fixture";
+  scheme?: 2;
+  provider: VoiceProvider;
   text: string;
   duration: number;
   words: Word[];
   envelope: Envelope;
+  /** Provenance (scheme 2). */
+  model?: string;
+  voiceId?: string;
+  format?: string;
+  /** ElevenLabs plan tier at generation time ("free" clips are non-commercial). */
+  tier?: string;
+  generatedAt?: string;
 };
 export type VoiceManifest = { version: 1; lines: Record<string, VoiceLine> };
 
@@ -30,10 +43,101 @@ export const hashString = (s: string) => {
   return (h >>> 0).toString(16).padStart(8, "0");
 };
 
+/** Legacy (scheme 1) cache key: text + raw cast overrides + provider. Kept to recognise old clips. */
 export const lineHash = (text: string, voice: unknown, provider: string) => hashString(`${provider}|${text}|${JSON.stringify(voice ?? {})}`);
 
-/** Split text into display words (keeps punctuation attached). */
-export const splitWords = (text: string) => text.split(/\s+/).filter(Boolean);
+// ---------------------------------------------------------------- effective voice requests
+
+/** Cast voice settings as written in episode.json (mirrors the schema's Voice object). */
+export type CastVoice = {
+  elevenlabs?: { voiceId: string; model?: string; settings?: Record<string, number> };
+  system?: string;
+  rate?: number;
+  pitch?: string;
+};
+
+/**
+ * Premade ElevenLabs voices used when a cast member has no voiceId, by cast order (override per cast
+ * `voice.elevenlabs.voiceId`). Confirmed usable via `voice --check` on 2026-10-18: Liam (young,
+ * energetic creator), Jessica (cute, playful), Will (young, relaxed), Laura (quirky).
+ */
+export const DEFAULT_ELEVEN_VOICES = ["TX3LPaxmHKxFdv7VOQHJ", "cgSgspJ2msm6clMCkdW9", "bIHbv24MWmeRgasZH58o", "FGY2WhTYpPnrIDTdsKH5"];
+export const DEFAULT_ELEVEN_MODEL = "eleven_v4";
+export const ELEVEN_FORMAT = "wav_24000";
+/** Voice settings each model accepts, with defaults (v3/v4: stability + similarity only, no style/speed). */
+export const ELEVEN_MODEL_SETTINGS: Record<string, Record<string, number>> = {
+  eleven_v4: { stability: 0.5, similarity_boost: 0.75 },
+  eleven_v4_turbo: { stability: 0.5, similarity_boost: 0.75 },
+  eleven_v3: { stability: 0.5, similarity_boost: 0.75 },
+};
+export const DEFAULT_ELEVEN_SETTINGS: Record<string, number> = { stability: 0.45, similarity_boost: 0.75, style: 0.3 };
+/** Models documented to use previous_text/next_text for continuity (not v3; v4 unverified, so off). */
+export const ELEVEN_STITCH_MODELS = ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_turbo_v2", "eleven_flash_v2"];
+/** Models that perform inline audio tags like [laughs] instead of reading them aloud. */
+export const ELEVEN_TAG_MODELS = ["eleven_v3", "eleven_v4", "eleven_v4_turbo"];
+export const DEFAULT_SYSTEM_VOICES = ["Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Mark"];
+
+// ---------------------------------------------------------------- audio tags
+
+/** Inline performance tags such as `[laughs]` or `[clears throat]` (expressive ElevenLabs models). */
+export const TAG_RE = /\[[^\]\n]{1,40}\]/g;
+/** Text with performance tags removed (what offline voices read and captions show). */
+export const stripTags = (text: string) => text.replace(TAG_RE, " ").replace(/\s+/g, " ").trim();
+export const hasTags = (text: string) => new RegExp(TAG_RE.source).test(text);
+
+export type VoiceRequest =
+  | { provider: "elevenlabs"; text: string; voiceId: string; model: string; settings: Record<string, number>; format: string }
+  | { provider: "system"; text: string; voice: string; rate: number; pitch?: string }
+  | { provider: "fixture"; text: string; speakerIndex: number };
+
+/** Exactly what a provider will be asked to synthesise, with every default filled in. Pure. */
+export const voiceRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number): VoiceRequest => {
+  if (provider === "elevenlabs") {
+    const el = voice?.elevenlabs;
+    const model = el?.model ?? DEFAULT_ELEVEN_MODEL;
+    const allowed = ELEVEN_MODEL_SETTINGS[model];
+    const settings = allowed
+      ? { ...allowed, ...Object.fromEntries(Object.entries(el?.settings ?? {}).filter(([k]) => k in allowed)) }
+      : { ...DEFAULT_ELEVEN_SETTINGS, ...(el?.settings ?? {}) };
+    return {
+      provider,
+      text: ELEVEN_TAG_MODELS.includes(model) ? text : stripTags(text),
+      voiceId: el?.voiceId ?? DEFAULT_ELEVEN_VOICES[speakerIndex % DEFAULT_ELEVEN_VOICES.length],
+      model,
+      settings,
+      format: ELEVEN_FORMAT,
+    };
+  }
+  // Offline voices would read "[laughs]" aloud: they get the tag-free text.
+  if (provider === "system") return { provider, text: stripTags(text), voice: voice?.system ?? DEFAULT_SYSTEM_VOICES[speakerIndex % DEFAULT_SYSTEM_VOICES.length], rate: voice?.rate ?? 0, ...(voice?.pitch ? { pitch: voice.pitch } : {}) };
+  return { provider, text: stripTags(text), speakerIndex };
+};
+
+const stable = (v: unknown): string =>
+  v && typeof v === "object" && !Array.isArray(v)
+    ? `{${Object.keys(v as object).sort().map((k) => `${JSON.stringify(k)}:${stable((v as Record<string, unknown>)[k])}`).join(",")}}`
+    : JSON.stringify(v);
+
+/** Scheme-2 cache key: changes exactly when the synthesised audio would change. */
+export const voiceFingerprint = (req: VoiceRequest) => hashString(`v2|${stable(req)}`);
+
+/** Why a cached clip no longer matches the episode, or null when it is fresh. */
+export const voiceStaleReason = (entry: VoiceLine, text: string, voice: CastVoice | undefined, speakerIndex: number): string | null => {
+  if (entry.text !== text) return "text changed";
+  if (entry.scheme === 2) {
+    const req = voiceRequest(entry.provider, text, voice, speakerIndex);
+    if (voiceFingerprint(req) === entry.hash) return null;
+    if (req.provider === "elevenlabs") {
+      if (entry.model && entry.model !== req.model) return `model changed (${entry.model} → ${req.model})`;
+      if (entry.voiceId && entry.voiceId !== req.voiceId) return `voice changed (${entry.voiceId} → ${req.voiceId})`;
+    }
+    return `${entry.provider} voice settings changed`;
+  }
+  return entry.hash === lineHash(text, voice, entry.provider) ? null : `${entry.provider} voice settings changed`;
+};
+
+/** Split text into display words (keeps punctuation attached; performance tags are not words). */
+export const splitWords = (text: string) => stripTags(text).split(/\s+/).filter(Boolean);
 
 /** Rough timing for lines that have no generated audio yet. */
 export const estimateWords = (text: string): { duration: number; words: Word[] } => {
@@ -102,12 +206,16 @@ export const lineCaptions = (words: Word[], lineStart: number): Caption[] =>
     confidence: null,
   }));
 
-/** Character-level alignment (ElevenLabs `alignment`) → words. */
+/** Character-level alignment (ElevenLabs `alignment`) → words. Characters inside `[tags]` are skipped. */
 export const wordsFromAlignment = (a: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }): Word[] => {
   const words: Word[] = [];
   let cur: Word | null = null;
+  let inTag = false;
   a.characters.forEach((ch, i) => {
-    if (/\s/.test(ch)) {
+    if (ch === "[") inTag = true;
+    const skip = inTag;
+    if (ch === "]") inTag = false;
+    if (/\s/.test(ch) || skip) {
       if (cur) words.push(cur);
       cur = null;
       return;
@@ -120,13 +228,5 @@ export const wordsFromAlignment = (a: { characters: string[]; character_start_ti
   return words;
 };
 
-/** Curated short sound effects hosted by Remotion (see the Remotion sfx skill). */
-export const SFX_LIBRARY: Record<string, string> = Object.fromEntries(
-  [
-    "whoosh", "whip", "page-turn", "switch", "mouse-click", "shutter-modern", "shutter-old", "ding", "bruh", "vine-boom",
-    "windows-xp-error", "fah", "spongebob-fail", "omg-hell-nah", "price-is-right-fail", "romance-meme", "bone-crack",
-    "anime-wow", "yippee", "loading-lag", "wilhelm-scream", "mac-quack", "skedaddle", "snapchat-notification",
-    "nelly-ahh", "sanctuary-guardian-what", "minecraft-hurt", "oh-my-god-vine", "illuminati-confirmed",
-    "dramatic-boomer", "triggered", "record-scratch",
-  ].map((n) => [n, `https://remotion.media/${n}.wav`]),
-);
+/** Sound library by name → public-relative file (local CC0 kit) or URL (remote legacy). Details: SFX_INFO. */
+export const SFX_LIBRARY: Record<string, string> = Object.fromEntries(Object.entries(SFX_INFO).map(([k, v]) => [k, v.file]));

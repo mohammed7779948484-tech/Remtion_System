@@ -653,5 +653,10 @@ export const project = (frame: CameraFrame, p: Vec3, aspect: number) => {
   const rel = sub(p, frame.position);
   const z = dot(rel, forward);
   const tanV = Math.tan((frame.fov * DEG) / 2);
-  return { x: dot(rel, right) / (z * tanV * aspect), y: dot(rel, up) / (z * tanV), depth: z };
+  const X = dot(rel, right) / (z * tanV);
+  const Y = dot(rel, up) / (z * tanV);
+  if (!frame.roll) return { x: X / aspect, y: Y, depth: z };
+  // The camera is rolled about its view axis (see CinematicCamera), so the image rotates the other way.
+  const r = frame.roll * DEG;
+  return { x: (X * Math.cos(r) + Y * Math.sin(r)) / aspect, y: -X * Math.sin(r) + Y * Math.cos(r), depth: z };
 };

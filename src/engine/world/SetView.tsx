@@ -20,10 +20,12 @@ const Shell: React.FC<{ layout: Layout }> = ({ layout }) => {
   const s = layout.shell;
   return (
     <group name="shell">
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color={s.floor} roughness={0.9} />
-      </mesh>
+      {s.floor === "none" ? null : (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]} receiveShadow>
+          <planeGeometry args={[40, 40]} />
+          <meshStandardMaterial color={s.floor} roughness={0.9} />
+        </mesh>
+      )}
       {s.walls.back ? (
         <group>
           <mesh position={[0, s.height / 2, s.back - 0.05]} receiveShadow>
@@ -61,9 +63,11 @@ export const SetView: React.FC<SetViewProps> = ({ layout, t, practicals, cues = 
       if (!View) return null;
       const w = itemWorld(layout, item.id);
       const { params, since } = itemParamsAt(item, cues, t);
+      if (params.visible === false) return null;
+      const own = cues.filter((c) => c.item === item.id);
       return (
         <group key={item.id} name={item.id} position={w.position} rotation={[0, w.yaw, 0]} scale={w.scale}>
-          <View id={item.id} params={params} since={since} t={t} practicals={practicals} screens={screens} />
+          <View id={item.id} params={params} since={since} t={t} practicals={practicals} screens={screens} cues={own} />
         </group>
       );
     })}

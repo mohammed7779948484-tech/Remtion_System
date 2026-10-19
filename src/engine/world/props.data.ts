@@ -1,8 +1,14 @@
 // Prop catalog metadata (pure). Origin = bottom centre, front faces +Z, metres.
 // `size` doubles as the occluder box used by the camera solver.
 import type { Vec3 } from "../core/time";
+import { KEY_TOP, KEY_TRAVEL, KEYBOARD_SIZE, KEYS, keyTop } from "./micro-keyboard/keys";
 
-export type ParamSpec = { type: "color" | "boolean" | "number" | "string" | "screen"; default: unknown; description: string };
+export type ParamSpec = { type: "color" | "boolean" | "number" | "string" | "screen" | "object" | "list"; default: unknown; description: string };
+
+/** Params every set item accepts, whatever its kind. */
+export const COMMON_ITEM_PARAMS: Record<string, ParamSpec> = {
+  visible: { type: "boolean", default: true, description: "false hides the item (toggle it with props cues, e.g. a placed copy appearing)" },
+};
 
 export type PropMeta = {
   description: string;
@@ -12,6 +18,11 @@ export type PropMeta = {
   /** Named points in prop-local space (framing targets, seats, surfaces). */
   anchors: Record<string, Vec3>;
   params: Record<string, ParamSpec>;
+  /**
+   * Pressable (the `press` recipe): which param a press sets and how far it travels. `keyed`: anchors
+   * named `key:<id>` press `{ [param]: { <id>: true } }`; otherwise `{ [param]: true }`.
+   */
+  press?: { param: string; travel: number; keyed?: boolean };
 };
 
 const screenParam: ParamSpec = {
@@ -109,6 +120,53 @@ export const PROPS: Record<string, PropMeta> = {
     params: {
       color: { type: "color", default: "#3b3f6b", description: "Main colour" },
       border: { type: "color", default: "#f59e0b", description: "Border" },
+    },
+  },
+  // ---- micro-keyboard world (a laptop scaled ~50×: normal-size actors stand on the keys)
+  giant_keyboard: {
+    description: "Giant laptop keyboard (14.5 × 5 keys, 0.95 m pitch). Stand actors on key tops (marks `on-<key>`, y 0.42). Press keys with props cues `{ \"keys\": { \"ctrl\": true } }` (false = release) or the `press` recipe; anchors `key:<id>` (enter, ctrl, z, space, a…).",
+    size: [KEYBOARD_SIZE[0], KEY_TOP, KEYBOARD_SIZE[2]],
+    occluder: true,
+    press: { param: "keys", travel: KEY_TRAVEL, keyed: true },
+    anchors: { center: [0, KEY_TOP, 0], top: [0, KEY_TOP, 0], ...Object.fromEntries(KEYS.map((k) => [`key:${k.id}`, keyTop(k.id)])) },
+    params: {
+      keys: { type: "object", default: {}, description: "Pressed keys: { <key id>: true|false }; each change animates the key from that cue's time" },
+      color: { type: "color", default: "#1c1d22", description: "Keycaps" },
+      legend: { type: "color", default: "#e7e9ee", description: "Key labels" },
+      deck: { type: "color", default: "#8d939c", description: "Aluminium deck around the keys" },
+      glow: { type: "color", default: "#ff9a3d", description: "Backlight colour showing between the keys" },
+      backlight: { type: "number", default: 0.6, description: "Backlight strength (0 = off)" },
+      highlight: { type: "list", default: [], description: "Key ids whose keycap glows (e.g. [\"ctrl\", \"z\"])" },
+    },
+  },
+  giant_screen: {
+    description: "Giant laptop lid behind the keyboard: a 14 × 9 m screen tilted back. `screen` takes any screen preset (code, terminal, error, deploy, chat…).",
+    size: [15.6, 9.8, 0.4],
+    occluder: true,
+    anchors: { screen: [0, 5.1, 0.25], center: [0, 5.1, 0], top: [0, 9.8, -1.2] },
+    params: {
+      screen: screenParam,
+      bezel: { type: "color", default: "#16171b", description: "Lid frame" },
+      tilt: { type: "number", default: 14, description: "Lid tilt back (degrees)" },
+    },
+  },
+  rubber_duck: {
+    description: "Rubber debugging duck (holdable, ~0.4 m: knee-high for a person, tiny in the real world).",
+    size: [0.34, 0.4, 0.42],
+    occluder: false,
+    anchors: { top: [0, 0.4, 0], center: [0, 0.2, 0] },
+    params: { color: { type: "color", default: "#ffd23f", description: "Body" } },
+  },
+  dust_motes: {
+    description: "Floating dust specks catching the light (pure drift; good for macro shots).",
+    size: [0, 0, 0],
+    occluder: false,
+    anchors: {},
+    params: {
+      count: { type: "number", default: 360, description: "Number of specks" },
+      area: { type: "list", default: [16, 5, 10], description: "Box [w, h, d] (metres) around the item origin, from the floor up" },
+      color: { type: "color", default: "#ffd9a8", description: "Speck colour" },
+      seed: { type: "string", default: "dust", description: "Layout seed" },
     },
   },
   window: {

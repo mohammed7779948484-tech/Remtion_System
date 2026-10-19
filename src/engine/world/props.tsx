@@ -5,6 +5,8 @@ import type { ReactNode } from "react";
 import { rand } from "../core/time";
 import type { Mood } from "../lighting/moods";
 import { PROPS } from "./props.data";
+import type { PropCue } from "./layout";
+import { DustMotes, GiantKeyboard, GiantScreen, RubberDuck } from "./micro-keyboard/MicroKeyboard";
 import { SCREEN_PRESETS, ScreenSurface, type DrawFn, type ScreenContent } from "./Screen";
 
 export type PropViewProps = {
@@ -16,6 +18,8 @@ export type PropViewProps = {
   practicals: Mood["practicals"];
   /** Optional custom screen draw functions supplied by a video, keyed by preset name. */
   screens?: Record<string, DrawFn>;
+  /** This item's props cues in time order (for views whose state depends on several changes, e.g. key presses). */
+  cues?: PropCue[];
 };
 
 const param = <T,>(kind: string, props: PropViewProps, key: string): T =>
@@ -374,5 +378,9 @@ export const PROP_VIEWS: Record<string, React.FC<PropViewProps>> = {
   bookshelf: Bookshelf,
   rug: Rug,
   window: Window,
+  giant_keyboard: GiantKeyboard,
+  giant_screen: GiantScreen,
+  rubber_duck: RubberDuck,
+  dust_motes: DustMotes,
 };
 

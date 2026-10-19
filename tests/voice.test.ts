@@ -2,8 +2,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { envelopeFromSamples, lineCaptions, wordsFromAlignment } from "../src/engine/audio/speech";
-import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, readWav, writeWav } from "../scripts/voice";
+import { captionPages } from "../src/engine/audio/Captions";
+import { envelopeFromSamples, lineCaptions, lineHash, splitWords, voiceFingerprint, voiceRequest, voiceStaleReason, wordsFromAlignment } from "../src/engine/audio/speech";
+import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, parseProvider, readWav, writeWav } from "../scripts/voice";
 
 const tmpRepo = (episode: object) => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "rs-voice-"));
@@ -86,6 +87,89 @@ describe("ElevenLabs (mocked HTTP, documented response shape)", () => {
   });
 });
 
+describe("cost safety", () => {
+  const lines = [{ id: "l1", speaker: "rayan", text: "Hello there." }];
+  const neverFetch = (async () => {
+    throw new Error("network must not be used");
+  }) as unknown as typeof fetch;
+
+  it("a key alone never switches to paid voices", async () => {
+    const root = tmpRepo(episode(lines));
+    const r = await generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} });
+    expect(r.provider).not.toBe("elevenlabs");
+  });
+
+  it("rejects an unknown provider instead of falling back to fixture", () => {
+    expect(() => parseProvider("elevenlab")).toThrow(/unknown provider/);
+    expect(() => parseProvider("")).toThrow(/unknown provider/);
+    expect(parseProvider(undefined)).toBeUndefined();
+  });
+
+  it("an ElevenLabs-voiced episode needs the explicit flag before buying changed lines", async () => {
+    const root = tmpRepo(episode(lines));
+    const fake = (async () => {
+      const chars = [..."Hello there."];
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.01), character_end_times_seconds: chars.map((_, i) => i * 0.01 + 0.01) } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: fake, log: () => {} });
+    // Unchanged: no flag needed, nothing bought.
+    expect(await generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).toMatchObject({ provider: "elevenlabs", generated: 0 });
+    fs.writeFileSync(path.join(root, "videos", "demo", "episode.json"), JSON.stringify(episode([{ ...lines[0], text: "Hello again." }])));
+    await expect(generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/explicit flag/);
+  });
+
+  it("prompted sound effects also need the explicit flag (unchanged dialogue doesn't open the paid path)", async () => {
+    const root = tmpRepo(episode(lines));
+    const fake = (async () => {
+      const chars = [..."Hello there."];
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64"), alignment: { characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.01), character_end_times_seconds: chars.map((_, i) => i * 0.01 + 0.01) } }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: fake, log: () => {} });
+    fs.writeFileSync(path.join(root, "videos", "demo", "episode.json"), JSON.stringify({ ...episode(lines), sfx: [{ at: 0, sound: "sfx/boom.mp3", prompt: "a boom" }] }));
+    await expect(generateVoices("demo", { root, apiKey: "KEY", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/sfx "sfx\/boom.mp3" needs paid ElevenLabs generation/);
+    await expect(generateVoices("demo", { root, provider: "elevenlabs", apiKey: "", fetchImpl: neverFetch, log: () => {} })).rejects.toThrow(/ELEVENLABS_API_KEY is not set/);
+  });
+
+  it("keeps already-generated clips in the manifest when a later line fails", async () => {
+    const two = [lines[0], { id: "l2", speaker: "claude", text: "Second line." }];
+    const root = tmpRepo(episode(two));
+    let calls = 0;
+    const flaky = (async (url: string) => {
+      if (url.includes("/user/subscription")) return new Response(JSON.stringify({ tier: "free", character_count: 0, character_limit: 10000 }), { status: 200 });
+      if (calls++ > 0) return new Response(JSON.stringify({ detail: { status: "quota_exceeded", message: "out of credits" } }), { status: 401 });
+      return new Response(JSON.stringify({ audio_base64: writeWav(new Float32Array(2400), 24000).toString("base64") }), { status: 200 });
+    }) as unknown as typeof fetch;
+    await expect(generateVoices("demo", { root, provider: "elevenlabs", apiKey: "KEY", fetchImpl: flaky, log: () => {} })).rejects.toThrow(/401 quota_exceeded/);
+    const manifest = JSON.parse(fs.readFileSync(path.join(root, "public", "videos", "demo", "voice.json"), "utf8"));
+    expect(Object.keys(manifest.lines)).toEqual(["l1"]);
+    expect(manifest.lines.l1).toMatchObject({ provider: "elevenlabs", model: "eleven_v4", tier: "free", scheme: 2 });
+    expect(fs.existsSync(path.join(root, "public", manifest.lines.l1.file))).toBe(true);
+  });
+});
+
+describe("voice fingerprint", () => {
+  it("changes with effective defaults, not with other providers' fields", () => {
+    const base = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" } }, 0);
+    const otherModel = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A", model: "eleven_multilingual_v2" } }, 0);
+    const systemEdit = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" }, system: "Microsoft Zira Desktop", pitch: "+30%" }, 0);
+    expect(voiceFingerprint(base)).not.toBe(voiceFingerprint(otherModel));
+    expect(voiceFingerprint(base)).toBe(voiceFingerprint(systemEdit));
+    // Default voice follows cast order: reordering the cast changes the audio, so the key changes.
+    expect(voiceFingerprint(voiceRequest("elevenlabs", "Hi", undefined, 0))).not.toBe(voiceFingerprint(voiceRequest("elevenlabs", "Hi", undefined, 1)));
+  });
+
+  it("names why a cached clip is stale and accepts legacy clips that still match", () => {
+    const req = voiceRequest("elevenlabs", "Hi", { elevenlabs: { voiceId: "A" } }, 0);
+    const entry = { file: "x.wav", hash: voiceFingerprint(req), scheme: 2 as const, provider: "elevenlabs" as const, text: "Hi", duration: 1, words: [], envelope: { rate: 60, values: [] }, model: req.provider === "elevenlabs" ? req.model : "" };
+    expect(voiceStaleReason(entry, "Hi", { elevenlabs: { voiceId: "A" } }, 0)).toBeNull();
+    expect(voiceStaleReason(entry, "Hi", { elevenlabs: { voiceId: "A", model: "eleven_multilingual_v2" } }, 0)).toMatch(/model changed \(eleven_v4 → eleven_multilingual_v2\)/);
+    expect(voiceStaleReason(entry, "Hello", { elevenlabs: { voiceId: "A" } }, 0)).toBe("text changed");
+    const legacy = { file: "y.wav", hash: lineHash("Hi", { system: "David" }, "system"), provider: "system" as const, text: "Hi", duration: 1, words: [], envelope: { rate: 60, values: [] } };
+    expect(voiceStaleReason(legacy, "Hi", { system: "David" }, 0)).toBeNull();
+    expect(voiceStaleReason(legacy, "Hi", { system: "Zira" }, 0)).toMatch(/settings changed/);
+  });
+});
+
 describe("voice cache", () => {
   it("generates once, skips unchanged lines, regenerates edited ones", async () => {
     const lines = [
@@ -109,3 +193,64 @@ describe("voice cache", () => {
     expect(manifest.lines.l2.envelope.values.length).toBeGreaterThan(10);
   });
 });
+
+describe("captions", () => {
+  it("a line's lingering last page never hides the next line's first words", () => {
+    const w = (text: string, start: number, end: number) => ({ text, start, end });
+    const lines = [
+      { id: "l1", speaker: "a", text: "Hi there.", start: 0, end: 1, words: [w("Hi", 0.1, 0.4), w("there.", 0.45, 0.9)], envelope: { rate: 60, values: [] }, voiced: true },
+      { id: "l2", speaker: "b", text: "Nope.", start: 1.05, end: 1.6, words: [w("Nope.", 0, 0.4)], envelope: { rate: 60, values: [] }, voiced: true },
+    ];
+    const pages = captionPages({ lines, captions: { style: "subtitle", pageSeconds: 1.6 } });
+    const at = (ms: number) => pages.find((p) => ms >= p.startMs && ms < p.endMs);
+    expect(at(1060)?.speaker).toBe("b"); // used to still show l1's page until 1.2 s
+    expect(at(500)?.speaker).toBe("a");
+    for (let i = 1; i < pages.length; i++) expect(pages[i].startMs).toBeGreaterThanOrEqual(pages[i - 1].endMs);
+  });
+});
+
+describe("audio tags (v3/v4 performance cues)", () => {
+  it("expressive models get the tags; offline voices, captions and word refs don't", () => {
+    const text = "Ship it. [laughs] Okay! [clears throat]";
+    const v4 = voiceRequest("elevenlabs", text, undefined, 0);
+    expect(v4.text).toBe(text);
+    expect(v4.provider === "elevenlabs" && v4.settings).toEqual({ stability: 0.5, similarity_boost: 0.75 });
+    expect(voiceRequest("elevenlabs", text, { elevenlabs: { voiceId: "A", model: "eleven_multilingual_v2" } }, 0).text).toBe("Ship it. Okay!");
+    expect(voiceRequest("system", text, undefined, 0).text).toBe("Ship it. Okay!");
+    expect(splitWords(text)).toEqual(["Ship", "it.", "Okay!"]);
+    const chars = [...text];
+    const words = wordsFromAlignment({ characters: chars, character_start_times_seconds: chars.map((_, i) => i * 0.05), character_end_times_seconds: chars.map((_, i) => i * 0.05 + 0.05) });
+    expect(words.map((w) => w.text)).toEqual(["Ship", "it.", "Okay!"]);
+  });
+
+  it("v4 only receives the settings it accepts and no stitching", () => {
+    const job = { id: "l1", text: "Hi", voice: { elevenlabs: { voiceId: "A", settings: { stability: 1, style: 0.9, speed: 1.2 } } }, speakerIndex: 0, previous: "Before.", next: "After." };
+    const body = JSON.parse(elevenLabsRequest(job, "KEY").init.body as string);
+    expect(body).toMatchObject({ model_id: "eleven_v4", voice_settings: { stability: 1, similarity_boost: 0.75 } });
+    expect(body.voice_settings.style).toBeUndefined();
+    expect(body.previous_text).toBeUndefined();
+    const v2 = JSON.parse(elevenLabsRequest({ ...job, voice: { elevenlabs: { voiceId: "A", model: "eleven_multilingual_v2" } } }, "KEY").init.body as string);
+    expect(v2.previous_text).toBe("Before.");
+  });
+});
+
+describe("ElevenLabs v4 (real response captured 2026-10-18, audio reduced to its header)", () => {
+  const fixture = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "elevenlabs-v4.json"), "utf8"));
+
+  it("is a 24 kHz mono 16-bit WAV, as the pipeline expects", () => {
+    const h = Buffer.from(fixture.audio.header_base64, "base64");
+    expect(h.toString("ascii", 0, 4) + h.toString("ascii", 8, 12)).toBe("RIFFWAVE");
+    expect({ channels: h.readUInt16LE(22), rate: h.readUInt32LE(24), bits: h.readUInt16LE(34) }).toEqual({ channels: 1, rate: 24000, bits: 16 });
+    expect(fixture.request).toMatchObject({ model: "eleven_v4", format: "wav_24000" });
+  });
+
+  it("alignment includes the [laughs] tag; parsed words skip it and stay monotonic", () => {
+    expect(fixture.alignment.characters.join("")).toBe("Ship it. [laughs] Okay!");
+    const words = wordsFromAlignment(fixture.alignment);
+    expect(words.map((w) => w.text)).toEqual(splitWords(fixture.request.text));
+    for (let i = 1; i < words.length; i++) expect(words[i].start).toBeGreaterThanOrEqual(words[i - 1].end);
+    // The performed laugh sits between "it." and "Okay!".
+    expect(words[2].start - words[1].end).toBeGreaterThan(0.5);
+  });
+});
+

@@ -12,6 +12,17 @@ export { buildTracks, makeQuery, evaluateScene, type SceneFrame } from "./player
 export { EpisodeSchema, parseEpisode, type Episode, type EpisodeInput } from "./core/schema";
 export { resolveEpisode, type ResolvedEpisode, type ResolvedLine, type ResolvedActor, type ResolveContext } from "./core/timeline";
 export * from "./core/time";
+export { FX_INFO, FxSchemas, fxEnvelope, type FxType, type ResolvedFx } from "./core/fx";
+export { expandRecipe } from "./core/recipes";
+export { beatSheet, pacingNotes } from "./core/pacing";
+
+// Reusable screen-space components (also used by the `fx` cues and the "window" screen preset)
+export { AppWindow, type AppWindowProps } from "./ui/AppWindow";
+export { KineticText, type KineticTextProps, type KineticStyle } from "./ui/KineticText";
+export { drawWindow, wrapText } from "./ui/drawWindow";
+export { windowState, windowTheme, type WindowParams, type WindowKind } from "./ui/window";
+export { FxOverlay, useFxPoint } from "./fx/FxOverlay";
+export { FxWorld } from "./fx/FxWorld";
 
 // Actors
 export { ACTORS, rayanDef, claudeDef, Rayan, Claude } from "./actors";
@@ -26,6 +37,8 @@ export { PROP_VIEWS, Mug, type PropViewProps } from "./world/props";
 export { SetView } from "./world/SetView";
 export { ScreenSurface, SCREEN_PRESETS, type DrawFn, type DrawContext, type ScreenContent } from "./world/Screen";
 export { ENVIRONMENTS } from "./world/environments";
+export { KEYS, KEY_PITCH, KEY_TOP, KEY_TRAVEL, keyTop } from "./world/micro-keyboard/keys";
+export { GiantKeyboard, GiantScreen, RubberDuck, DustMotes, keyStates, keyTravel } from "./world/micro-keyboard/MicroKeyboard";
 export * from "./world/layout";
 
 // Camera, lighting, post

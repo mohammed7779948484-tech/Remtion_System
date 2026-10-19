@@ -5,8 +5,9 @@ import path from "node:path";
 import { z } from "zod";
 import { ACTOR_DEFS } from "../src/engine/actors/defs";
 import { restChannels, type ActorDefinition } from "../src/engine/actors/rig";
-import { SFX_LIBRARY } from "../src/engine/audio/speech";
+import { SFX_INFO } from "../src/engine/audio/sfx.data";
 import { MOVES, SHOT_TYPES } from "../src/engine/camera/solve";
+import { FX_INFO, FxSchemas } from "../src/engine/core/fx";
 import { EpisodeSchema } from "../src/engine/core/schema";
 import { MOODS } from "../src/engine/lighting/moods";
 import { ENVIRONMENTS } from "../src/engine/world/environments";
@@ -71,7 +72,10 @@ export const buildCatalog = (): Record<string, unknown> => {
   };
   files["moods.json"] = MOODS;
   files["screens.json"] = Object.fromEntries(Object.entries(SCREEN_PRESETS).map(([k, v]) => [k, { description: v.description, params: v.params }]));
-  files["sfx.json"] = SFX_LIBRARY;
+  files["sfx.json"] = SFX_INFO;
+  files["fx.json"] = Object.fromEntries(
+    Object.entries(FX_INFO).map(([type, info]) => [type, { ...info, params: Object.keys(FxSchemas[type as keyof typeof FxSchemas].shape).filter((k) => k !== "type" && k !== "at") }]),
+  );
   files["episode.schema.json"] = z.toJSONSchema(EpisodeSchema, { io: "input", unrepresentable: "any" });
   return files;
 };

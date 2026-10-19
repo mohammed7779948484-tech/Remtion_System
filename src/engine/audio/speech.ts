@@ -55,12 +55,34 @@ export type CastVoice = {
   pitch?: string;
 };
 
-/** Premade ElevenLabs voices used when a cast member has no voiceId (override per cast `voice.elevenlabs.voiceId`). */
-export const DEFAULT_ELEVEN_VOICES = ["JBFqnCBsd6RMkjVDRZzb", "EXAVITQu4vr4xnSDxMaL", "pNInz6obpgDQGcFmaJgB", "XB0fDUnXU5powFXDhCwa"];
-export const DEFAULT_ELEVEN_MODEL = "eleven_multilingual_v2";
+/**
+ * Premade ElevenLabs voices used when a cast member has no voiceId, by cast order (override per cast
+ * `voice.elevenlabs.voiceId`). Confirmed usable via `voice --check` on 2026-10-18: Liam (young,
+ * energetic creator), Jessica (cute, playful), Will (young, relaxed), Laura (quirky).
+ */
+export const DEFAULT_ELEVEN_VOICES = ["TX3LPaxmHKxFdv7VOQHJ", "cgSgspJ2msm6clMCkdW9", "bIHbv24MWmeRgasZH58o", "FGY2WhTYpPnrIDTdsKH5"];
+export const DEFAULT_ELEVEN_MODEL = "eleven_v4";
 export const ELEVEN_FORMAT = "wav_24000";
+/** Voice settings each model accepts, with defaults (v3/v4: stability + similarity only, no style/speed). */
+export const ELEVEN_MODEL_SETTINGS: Record<string, Record<string, number>> = {
+  eleven_v4: { stability: 0.5, similarity_boost: 0.75 },
+  eleven_v4_turbo: { stability: 0.5, similarity_boost: 0.75 },
+  eleven_v3: { stability: 0.5, similarity_boost: 0.75 },
+};
 export const DEFAULT_ELEVEN_SETTINGS: Record<string, number> = { stability: 0.45, similarity_boost: 0.75, style: 0.3 };
+/** Models documented to use previous_text/next_text for continuity (not v3; v4 unverified, so off). */
+export const ELEVEN_STITCH_MODELS = ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_flash_v2_5", "eleven_turbo_v2", "eleven_flash_v2"];
+/** Models that perform inline audio tags like [laughs] instead of reading them aloud. */
+export const ELEVEN_TAG_MODELS = ["eleven_v3", "eleven_v4", "eleven_v4_turbo"];
 export const DEFAULT_SYSTEM_VOICES = ["Microsoft David Desktop", "Microsoft Zira Desktop", "Microsoft Mark"];
+
+// ---------------------------------------------------------------- audio tags
+
+/** Inline performance tags such as `[laughs]` or `[clears throat]` (expressive ElevenLabs models). */
+export const TAG_RE = /\[[^\]\n]{1,40}\]/g;
+/** Text with performance tags removed (what offline voices read and captions show). */
+export const stripTags = (text: string) => text.replace(TAG_RE, " ").replace(/\s+/g, " ").trim();
+export const hasTags = (text: string) => new RegExp(TAG_RE.source).test(text);
 
 export type VoiceRequest =
   | { provider: "elevenlabs"; text: string; voiceId: string; model: string; settings: Record<string, number>; format: string }
@@ -71,17 +93,23 @@ export type VoiceRequest =
 export const voiceRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number): VoiceRequest => {
   if (provider === "elevenlabs") {
     const el = voice?.elevenlabs;
+    const model = el?.model ?? DEFAULT_ELEVEN_MODEL;
+    const allowed = ELEVEN_MODEL_SETTINGS[model];
+    const settings = allowed
+      ? { ...allowed, ...Object.fromEntries(Object.entries(el?.settings ?? {}).filter(([k]) => k in allowed)) }
+      : { ...DEFAULT_ELEVEN_SETTINGS, ...(el?.settings ?? {}) };
     return {
       provider,
-      text,
+      text: ELEVEN_TAG_MODELS.includes(model) ? text : stripTags(text),
       voiceId: el?.voiceId ?? DEFAULT_ELEVEN_VOICES[speakerIndex % DEFAULT_ELEVEN_VOICES.length],
-      model: el?.model ?? DEFAULT_ELEVEN_MODEL,
-      settings: { ...DEFAULT_ELEVEN_SETTINGS, ...(el?.settings ?? {}) },
+      model,
+      settings,
       format: ELEVEN_FORMAT,
     };
   }
-  if (provider === "system") return { provider, text, voice: voice?.system ?? DEFAULT_SYSTEM_VOICES[speakerIndex % DEFAULT_SYSTEM_VOICES.length], rate: voice?.rate ?? 0, ...(voice?.pitch ? { pitch: voice.pitch } : {}) };
-  return { provider, text, speakerIndex };
+  // Offline voices would read "[laughs]" aloud: they get the tag-free text.
+  if (provider === "system") return { provider, text: stripTags(text), voice: voice?.system ?? DEFAULT_SYSTEM_VOICES[speakerIndex % DEFAULT_SYSTEM_VOICES.length], rate: voice?.rate ?? 0, ...(voice?.pitch ? { pitch: voice.pitch } : {}) };
+  return { provider, text: stripTags(text), speakerIndex };
 };
 
 const stable = (v: unknown): string =>
@@ -107,8 +135,8 @@ export const voiceStaleReason = (entry: VoiceLine, text: string, voice: CastVoic
   return entry.hash === lineHash(text, voice, entry.provider) ? null : `${entry.provider} voice settings changed`;
 };
 
-/** Split text into display words (keeps punctuation attached). */
-export const splitWords = (text: string) => text.split(/\s+/).filter(Boolean);
+/** Split text into display words (keeps punctuation attached; performance tags are not words). */
+export const splitWords = (text: string) => stripTags(text).split(/\s+/).filter(Boolean);
 
 /** Rough timing for lines that have no generated audio yet. */
 export const estimateWords = (text: string): { duration: number; words: Word[] } => {
@@ -177,12 +205,16 @@ export const lineCaptions = (words: Word[], lineStart: number): Caption[] =>
     confidence: null,
   }));
 
-/** Character-level alignment (ElevenLabs `alignment`) → words. */
+/** Character-level alignment (ElevenLabs `alignment`) → words. Characters inside `[tags]` are skipped. */
 export const wordsFromAlignment = (a: { characters: string[]; character_start_times_seconds: number[]; character_end_times_seconds: number[] }): Word[] => {
   const words: Word[] = [];
   let cur: Word | null = null;
+  let inTag = false;
   a.characters.forEach((ch, i) => {
-    if (/\s/.test(ch)) {
+    if (ch === "[") inTag = true;
+    const skip = inTag;
+    if (ch === "]") inTag = false;
+    if (/\s/.test(ch) || skip) {
       if (cur) words.push(cur);
       cur = null;
       return;

@@ -2,7 +2,7 @@
 //   list [actors|props|environments|shots|moves|moods|screens|sfx|videos]
 //   show <actor|prop|environment|mood|screen> <id>
 //   new <slug> [--preset landscape|portrait|square] [--env dev-office] [--title "..."]
-//   voice <slug> [--provider elevenlabs|system|fixture] [--force]
+//   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
 //   validate <slug>
 //   stills <slug> [--frames 0,90,180] [--verify]
 //   render <slug> [--out out/<slug>.mp4] [--draft] [--timeout ms]
@@ -17,7 +17,7 @@ import { resolveEpisode, type ResolvedEpisode } from "../src/engine/core/timelin
 import type { VideoData } from "../src/engine/player/defineVideo";
 import { buildTracks, makeQuery } from "../src/engine/player/scene";
 import { buildCatalog, writeCatalog } from "./catalog";
-import { generateVoices, parseProvider, readManifest } from "./voice";
+import { elevenLabsAccount, generateVoices, parseProvider, readManifest } from "./voice";
 
 const ROOT = process.cwd();
 if (fs.existsSync(path.join(ROOT, ".env"))) process.loadEnvFile(path.join(ROOT, ".env"));
@@ -169,9 +169,23 @@ const newVideo = () => {
   console.log(`✔ created videos/${slug}/ (episode.json, index.tsx) and registered it.\nNext: edit episode.json → npm run cli -- voice ${slug} → validate → stills → render`);
 };
 
+const voiceCheck = async () => {
+  const key = process.env.ELEVENLABS_API_KEY;
+  if (!key) fail("ELEVENLABS_API_KEY is not set (put it in .env)");
+  const a = await elevenLabsAccount(key!);
+  console.log(`ElevenLabs plan: ${a.tier}${a.limit !== null ? ` — ${a.used}/${a.limit} credits used this period (${a.limit - (a.used ?? 0)} left)` : ""}`);
+  const v4 = a.models.filter((m) => m.id.startsWith("eleven_v4"));
+  console.log(`models: ${a.models.length} (${v4.length ? v4.map((m) => `${m.id}${m.tts ? " tts" : ""}${m.maxChars ? ` ≤${m.maxChars} chars` : ""}`).join(", ") : "no eleven_v4 model visible"})`);
+  console.log(`voices usable by this key: ${a.voices.length}`);
+  for (const v of a.voices) console.log(`  ${v.id}  ${v.name.padEnd(28)} ${v.category.padEnd(10)} ${Object.values(v.labels).join(", ")}`);
+  for (const n of a.notes) console.log(`⚠ ${n}`);
+  if (a.tier === "free") console.log("⚠ free plan: audio is non-commercial (also after upgrading) and published titles must credit elevenlabs.io");
+};
+
 const voice = async () => {
-  const slug = positional[1] ?? fail("usage: voice <slug>");
-  const r = await generateVoices(slug, { provider: parseProvider(flag("provider")), force: has("force") });
+  if (has("check")) return voiceCheck();
+  const slug = positional[1] ?? fail("usage: voice <slug> [--provider elevenlabs|system|fixture] [--force]  |  voice --check");
+  const r = await generateVoices(slug, { provider: parseProvider(flag("provider")), force: has("force"), saveResponse: flag("save-response") });
   console.log(`✔ voice (${r.provider}): ${r.generated} generated, ${r.skipped} cached → public/videos/${slug}/voice.json`);
 };
 

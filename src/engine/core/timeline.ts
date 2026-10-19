@@ -3,7 +3,7 @@
 import { checkActorDef } from "../actors/check";
 import { ACTOR_DEFS } from "../actors/defs";
 import type { ActorDefinition, HoldCue, LookTarget, MoveCue, OverrideCue, TurnCue } from "../actors/rig";
-import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, voiceStaleReason, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
+import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, splitWords, voiceStaleReason, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
 import type { FocusTarget, MoveSpec, Shot } from "../camera/solve";
 import { MOODS, type MoodCue, type MoodRef } from "../lighting/moods";
 import { ENVIRONMENTS } from "../world/environments";
@@ -27,6 +27,9 @@ export type ResolvedLine = {
   voiced: boolean;
   /** Voiced, but the clip was made with different voice settings (plays in drafts; final renders refuse). */
   stale?: boolean;
+  /** Clip provenance (ElevenLabs plan tier, e.g. "free" = non-commercial). */
+  provider?: string;
+  tier?: string;
 };
 
 export type ResolvedActor = {
@@ -152,7 +155,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     if (!voiced) anyUnvoiced = true;
     const est = voiced ? null : estimateWords(l.text);
     const duration = voiced ? vl!.duration : est!.duration;
-    const words = voiced ? vl!.words : est!.words;
+    // Alignment can run a few ms past the decoded audio; keep word times inside the clip.
+    const words = voiced ? vl!.words.map((w) => ({ ...w, start: Math.min(w.start, vl!.duration), end: Math.min(w.end, vl!.duration) })) : est!.words;
     const line: ResolvedLine = {
       id: l.id,
       speaker: l.speaker,
@@ -164,7 +168,10 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       envelope: voiced ? vl!.envelope : envelopeFromWords(words, duration),
       voiced,
       ...(voiced && stale ? { stale: true } : {}),
+      ...(voiced ? { provider: vl!.provider, ...(vl!.tier ? { tier: vl!.tier } : {}) } : {}),
     };
+    if (voiced && vl!.words.length !== splitWords(l.text).length)
+      warnings.push(`dialogue ${l.id}: the voice has ${vl!.words.length} timed words but the script has ${splitWords(l.text).length} — "${l.id}.word:N" refs count the timed words`);
     lines.push(line);
     lineById.set(l.id, line);
     cursor = line.end;

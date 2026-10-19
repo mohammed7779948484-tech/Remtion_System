@@ -9,6 +9,8 @@ import path from "node:path";
 import { parseEpisode, type Episode, type EpisodeVoice } from "../src/engine/core/schema";
 import {
   DEFAULT_ELEVEN_VOICES,
+  ELEVEN_STITCH_MODELS,
+  stripTags,
   envelopeFromSamples,
   hashString,
   splitWords,
@@ -126,21 +128,88 @@ export const elevenLabsRequest = (job: LineJob, apiKey: string) => {
     model_id: req.model,
     voice_settings: req.settings,
     seed: parseInt(hashString(job.text).slice(0, 7), 16),
-    previous_text: job.previous,
-    next_text: job.next,
+    ...(ELEVEN_STITCH_MODELS.includes(req.model) ? { previous_text: job.previous && stripTags(job.previous), next_text: job.next && stripTags(job.next) } : {}),
   };
   return { url, req, init: { method: "POST", headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) } };
 };
 
-export const elevenLabsClip = async (job: LineJob, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<Clip> => {
-  const { url, init } = elevenLabsRequest(job, apiKey);
+export const elevenLabsClip = async (job: LineJob, apiKey: string, fetchImpl: typeof fetch = fetch, saveResponse?: string): Promise<Clip> => {
+  const { url, init, req } = elevenLabsRequest(job, apiKey);
   const res = await fetchImpl(url, init);
   if (!res.ok) throw await elevenError(res, `text-to-speech (${job.id})`);
   const json = (await res.json()) as { audio_base64: string; alignment?: Parameters<typeof wordsFromAlignment>[0] | null; normalized_alignment?: Parameters<typeof wordsFromAlignment>[0] | null };
   const raw = Buffer.from(json.audio_base64, "base64");
+  if (saveResponse) {
+    // Debug/fixture capture: response shape with the audio reduced to its header (no request headers, no key).
+    fs.mkdirSync(saveResponse, { recursive: true });
+    const { audio_base64: _a, ...rest } = json;
+    fs.writeFileSync(path.join(saveResponse, `${job.id}.json`), JSON.stringify({ request: { model: req.model, format: req.format, text: req.text, settings: req.settings }, audio: { bytes: raw.length, header_base64: raw.subarray(0, 44).toString("base64") }, ...rest }, null, 1));
+  }
   const wav = raw.toString("ascii", 0, 4) === "RIFF" ? raw : pcmToWav(raw, 24000);
   const alignment = json.alignment ?? json.normalized_alignment;
   return { wav, words: alignment ? wordsFromAlignment(alignment) : [] };
+};
+
+export type ElevenLabsAccount = {
+  tier: string;
+  /** Credits used / available this period (null when the key may not read the subscription). */
+  used: number | null;
+  limit: number | null;
+  models: { id: string; tts: boolean; maxChars?: number }[];
+  voices: { id: string; name: string; category: string; labels: Record<string, string> }[];
+  notes: string[];
+};
+
+/** Plan tier and credit usage (free call); null when the key can't read the subscription. */
+export const elevenLabsUsage = async (apiKey: string, fetchImpl: typeof fetch = fetch): Promise<{ tier: string; used: number; limit: number } | null> => {
+  try {
+    const res = await fetchImpl("https://api.elevenlabs.io/v1/user/subscription", { headers: { "xi-api-key": apiKey, Accept: "application/json" } });
+    if (!res.ok) return null;
+    const j = (await res.json()) as { tier?: unknown; character_count?: unknown; character_limit?: unknown };
+    if (typeof j.tier !== "string" || typeof j.character_count !== "number" || typeof j.character_limit !== "number") return null;
+    return { tier: j.tier, used: j.character_count, limit: j.character_limit };
+  } catch {
+    return null;
+  }
+};
+
+/** Free (no credits): which models, plan and voices this key can use. Never logs the key. */
+export const elevenLabsAccount = async (apiKey: string, fetchImpl: typeof fetch = fetch): Promise<ElevenLabsAccount> => {
+  const get = (p: string) => fetchImpl(`https://api.elevenlabs.io${p}`, { headers: { "xi-api-key": apiKey, Accept: "application/json" } });
+  const notes: string[] = [];
+  const out: ElevenLabsAccount = { tier: "unknown", used: null, limit: null, models: [], voices: [], notes };
+
+  const sub = await get("/v1/user/subscription");
+  if (sub.ok) {
+    const j = (await sub.json()) as { tier?: string; character_count?: number; character_limit?: number };
+    out.tier = j.tier ?? "unknown";
+    out.used = j.character_count ?? null;
+    out.limit = j.character_limit ?? null;
+  } else {
+    const err = await elevenError(sub, "subscription");
+    if (err.status === 401 && err.code !== "missing_permissions") throw err; // invalid key: a real blocker
+    notes.push(`subscription not readable (${err.status} ${err.code || ""}: ${err.message.replace(/^.*?: /, "").slice(0, 120)}); tier unknown`);
+  }
+
+  const models = await get("/v1/models");
+  if (models.ok) {
+    for (const m of (await models.json()) as { model_id: string; can_do_text_to_speech?: boolean; maximum_text_length_per_request?: number }[])
+      out.models.push({ id: m.model_id, tts: m.can_do_text_to_speech !== false, maxChars: m.maximum_text_length_per_request });
+  } else {
+    const err = await elevenError(models, "models");
+    if (err.status === 401 && err.code !== "missing_permissions") throw err;
+    notes.push(`models not readable (${err.status} ${err.code || ""}: ${err.message.replace(/^.*?: /, "").slice(0, 120)})`);
+  }
+
+  const voices = await get("/v2/voices?page_size=100");
+  if (voices.ok) {
+    const j = (await voices.json()) as { voices?: { voice_id: string; name: string; category?: string; labels?: Record<string, string> }[] };
+    for (const v of j.voices ?? []) out.voices.push({ id: v.voice_id, name: v.name, category: v.category ?? "", labels: v.labels ?? {} });
+  } else {
+    const err = await elevenError(voices, "voices");
+    notes.push(`voices not readable (${err.status} ${err.code || ""}: ${err.message.replace(/^.*?: /, "").slice(0, 120)})`);
+  }
+  return out;
 };
 
 export const elevenLabsSfx = async (prompt: string, apiKey: string, fetchImpl: typeof fetch = fetch): Promise<Buffer> => {
@@ -173,8 +242,8 @@ const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 export const systemClip = (job: LineJob, tmpDir: string): Clip => {
   if (process.platform !== "win32") throw new Error("system voices need Windows (use --provider fixture or elevenlabs)");
-  const { voice, rate, pitch } = voiceRequest("system", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "system" }>;
-  const prosody = `<prosody rate="${rate >= 0 ? "+" : ""}${rate * 6}%"${pitch ? ` pitch="${xml(pitch)}"` : ""}>${xml(job.text)}</prosody>`;
+  const { voice, rate, pitch, text } = voiceRequest("system", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "system" }>;
+  const prosody = `<prosody rate="${rate >= 0 ? "+" : ""}${rate * 6}%"${pitch ? ` pitch="${xml(pitch)}"` : ""}>${xml(text)}</prosody>`;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${prosody}</speak>`;
   const out = path.join(tmpDir, `sapi-${hashString(job.id + job.text)}.wav`);
   const scriptFile = path.join(tmpDir, "sapi.ps1");
@@ -256,6 +325,8 @@ export type VoiceOptions = {
   apiKey?: string;
   /** ElevenLabs plan tier recorded as clip provenance (from `voice --check`). */
   tier?: string;
+  /** Save each ElevenLabs response (audio reduced to its header) here, e.g. for test fixtures. */
+  saveResponse?: string;
   log?: (msg: string) => void;
 };
 
@@ -330,8 +401,11 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
     if (!explicit) throw new Error(`${todo.size} line(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs (or --provider system for free offline voices).`);
     if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
     const chars = ep.dialogue.filter((l) => todo.has(l.id)).reduce((n, l) => n + l.text.length, 0);
-    log(`  elevenlabs: ${todo.size} line(s), ${chars} characters to generate (credits depend on model/plan; \`voice --check\` shows the balance)`);
+    log(`  elevenlabs: ${todo.size} line(s), ${chars} characters to generate`);
   }
+  const before = provider === "elevenlabs" && todo.size ? await elevenLabsUsage(apiKey, opts.fetchImpl) : null;
+  if (before) log(`  plan: ${before.tier}, ${before.used}/${before.limit} credits used before this run`);
+  const tier = opts.tier ?? before?.tier ?? "unknown";
 
   // Start from the old manifest so an interrupted run never forgets clips it already paid for.
   const manifest: VoiceManifest = { version: 1, lines: { ...(old?.lines ?? {}) } };
@@ -346,7 +420,7 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
       const req = voiceRequest(provider, line.text, voice, job.speakerIndex);
       const hash = voiceFingerprint(req);
       log(`  ${provider}: ${line.id} (${line.speaker}) "${line.text.slice(0, 60)}"`);
-      const clip = provider === "elevenlabs" ? await elevenLabsClip(job, apiKey, opts.fetchImpl) : provider === "system" ? systemClip(job, tmp) : fixtureClip(job);
+      const clip = provider === "elevenlabs" ? await elevenLabsClip(job, apiKey, opts.fetchImpl, opts.saveResponse) : provider === "system" ? systemClip(job, tmp) : fixtureClip(job);
       const { samples, sampleRate } = readWav(clip.wav);
       const file = `videos/${slug}/voice/${line.id}-${hash}.wav`;
       fs.writeFileSync(path.join(root, "public", file), clip.wav);
@@ -354,7 +428,7 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
       const words = clip.words.length ? clip.words : evenWords(line.text, duration);
       const prev = manifest.lines[line.id];
       const entry: VoiceLine = { file, hash, scheme: 2, provider, text: line.text, duration, words, envelope: envelopeFromSamples(samples, sampleRate, 60), generatedAt: new Date().toISOString() };
-      if (req.provider === "elevenlabs") Object.assign(entry, { model: req.model, voiceId: req.voiceId, format: req.format, tier: opts.tier ?? "unknown" });
+      if (req.provider === "elevenlabs") Object.assign(entry, { model: req.model, voiceId: req.voiceId, format: req.format, tier });
       manifest.lines[line.id] = entry;
       writeManifest(dir, manifest); // after every clip: a later failure keeps this one
       if (prev && prev.file !== file) fs.rmSync(path.join(root, "public", prev.file), { force: true });
@@ -376,6 +450,11 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
     }
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });
+    if (before && generated) {
+      const after = await elevenLabsUsage(apiKey, opts.fetchImpl);
+      // The account counter can lag a few seconds (v4 measured at 1 credit per character, tags included).
+      if (after) log(`  credits used so far this period: ${after.used}/${after.limit}${after.used === before.used ? " (counter not updated yet — expect about 1 credit per character; check `voice --check` later)" : ` (this run: ${after.used - before.used})`}`);
+    }
   }
 
   // Forget lines that no longer exist, then drop clips nothing references.

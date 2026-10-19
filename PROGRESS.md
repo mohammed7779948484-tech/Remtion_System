@@ -94,7 +94,7 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 |---|---|---|
 | 0 Safety + baseline | ✅ done | key moved to ignored `.env` (never printed); `.env.example` restored + `tests/secrets.test.ts`; exposure scan: 0/6 commits, nothing staged, no other files (key appeared only in a local session log → rotation recommended, low urgency). Baseline stills in `out/baseline/`. |
 | 1 V1 defect fixes | ✅ done | 11 confirmed defects fixed; each new regression test failed on the old code. 86 tests. Stills vs baseline: video 1 12/12 byte-identical; video 2 3/8 identical, others max diff 4/255 on ~0.001% of pixels (≈26 px, the known translucent-holo GPU noise) — harmless. |
-| 2 Eleven v4 live | ⏳ | |
+| 2 Eleven v4 live | ✅ done | live smoke test passed on the free plan (23 credits, 9,977 left). See log. |
 | 3 Showcase slice | ⏳ | |
 | 4 Regressions | ⏳ | |
 | 5 Docs + skill | ⏳ | |
@@ -115,3 +115,15 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 - Verified empirically: `@remotion/media` `<Audio>` aborts a render (even a draft) on a 404 → missing files block drafts.
   A final render with a missing clip now fails up front with a readable list (also via plain `npx remotion render`).
 - Screen preset metadata moved to pure `world/screens.data.ts` (Node-safe validation); `SCREEN_PRESETS` keeps its shape.
+- **Phase 2 — Eleven v4 verified live (2026-10-18).** Docs: v4 on Text-to-Speech and Text-to-Dialogue, ≤10k chars;
+  `wav_24000` allowed on free; v4 settings = stability + similarity only. Chose per-line TTS `/with-timestamps`
+  (per-line caching; Dialogue re-buys the whole exchange on any edit). First key was restricted (no `user_read`,
+  `models_read`) → reported as a blocker; user widened the key policy. `voice --check`: plan free, 10,000 credits,
+  `eleven_v4`/`eleven_v4_turbo` listed, 21 premade voices (defaults now Liam / Jessica / Will / Laura).
+  Live line `Ship it. [laughs] Okay!` → RIFF WAV 16-bit mono 24 kHz; alignment present for v4 and includes the tag
+  characters (parser skips them → 3 monotonic words); 0.9 s performed laugh between words; cost **23 credits = 1 per
+  character incl. tags** (account counter lags a few seconds); re-run = 0 generated (cache); final 9:16 render: AAC
+  audio, clip lands at exactly 0.600 s (cross-correlation), captions tag-free and word-synced, mouth opens on speech.
+  Response captured as `tests/fixtures/elevenlabs-v4.json` (no headers/key). Temporary video removed.
+  Not verified: v4 request stitching (off for v4 by default). Free-plan clips are non-commercial forever and need
+  "elevenlabs.io" in the title → `validate`/`render` warn.

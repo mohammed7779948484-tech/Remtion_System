@@ -12,3 +12,6 @@ scratch/
 
 # skill eval runs (skill-creator workspace)
 .claude/skills/make-episode-workspace/
+
+# agent worktrees
+.claude/worktrees/

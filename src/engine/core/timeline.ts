@@ -1,13 +1,15 @@
 // Episode JSON → resolved, absolute-time, serializable direction data. Pure: the same function
 // runs in calculateMetadata (browser), the CLI validator and tests (Node).
+import { checkActorDef } from "../actors/check";
 import { ACTOR_DEFS } from "../actors/defs";
 import type { ActorDefinition, HoldCue, LookTarget, MoveCue, OverrideCue, TurnCue } from "../actors/rig";
-import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
+import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, voiceStaleReason, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
 import type { FocusTarget, MoveSpec, Shot } from "../camera/solve";
 import { MOODS, type MoodCue, type MoodRef } from "../lighting/moods";
 import { ENVIRONMENTS } from "../world/environments";
 import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropCue, type SetOverrides } from "../world/layout";
 import { PROPS } from "../world/props.data";
+import { COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
 import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeShot } from "./schema";
 import type { Vec3 } from "./time";
 
@@ -23,6 +25,8 @@ export type ResolvedLine = {
   words: Word[];
   envelope: Envelope;
   voiced: boolean;
+  /** Voiced, but the clip was made with different voice settings (plays in drafts; final renders refuse). */
+  stale?: boolean;
 };
 
 export type ResolvedActor = {
@@ -71,6 +75,8 @@ export type ResolveContext = {
   actors?: Record<string, ActorDefinition>;
   /** Names of custom item kinds the video provides components for. */
   components?: string[];
+  /** Names of custom screen presets the video provides (`screens` in index.tsx / `screenKinds`). */
+  screens?: string[];
 };
 
 const FORMATS = { landscape: [1920, 1080], portrait: [1080, 1920], square: [1080, 1080] } as const;
@@ -92,11 +98,13 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   // ---- set
   const env = envs[ep.set.environment];
   if (!env) throw new Error(`Unknown environment "${ep.set.environment}". Known: ${Object.keys(envs).join(", ")}`);
-  const layout = resolveLayout(env, ep.set as SetOverrides);
+  const layout = resolveLayout(env, ep.set as SetOverrides, errors);
   for (const it of layout.items) {
     if (!PROPS[it.kind] && !(ctx.components ?? []).includes(it.kind)) errors.push(`set item "${it.id}": unknown kind "${it.kind}" (not in the prop catalog or the video's components)`);
+    else checkItemParams(it.kind, it.params ?? {}, `set item "${it.id}"`, ctx.screens ?? [], warnings);
   }
   const itemIds = new Set(layout.items.map((i) => i.id));
+  for (const [id, def] of Object.entries(ctx.actors ?? {})) for (const p of checkActorDef(def)) errors.push(`${p} (from the video's actorDefs "${id}")`);
 
   // ---- dialogue timing
   const lines: ResolvedLine[] = [];
@@ -127,13 +135,20 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
 
   let cursor = 0.6;
   let anyUnvoiced = false;
+  const staleLines: string[] = [];
+  const castOrder = Object.keys(ep.cast);
   ep.dialogue.forEach((l, i) => {
     if (!ep.cast[l.speaker]) errors.push(`dialogue ${l.id}: unknown speaker "${l.speaker}"`);
     if (lineById.has(l.id)) errors.push(`dialogue: duplicate line id "${l.id}"`);
     const start = l.at !== undefined ? timeOf(l.at, `dialogue ${l.id}`) : i === 0 ? cursor : cursor + (l.gap ?? 0.35);
     const vl = voice?.lines[l.id];
+    const stale = vl ? voiceStaleReason(vl, l.text, ep.cast[l.speaker]?.voice, Math.max(0, castOrder.indexOf(l.speaker))) : null;
+    // A clip whose text changed can't be used at all; one whose voice settings changed still plays (draft) but is flagged.
     const voiced = !!vl && vl.text === l.text;
-    if (vl && !voiced) warnings.push(`dialogue ${l.id}: voice clip is stale (text changed) — run \`npm run cli -- voice ${ep.id}\``);
+    if (stale) {
+      warnings.push(`dialogue ${l.id}: voice clip is stale (${stale}) — run \`npm run cli -- voice ${ep.id}\``);
+      staleLines.push(l.id);
+    }
     if (!voiced) anyUnvoiced = true;
     const est = voiced ? null : estimateWords(l.text);
     const duration = voiced ? vl!.duration : est!.duration;
@@ -148,11 +163,17 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       words,
       envelope: voiced ? vl!.envelope : envelopeFromWords(words, duration),
       voiced,
+      ...(voiced && stale ? { stale: true } : {}),
     };
     lines.push(line);
     lineById.set(l.id, line);
     cursor = line.end;
   });
+  // Two lines of the same speaker at once is almost always a timing mistake (interruptions use two speakers).
+  for (let i = 0; i < lines.length; i++)
+    for (let j = i + 1; j < lines.length; j++)
+      if (lines[i].speaker === lines[j].speaker && lines[j].start < lines[i].end - 0.05 && lines[i].start < lines[j].end - 0.05)
+        warnings.push(`dialogue ${lines[j].id} overlaps ${lines[i].id} (same speaker ${lines[i].speaker})`);
   if (anyUnvoiced && ep.dialogue.length) warnings.push(`some lines have no generated voice (timing estimated) — run \`npm run cli -- voice ${ep.id}\``);
 
   // ---- places
@@ -212,15 +233,20 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     };
     if (def && c.pose && !def.poses[c.pose]) errors.push(`cast ${id}: unknown pose "${c.pose}" for ${c.actor}`);
     if (def && c.emotion && !def.emotions[c.emotion]) errors.push(`cast ${id}: unknown emotion "${c.emotion}" for ${c.actor}`);
+    if (def) for (const k of Object.keys(c.appearance ?? {})) if (!def.appearance[k]) warnings.push(`cast ${id}: unknown appearance "${k}" for ${c.actor} (has: ${Object.keys(def.appearance).join(", ")})`);
     return ra;
   });
   const actorById = new Map(actors.map((a) => [a.id, a]));
 
-  // Track positions through moves so mark arrivals can turn to the mark's yaw.
+  // Track positions through moves so mark arrivals can turn to the mark's yaw. Moves queue exactly
+  // like the rig does (a move starting before the previous one ends waits for it).
   const lastPos = new Map(actors.map((a) => [a.id, a.start.position]));
+  const moveFree = new Map(actors.map((a) => [a.id, -Infinity]));
+  let contentEnd = 0;
   const sortedActions = [...ep.actions].map((a, i) => ({ a, i, t: timeOf(a.at, `actions[${i}]`) })).sort((x, y) => x.t - y.t || x.i - y.i);
   for (const { a, i, t } of sortedActions) {
     const where = `actions[${i}] (${a.actor} @ ${t.toFixed(2)}s)`;
+    contentEnd = Math.max(contentEnd, t + (a.transition ?? 0));
     const ra = actorById.get(a.actor);
     if (!ra) {
       errors.push(`${where}: unknown cast member "${a.actor}"`);
@@ -238,6 +264,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     if (a.gesture) {
       if (def && !def.gestures[a.gesture]) errors.push(`${where}: unknown gesture "${a.gesture}" (has: ${Object.keys(def.gestures).join(", ")})`);
       ra.gestures.push({ at: t, gesture: a.gesture, speed: a.speed, intensity: a.intensity });
+      const gd = def?.gestures[a.gesture];
+      if (gd) contentEnd = Math.max(contentEnd, t + gd.duration / (a.speed ?? 1));
     }
     if (a.look !== undefined) ra.looks.push({ at: t, target: lookTarget(a.look, where), transition: a.transition });
     if (a.move) {
@@ -246,10 +274,14 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       const dist = Math.hypot(to[0] - from[0], to[2] - from[2]);
       const speed = (a.move.speed ?? def?.walk.speed ?? 1) * ra.scale;
       const duration = a.move.duration ?? Math.max(0.2, dist / speed);
+      const start = Math.max(t, moveFree.get(ra.id)!);
+      if (start > t + 1e-6) warnings.push(`${where}: move starts before the previous move ends; it waits until ${start.toFixed(2)}s`);
       ra.moves.push({ at: t, to, duration, face: a.move.face });
       lastPos.set(ra.id, to);
+      moveFree.set(ra.id, start + duration);
+      contentEnd = Math.max(contentEnd, start + duration);
       if (typeof a.move.to === "string" && layout.marks[a.move.to] && a.move.face === undefined) {
-        ra.turns.push({ at: t + duration - 0.15, yaw: layout.marks[a.move.to].yaw, duration: 0.45 });
+        ra.turns.push({ at: start + duration - 0.15, yaw: layout.marks[a.move.to].yaw, duration: 0.45 });
       }
     }
     if (a.turn !== undefined) {
@@ -270,17 +302,29 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     if (a.joints) {
       if (def) for (const k of Object.keys(a.joints)) if (!def.channels[k]) errors.push(`${where}: ${ra.actor} has no channel "${k}"`);
       ra.overrides.push({ at: t, set: a.joints, duration: a.duration, blend: a.transition, mode: a.mode });
+      if (a.duration !== undefined) contentEnd = Math.max(contentEnd, t + a.duration + (a.transition ?? 0.25));
     }
   }
 
-  // ---- end time
-  const lastLine = lines.length ? lines[lines.length - 1].end : 0;
+  // ---- end time: the latest-ending thing in the episode (not just the last array entry).
   const events = ep.events.map((e, i) => {
     const at = timeOf(e.at, `events[${i}]`);
     return { name: e.name, at, end: at + (e.duration ?? 0), data: e.data ?? {} };
   });
-  const lastAction = sortedActions.length ? sortedActions[sortedActions.length - 1].t : 0;
-  const duration = ep.end !== undefined ? timeOf(ep.end, "end") : Math.max(lastLine, lastAction, ...events.map((e) => e.end), 2) + 1.5;
+  const cueTimes: { at: number; what: string }[] = [
+    ...lines.map((l) => ({ at: l.end, what: `dialogue ${l.id} ends` })),
+    ...events.map((e, i) => ({ at: e.end, what: `events[${i}] (${e.name})` })),
+    ...ep.camera.map((c, i) => ({ at: timeOf(c.at, `camera[${i}]`), what: `camera[${i}] cut` })),
+    ...ep.sfx.map((c, i) => ({ at: timeOf(c.at, `sfx[${i}]`), what: `sfx[${i}] (${c.sound})` })),
+    ...ep.props.map((c, i) => ({ at: timeOf(c.at, `props[${i}]`), what: `props[${i}] (${c.item})` })),
+    ...ep.lighting.map((c, i) => ({ at: timeOf(c.at, `lighting[${i}]`) + (c.transition ?? 0), what: `lighting[${i}]` })),
+  ];
+  const lastCue = Math.max(contentEnd, ...cueTimes.map((c) => c.at), 0);
+  const duration = ep.end !== undefined ? timeOf(ep.end, "end") : Math.max(lastCue, 2) + 1.5;
+  if (ep.end !== undefined) {
+    for (const c of cueTimes) if (c.at > duration + 1e-6 && !c.what.includes("cut")) warnings.push(`${c.what} at ${c.at.toFixed(2)}s is after the end (${duration.toFixed(2)}s) and will be cut`);
+    if (contentEnd > duration + 1e-6) warnings.push(`actions run until ${contentEnd.toFixed(2)}s, after the end (${duration.toFixed(2)}s)`);
+  }
 
   // ---- camera
   const focusTarget = (f: Vec3 | string, where: string): FocusTarget => {
@@ -292,6 +336,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     return [0, 1, 0];
   };
   const shotsIn = [...ep.camera].map((s, i) => ({ s, i, t: timeOf(s.at, `camera[${i}]`) })).sort((a, b) => a.t - b.t || a.i - b.i);
+  for (const { i, t } of shotsIn) if (t >= duration) errors.push(`camera[${i}]: cut at ${t.toFixed(2)}s is at/after the end (${duration.toFixed(2)}s)`);
   const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, castIds, itemIds, layout, focusTarget, timeOf }));
 
   // ---- lighting / props / sfx
@@ -310,6 +355,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const props: PropCue[] = ep.props
     .map((p, i) => {
       if (!itemIds.has(p.item)) errors.push(`props[${i}]: unknown set item "${p.item}"`);
+      else checkItemParams(layout.items.find((it) => it.id === p.item)!.kind, p.set, `props[${i}] (${p.item})`, ctx.screens ?? [], warnings);
       return { at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set };
     })
     .sort((a, b) => a.at - b.at);
@@ -327,7 +373,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
 
   for (const a of actors) for (const k of ["poses", "emotions", "gestures", "looks", "turns", "overrides", "holds"] as const) (a[k] as { at: number }[]).sort((x, y) => x.at - y.at);
 
-  if (errors.length) throw new Error(`Episode "${ep.id}" has ${errors.length} problem(s):\n${errors.map((e) => `  • ${e}`).join("\n")}`);
+  const problems = [...new Set(errors)];
+  if (problems.length) throw new Error(`Episode "${ep.id}" has ${problems.length} problem(s):\n${problems.map((e) => `  • ${e}`).join("\n")}`);
 
   return {
     id: ep.id,
@@ -408,3 +455,26 @@ const toShot = (
 };
 
 export { lineHash };
+
+/** Warn (never fail) on params a catalog prop doesn't read, and on unknown screen presets/params. */
+const checkItemParams = (kind: string, params: Record<string, unknown>, where: string, customScreens: string[], warnings: string[]) => {
+  const meta = PROPS[kind];
+  if (!meta) return; // custom components define their own params
+  for (const [k, v] of Object.entries(params)) {
+    const spec = meta.params[k];
+    if (!spec) {
+      warnings.push(`${where}: "${kind}" has no param "${k}" (has: ${Object.keys(meta.params).join(", ")})`);
+      continue;
+    }
+    if (spec.type !== "screen" || !v || typeof v !== "object") continue;
+    const screen = v as Record<string, unknown>;
+    const preset = String(screen.preset ?? "");
+    if (customScreens.includes(preset)) continue; // the video's own drawing reads its own params
+    const sm = SCREEN_META[preset];
+    if (!sm) {
+      warnings.push(`${where}: unknown screen preset "${preset}" (renders "off"; has: ${[...Object.keys(SCREEN_META), ...customScreens].join(", ")})`);
+      continue;
+    }
+    for (const key of Object.keys(screen)) if (!sm.params[key] && !COMMON_SCREEN_PARAMS[key]) warnings.push(`${where}: screen preset "${preset}" has no param "${key}" (has: ${Object.keys(sm.params).join(", ")})`);
+  }
+};

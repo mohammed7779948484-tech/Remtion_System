@@ -5,7 +5,8 @@
       "code": "source text",
       "lang": "typescript|python|bash|json",
       "title": "tab title",
-      "speed": "chars per second (default 30; 0 = show all)"
+      "speed": "chars per second (default 30; 0 = show all)",
+      "fontSize": "px at 1024-wide canvas (default 30)"
     }
   },
   "terminal": {

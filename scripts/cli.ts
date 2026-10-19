@@ -5,12 +5,13 @@
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]
 //   validate <slug>
 //   stills <slug> [--frames 0,90,180] [--verify]
-//   render <slug> [--out out/<slug>.mp4]
+//   render <slug> [--out out/<slug>.mp4] [--draft] [--timeout ms]
 //   catalog
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { auditAudio, isMissingFile } from "../src/engine/audio/audit";
 import { cameraAt, project, shotLayout } from "../src/engine/camera/solve";
 import { resolveEpisode, type ResolvedEpisode } from "../src/engine/core/timeline";
 import type { VideoData } from "../src/engine/player/defineVideo";
@@ -27,7 +28,9 @@ const flag = (name: string) => {
   return i >= 0 ? args[i + 1] ?? "" : undefined;
 };
 const has = (name: string) => args.includes(`--${name}`);
-const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !["--force", "--verify"].includes(args[i - 1])));
+/** Flags that take no value (everything else consumes the next token). */
+const BOOLEAN_FLAGS = ["--force", "--verify", "--draft", "--guides", "--check"];
+const positional = args.filter((a, i) => !a.startsWith("--") && !(i > 0 && args[i - 1].startsWith("--") && !BOOLEAN_FLAGS.includes(args[i - 1])));
 
 const fail = (msg: string): never => {
   console.error(`✖ ${msg}`);
@@ -42,6 +45,7 @@ const SILENT = process.platform === "win32" ? `--props="{\\"silent\\":true}"` : 
 const hasFfmpeg = () => spawnSync("ffmpeg", ["-version"], { shell: true }).status === 0;
 
 const videoDir = (slug: string) => path.join(ROOT, "videos", slug);
+const publicExists = (p: string) => fs.existsSync(path.join(ROOT, "public", p));
 const loadVideo = async (slug: string) => {
   const dir = videoDir(slug);
   if (!fs.existsSync(path.join(dir, "episode.json"))) fail(`videos/${slug}/episode.json not found (npm run cli -- list videos)`);
@@ -52,7 +56,7 @@ const loadVideo = async (slug: string) => {
     const mod = await import(pathToFileURL(dataFile).href);
     data = (mod.default?.default ?? mod.default ?? mod.data ?? {}) as VideoData;
   }
-  const ctx = { environments: data.environments, actors: data.actorDefs, components: data.componentKinds ?? [] };
+  const ctx = { environments: data.environments, actors: data.actorDefs, components: data.componentKinds ?? [], screens: data.screenKinds ?? [] };
   return { episode, ctx, manifest: readManifest(ROOT, slug) };
 };
 
@@ -135,8 +139,8 @@ const newVideo = () => {
     format: { preset },
     set: { environment: env },
     cast: {
-      rayan: { actor: "rayan", at: office ? "chair-seat" : [-0.6, 0, 0], pose: office ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop", elevenlabs: { voiceId: "JBFqnCBsd6RMkjVDRZzb" } } },
-      claude: { actor: "claude", at: office ? "desk-mascot" : [0.7, 0, 0.2], scale: office ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%", elevenlabs: { voiceId: "EXAVITQu4vr4xnSDxMaL" } } },
+      rayan: { actor: "rayan", at: office ? "chair-seat" : [-0.6, 0, 0], pose: office ? "sit_typing" : "stand_idle", voice: { system: "Microsoft David Desktop" } },
+      claude: { actor: "claude", at: office ? "desk-mascot" : [0.7, 0, 0.2], scale: office ? 1.5 : 4, voice: { system: "Microsoft Zira Desktop", pitch: "+25%" } },
     },
     dialogue: [
       { id: "l1", speaker: "rayan", text: "Hello world." },
@@ -176,8 +180,10 @@ const validate = async () => {
   const r = await resolve(slug);
   const problems: string[] = [];
   const notes: string[] = [...r.warnings];
-  for (const l of r.lines) if (l.file && !fs.existsSync(path.join(ROOT, "public", l.file))) problems.push(`line ${l.id}: audio file missing (${l.file})`);
-  for (const s of r.sfx) if (!/^https?:/.test(s.src) && !fs.existsSync(path.join(ROOT, "public", s.src))) problems.push(`sfx at ${s.at.toFixed(2)}s: file missing public/${s.src}`);
+  // Missing files are errors even for drafts; unvoiced/stale lines only block final renders.
+  const audio = auditAudio(r, publicExists);
+  for (const e of audio.errors) (isMissingFile(e) ? problems : notes).push(e);
+  notes.push(...audio.warnings);
   const manifest = readManifest(ROOT, slug);
   if (process.env.ELEVENLABS_API_KEY && manifest && Object.values(manifest.lines).some((l) => l.provider !== "elevenlabs")) notes.push("info: clips use offline voices; `voice <slug> --provider elevenlabs` would re-voice them (paid, changes timing)");
 
@@ -207,6 +213,7 @@ const validate = async () => {
   for (const p of problems) console.log(`✖ ${p}`);
   if (problems.length) process.exit(1);
   console.log(`✔ ${slug} is valid${notes.length ? ` (${notes.length} warning${notes.length > 1 ? "s" : ""})` : ""}`);
+  console.log(audio.errors.length ? `  final render: not ready (${audio.errors.length} audio issue${audio.errors.length > 1 ? "s" : ""} above); drafts: \`render ${slug} --draft\`` : "  final render: ready");
 };
 
 const stillFrames = (r: ResolvedEpisode) => {
@@ -261,11 +268,18 @@ const stills = async () => {
 };
 
 const render = async () => {
-  const slug = positional[1] ?? fail("usage: render <slug>");
-  await resolve(slug); // fail fast on invalid direction
-  const out = flag("out") ?? path.join("out", `${slug}.mp4`);
-  npx(["remotion", "render", slug, out, "--log=info"]);
-  console.log(`✔ rendered ${out}`);
+  const slug = positional[1] ?? fail("usage: render <slug> [--draft] [--out file] [--timeout ms]");
+  const r = await resolve(slug); // fail fast on invalid direction
+  const draft = has("draft");
+  const audio = auditAudio(r, publicExists);
+  for (const w of audio.warnings) console.log(`⚠ ${w}`);
+  const blocking = draft ? audio.errors.filter(isMissingFile) : audio.errors;
+  if (blocking.length) fail(`not ready for a ${draft ? "draft" : "final"} render:\n${blocking.map((e) => `  • ${e}`).join("\n")}${draft ? "" : "\n  (render a draft with --draft)"}`);
+  const out = flag("out") ?? path.join("out", `${slug}${draft ? "-draft" : ""}.mp4`);
+  const timeout = flag("timeout");
+  const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `--props={"draft":true}`;
+  npx(["remotion", "render", slug, out, "--log=info", ...(draft ? [draftProps] : []), ...(timeout ? [`--timeout=${timeout}`] : [])]);
+  console.log(`✔ rendered ${out}${draft ? " (draft)" : ""}`);
 };
 
 const commands: Record<string, () => unknown> = {

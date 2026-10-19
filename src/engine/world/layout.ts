@@ -58,18 +58,71 @@ export type SetOverrides = {
 
 export type Layout = Omit<EnvironmentDef, "description" | "defaultMood"> & { env: string };
 
-export const resolveLayout = (env: EnvironmentDef, o: SetOverrides = {}): Layout => {
+/**
+ * Applies episode overrides to an environment. Problems (unknown ids, parents, cycles) are pushed to
+ * `problems`, or thrown together when no array is given. Items with a broken `on` are kept at their
+ * own position so later steps never crash on them.
+ */
+export const resolveLayout = (env: EnvironmentDef, o: SetOverrides = {}, problems?: string[]): Layout => {
+  const issues: string[] = [];
+  const known = new Set([...env.items.map((i) => i.id), ...(o.add ?? []).map((a) => a.id)]);
+  for (const id of o.remove ?? []) if (!env.items.some((i) => i.id === id)) issues.push(`set.remove: unknown item "${id}"`);
+  for (const id of Object.keys(o.move ?? {})) if (!known.has(id)) issues.push(`set.move: unknown item "${id}"`);
+  for (const id of Object.keys(o.params ?? {})) if (!known.has(id)) issues.push(`set.params: unknown item "${id}"`);
+
+  // Removing an item removes everything standing on it, at any depth.
+  const parentOf = new Map(env.items.map((i) => [i.id, i.on]));
   const removed = new Set(o.remove ?? []);
-  const items = env.items
-    .filter((it) => !removed.has(it.id) && !(it.on && removed.has(it.on)))
+  const isRemoved = (id: string, seen = new Set<string>()): boolean => {
+    if (removed.has(id)) return true;
+    const p = parentOf.get(id);
+    if (!p || seen.has(id)) return false;
+    seen.add(id);
+    return isRemoved(p, seen);
+  };
+  const items: SetItem[] = env.items
+    .filter((it) => !isRemoved(it.id))
     .map((it) => ({
       ...it,
       ...(o.move?.[it.id] ?? {}),
       params: { ...(it.params ?? {}), ...(o.params?.[it.id] ?? {}) },
     }));
   for (const add of o.add ?? []) {
-    if (items.some((it) => it.id === add.id)) throw new Error(`Set item "${add.id}" already exists`);
+    if (items.some((it) => it.id === add.id)) {
+      issues.push(`set.add: item "${add.id}" already exists`);
+      continue;
+    }
     items.push({ ...add, params: { ...(add.params ?? {}), ...(o.params?.[add.id] ?? {}) } });
+  }
+
+  // Parents must exist and must not loop.
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const broken = new Set<string>();
+  for (const it of items) {
+    const chain = [it.id];
+    let cur: SetItem = it;
+    while (cur.on) {
+      const parent = byId.get(cur.on);
+      if (!parent) {
+        issues.push(`set item "${cur.id}": parent "${cur.on}" ${removed.has(cur.on) ? "was removed" : "does not exist"}`);
+        broken.add(cur.id);
+        break;
+      }
+      if (chain.includes(parent.id)) {
+        issues.push(`set item "${it.id}": parent cycle ${[...chain, parent.id].join(" → ")}`);
+        broken.add(it.id);
+        break;
+      }
+      chain.push(parent.id);
+      cur = parent;
+    }
+  }
+  // Detach broken links so nothing downstream recurses forever or throws mid-render.
+  for (const it of items) if (broken.has(it.id)) delete it.on;
+  const unique = [...new Set(issues)];
+  if (unique.length) {
+    if (problems) problems.push(...unique);
+    else throw new Error(unique.join("\n"));
   }
   return {
     env: env.id,

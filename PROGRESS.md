@@ -93,7 +93,7 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
 | Phase | State | Notes |
 |---|---|---|
 | 0 Safety + baseline | ✅ done | key moved to ignored `.env` (never printed); `.env.example` restored + `tests/secrets.test.ts`; exposure scan: 0/6 commits, nothing staged, no other files (key appeared only in a local session log → rotation recommended, low urgency). Baseline stills in `out/baseline/`. |
-| 1 V1 defect fixes | ⏳ | |
+| 1 V1 defect fixes | ✅ done | 11 confirmed defects fixed; each new regression test failed on the old code. 86 tests. Stills vs baseline: video 1 12/12 byte-identical; video 2 3/8 identical, others max diff 4/255 on ~0.001% of pixels (≈26 px, the known translucent-holo GPU noise) — harmless. |
 | 2 Eleven v4 live | ⏳ | |
 | 3 Showcase slice | ⏳ | |
 | 4 Regressions | ⏳ | |
@@ -105,3 +105,13 @@ set/props/lighting → camera → episode JSON/audio → CLI/docs → video 1 �
   count printed before paid generation; manifest written after every clip (a failure keeps paid clips).
 - Cache key is now a fingerprint of the *effective* request (`voiceRequest` + `voiceFingerprint` in `speech.ts`,
   scheme 2). Legacy (scheme 1) clips stay valid while their old hash matches → both existing videos untouched.
+- Phase 1 fixes: resolver stale-voice detection (names the cause); `auditAudio` shared by `validate`/`render`/
+  `calculateMetadata` (final renders refuse unvoiced/stale lines + missing files; drafts refuse only missing files);
+  duration from all content; shots after `end` are errors, cues after it warn; moves queue like the rig; same-speaker
+  overlap warns; prop parents/cycles/transitive remove/typo ids validated in `resolveLayout`; unknown screen presets/
+  params, prop params, appearance keys warn; `checkActorDef` for video-supplied actors; `componentKinds`/`screenKinds`
+  without implementations reported; ComposerGate timeout → `cancelRender`; caption pages never hide the next line;
+  CLI boolean flags no longer swallow the slug; `new` no longer hard-codes expiring voice ids; `render --draft/--timeout`.
+- Verified empirically: `@remotion/media` `<Audio>` aborts a render (even a draft) on a 404 → missing files block drafts.
+  A final render with a missing clip now fails up front with a readable list (also via plain `npx remotion render`).
+- Screen preset metadata moved to pure `world/screens.data.ts` (Node-safe validation); `SCREEN_PRESETS` keeps its shape.

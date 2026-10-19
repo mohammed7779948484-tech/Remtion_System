@@ -11,6 +11,7 @@ import jsonLang from "shiki/langs/json.mjs";
 import darkTheme from "shiki/themes/github-dark.mjs";
 import { FONTS } from "../fonts";
 import { clamp01 } from "../core/time";
+import { SCREEN_META, type ScreenMeta } from "./screens.data";
 
 export type DrawContext = { ctx: CanvasRenderingContext2D; w: number; h: number; t: number; since: number };
 export type DrawFn = (d: DrawContext, params: Record<string, unknown>) => void;
@@ -54,11 +55,9 @@ const chrome = (d: DrawContext, title: string, accent = "#58a6ff") => {
   ctx.fillText(title, 150, 42);
 };
 
-export const SCREEN_PRESETS: Record<string, { description: string; params: Record<string, string>; glow: string; draw: DrawFn }> = {
+export const SCREEN_PRESETS: Record<string, ScreenMeta & { draw: DrawFn }> = {
   code: {
-    description: "Code editor that types itself out (syntax highlighted).",
-    params: { code: "source text", lang: "typescript|python|bash|json", title: "tab title", speed: "chars per second (default 30; 0 = show all)" },
-    glow: "#6ea8ff",
+    ...SCREEN_META.code,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0d1117";
@@ -97,9 +96,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   terminal: {
-    description: "Terminal printing lines one by one. Prefix a line with '!' for red, '+' for green.",
-    params: { lines: "string[]", interval: "seconds between lines (default 0.5)", title: "window title" },
-    glow: "#7ee787",
+    ...SCREEN_META.terminal,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0b0f14";
@@ -123,9 +120,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   error: {
-    description: "Flashing red failure screen.",
-    params: { title: "headline (default BUILD FAILED)", message: "detail line", lines: "string[] of stack-trace lines" },
-    glow: "#ff3b3b",
+    ...SCREEN_META.error,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       const flash = 0.5 + 0.5 * Math.sin((t - since) * Math.PI * 2 * 1.6);
@@ -147,9 +142,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   deploy: {
-    description: "Deploy progress bar; optionally fails part way.",
-    params: { label: "text above the bar", duration: "seconds to 100% (default 3)", failAt: "0..1 progress where it fails (omit = success)" },
-    glow: "#58a6ff",
+    ...SCREEN_META.deploy,
     draw: (d, p) => {
       const { ctx, w, h, t, since } = d;
       ctx.fillStyle = "#0d1117";
@@ -173,9 +166,7 @@ export const SCREEN_PRESETS: Record<string, { description: string; params: Recor
     },
   },
   off: {
-    description: "Screen off (dark glass).",
-    params: {},
-    glow: "#000000",
+    ...SCREEN_META.off,
     draw: ({ ctx, w, h }) => {
       const g = ctx.createLinearGradient(0, 0, w, h);
       g.addColorStop(0, "#15171c");

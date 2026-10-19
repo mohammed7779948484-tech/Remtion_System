@@ -2,6 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { captionPages } from "../src/engine/audio/Captions";
 import { envelopeFromSamples, lineCaptions, lineHash, voiceFingerprint, voiceRequest, voiceStaleReason, wordsFromAlignment } from "../src/engine/audio/speech";
 import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, parseProvider, readWav, writeWav } from "../scripts/voice";
 
@@ -176,5 +177,20 @@ describe("voice cache", () => {
     const manifest = JSON.parse(fs.readFileSync(path.join(root, "public", "videos", "demo", "voice.json"), "utf8"));
     expect(manifest.lines.l2.text).toBe("Did you test it?");
     expect(manifest.lines.l2.envelope.values.length).toBeGreaterThan(10);
+  });
+});
+
+describe("captions", () => {
+  it("a line's lingering last page never hides the next line's first words", () => {
+    const w = (text: string, start: number, end: number) => ({ text, start, end });
+    const lines = [
+      { id: "l1", speaker: "a", text: "Hi there.", start: 0, end: 1, words: [w("Hi", 0.1, 0.4), w("there.", 0.45, 0.9)], envelope: { rate: 60, values: [] }, voiced: true },
+      { id: "l2", speaker: "b", text: "Nope.", start: 1.05, end: 1.6, words: [w("Nope.", 0, 0.4)], envelope: { rate: 60, values: [] }, voiced: true },
+    ];
+    const pages = captionPages({ lines, captions: { style: "subtitle", pageSeconds: 1.6 } });
+    const at = (ms: number) => pages.find((p) => ms >= p.startMs && ms < p.endMs);
+    expect(at(1060)?.speaker).toBe("b"); // used to still show l1's page until 1.2 s
+    expect(at(500)?.speaker).toBe("a");
+    for (let i = 1; i < pages.length; i++) expect(pages[i].startMs).toBeGreaterThanOrEqual(pages[i - 1].endMs);
   });
 });

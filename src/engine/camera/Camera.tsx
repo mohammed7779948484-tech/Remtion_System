@@ -5,7 +5,7 @@ import { useThree } from "@react-three/fiber";
 import { Bloom, DepthOfField, EffectComposer, ToneMapping, Vignette } from "@react-three/postprocessing";
 import { ToneMappingMode, type EffectComposer as Composer } from "postprocessing";
 import { useLayoutEffect, useMemo, useRef } from "react";
-import { useCurrentFrame, useDelayRender } from "remotion";
+import { cancelRender, getRemotionEnvironment, useCurrentFrame, useDelayRender } from "remotion";
 import * as THREE from "three";
 import type { CameraFrame } from "./solve";
 
@@ -42,7 +42,14 @@ const ComposerGate: React.FC<{ composer: React.RefObject<Composer | null> }> = (
     let tries = 0;
     let done = false;
     const poll = () => {
-      if (ready() || tries++ > 600) {
+      const ok = ready();
+      if (!ok && tries > 600 && getRemotionEnvironment().isRendering) {
+        // Never emit a frame without post (blank/ungraded): fail the render loudly instead.
+        done = true;
+        cancelRender(new Error(`Postprocessing passes were not ready for frame ${frame} after 600 polls`));
+        return;
+      }
+      if (ok || tries++ > 600) {
         advance(performance.now());
         done = true;
         continueRender(handle);

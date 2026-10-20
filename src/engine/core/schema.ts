@@ -58,6 +58,17 @@ const Line = z.strictObject({
   /** Start time. Omit to follow the previous line after `gap` seconds. */
   at: TimeRef.optional(),
   gap: z.number().optional(),
+  /**
+   * Which generated take plays (`voice <slug> --takes l3=3` makes them; 0 = the original). Record who chose it
+   * and why: `{ "n": 2, "by": "director", "why": "the tired sigh" }` (`by: "agent"` = measured, not heard).
+   */
+  take: z.union([z.number().int().min(0), z.strictObject({ n: z.number().int().min(0), by: z.enum(["director", "agent"]), why: z.string().min(1) })]).optional(),
+  /** Clip in/out points in seconds of the file (`false` = no automatic edge trim). Never edits the file. */
+  trim: z.union([z.literal(false), z.strictObject({ start: z.number().min(0).optional(), end: z.number().positive().optional() })]).optional(),
+  /** Deliberate level change in dB on top of the automatic levelling (e.g. -6 for a mutter). */
+  gain: z.number().min(-24).max(12).optional(),
+  /** Caption text to show instead of the spoken text (the voice and its cache are untouched). */
+  caption: z.string().min(1).optional(),
 });
 
 const Action = z.strictObject({
@@ -200,8 +211,9 @@ export const EpisodeSchema = z.strictObject({
   allow: Allow.optional(),
   /**
    * Automatic behaviour switches. Corrections default on with `engine: 2` (focus pulls between speakers, blends
-   * that arc around the subject, self-touch recipes through via points); styles are opt-in (cameraLife: subtle
-   * drift on shots without a move, 0..2; listen: characters look at whoever speaks and nod, 0..1).
+   * that arc around the subject, self-touch recipes through via points, dialogue edge trim, levels, speech
+   * motion); styles are opt-in (cameraLife: subtle drift on shots without a move, 0..2; listen: characters look
+   * at whoever speaks and nod, 0..1).
    */
   defaults: z
     .strictObject({
@@ -210,6 +222,9 @@ export const EpisodeSchema = z.strictObject({
       arcBlend: z.boolean().optional(),
       listen: z.number().min(0).max(1).optional(),
       viaPoints: z.boolean().optional(),
+      trim: z.boolean().optional(),
+      level: z.boolean().optional(),
+      speechMotion: z.boolean().optional(),
     })
     .optional(),
   format: z

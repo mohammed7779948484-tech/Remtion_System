@@ -3,7 +3,8 @@
 import { checkActorDef } from "../actors/check";
 import { ACTOR_DEFS } from "../actors/defs";
 import type { ActorDefinition, HoldCue, LookTarget, MoveCue, OverrideCue, TurnCue } from "../actors/rig";
-import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, splitWords, voiceStaleReason, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
+import { autoTrim, lineGain, median, trimmedProtected } from "../audio/analysis";
+import { estimateWords, envelopeFromWords, lineHash, SFX_LIBRARY, splitWords, takeKey, voiceStaleReason, type Envelope, type VoiceManifest, type Word } from "../audio/speech";
 import type { FocusTarget, MoveSpec, Shot } from "../camera/solve";
 import { MOODS, type MoodCue, type MoodRef } from "../lighting/moods";
 import { ENVIRONMENTS } from "../world/environments";
@@ -35,6 +36,17 @@ export type ResolvedLine = {
   /** Clip provenance (ElevenLabs plan tier, e.g. "free" = non-commercial). */
   provider?: string;
   tier?: string;
+  /** The take that plays (absent = 0) and who chose it. */
+  take?: number;
+  takeChoice?: { by: "director" | "agent"; why: string };
+  /** In/out points within the file (seconds; `from` is frame-aligned). Absent = the whole file. */
+  clip?: { from: number; to: number };
+  /** Level change in dB (automatic levelling + the line's `gain`). */
+  gain?: number;
+  /** Mouth size relative to the speaker's loudest line (speech motion). */
+  talkScale?: number;
+  /** Caption words when `caption` replaces the spoken text on screen. */
+  display?: Word[];
 };
 
 export type ResolvedActor = {
@@ -164,7 +176,9 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     if (!ep.cast[l.speaker]) errors.push(`dialogue ${l.id}: unknown speaker "${l.speaker}"`);
     if (lineById.has(l.id)) errors.push(`dialogue: duplicate line id "${l.id}"`);
     const start = l.at !== undefined ? timeOf(l.at, `dialogue ${l.id}`) : i === 0 ? cursor : cursor + (l.gap ?? 0.35);
-    const vl = voice?.lines[l.id];
+    const take = typeof l.take === "number" ? l.take : (l.take?.n ?? 0);
+    const vl = voice?.lines[takeKey(l.id, take)];
+    if (take > 0 && !vl) warnings.push(`dialogue ${l.id}: take ${take} isn't generated — run \`npm run cli -- voice ${ep.id} --takes ${l.id}=${take + 1}\``);
     const stale = vl ? voiceStaleReason(vl, l.text, ep.cast[l.speaker]?.voice, Math.max(0, castOrder.indexOf(l.speaker))) : null;
     // A clip whose text changed can't be used at all; one whose voice settings changed still plays (draft) but is flagged.
     const voiced = !!vl && vl.text === l.text;
@@ -174,9 +188,27 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     }
     if (!voiced) anyUnvoiced = true;
     const est = voiced ? null : estimateWords(l.text);
-    const duration = voiced ? vl!.duration : est!.duration;
+    let duration = voiced ? vl!.duration : est!.duration;
     // Alignment can run a few ms past the decoded audio; keep word times inside the clip.
-    const words = voiced ? vl!.words.map((w) => ({ ...w, start: Math.min(w.start, vl!.duration), end: Math.min(w.end, vl!.duration) })) : est!.words;
+    let words = voiced ? vl!.words.map((w) => ({ ...w, start: Math.min(w.start, vl!.duration), end: Math.min(w.end, vl!.duration) })) : est!.words;
+    let envelope = voiced ? vl!.envelope : envelopeFromWords(words, duration);
+    // Edge trim: in/out points on the untouched file (automatic on engine 2, or the line's own `trim`).
+    let clip: ResolvedLine["clip"];
+    const an = voiced ? vl!.analysis : undefined;
+    if (voiced && l.trim !== false && (l.trim || (behaviour.defaults.trim && an))) {
+      const auto = behaviour.defaults.trim && an ? autoTrim(an, words) : { start: 0, end: duration };
+      // The in-point is frame-aligned (playback starts on a frame), rounded down so nothing audible is lost.
+      const from = Math.floor((l.trim ? (l.trim.start ?? auto.start) : auto.start) * fps + 1e-6) / fps;
+      const to = Math.min(duration, l.trim ? (l.trim.end ?? auto.end) : auto.end);
+      if (to <= from + 0.05) errors.push(`dialogue ${l.id}: trim leaves nothing (${from.toFixed(2)}–${to.toFixed(2)} s)`);
+      else if (from > 0 || to < duration - 1e-6) {
+        if (an && l.trim) for (const p of trimmedProtected(an, words, { start: from, end: to })) warnings.push(`dialogue ${l.id}: trim ${from.toFixed(2)}–${to.toFixed(2)} s cuts into ${p.what} (${p.span[0].toFixed(2)}–${p.span[1].toFixed(2)} s)`);
+        clip = { from, to };
+        words = words.map((w) => ({ ...w, start: Math.max(0, w.start - from), end: Math.min(to - from, Math.max(0, w.end - from)) }));
+        envelope = { rate: envelope.rate, values: envelope.values.slice(Math.round(from * envelope.rate), Math.round(to * envelope.rate)) };
+        duration = to - from;
+      }
+    }
     const line: ResolvedLine = {
       id: l.id,
       speaker: l.speaker,
@@ -185,10 +217,14 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       end: start + duration,
       file: voiced ? vl!.file : undefined,
       words,
-      envelope: voiced ? vl!.envelope : envelopeFromWords(words, duration),
+      envelope,
       voiced,
       ...(voiced && stale ? { stale: true } : {}),
       ...(voiced ? { provider: vl!.provider, ...(vl!.tier ? { tier: vl!.tier } : {}) } : {}),
+      ...(take > 0 ? { take } : {}),
+      ...(typeof l.take === "object" ? { takeChoice: { by: l.take.by, why: l.take.why } } : {}),
+      ...(clip ? { clip } : {}),
+      ...(l.caption ? { display: captionWords(l.caption, words) } : {}),
     };
     if (voiced && vl!.words.length !== splitWords(l.text).length)
       warnings.push(`dialogue ${l.id}: the voice has ${vl!.words.length} timed words but the script has ${splitWords(l.text).length} — "${l.id}.word:N" refs count the timed words`);
@@ -202,6 +238,19 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       // Measured to the last spoken word: starting a line in the previous clip's trailing silence is fine.
       if (lines[i].speaker === lines[j].speaker && lines[j].start < spokenEnd(lines[i]) - 0.05 && lines[i].start < spokenEnd(lines[j]) - 0.05)
         warnings.push(`dialogue ${lines[j].id} overlaps ${lines[i].id} (same speaker ${lines[i].speaker})`);
+  // Levels and speech motion are relative to each speaker's own lines (measured clips only).
+  for (const sp of new Set(lines.map((l) => l.speaker))) {
+    const measured = lines.filter((l) => l.speaker === sp && l.voiced).map((l) => ({ l, an: voice!.lines[takeKey(l.id, l.take ?? 0)]?.analysis })).filter((x) => !!x.an);
+    const target = median(measured.map((x) => x.an!.loudness));
+    const loudest = Math.max(...measured.map((x) => x.an!.envPeak), 1e-9);
+    for (const l of lines.filter((x) => x.speaker === sp)) {
+      const an = measured.find((x) => x.l === l)?.an;
+      const authored = ep.dialogue.find((d) => d.id === l.id)?.gain;
+      const gain = behaviour.defaults.level && an ? lineGain(an, target, authored ?? 0) : authored;
+      if (gain) l.gain = gain;
+      if (behaviour.defaults.speechMotion && an) l.talkScale = Math.round(Math.min(1, an.envPeak / loudest) * 1000) / 1000;
+    }
+  }
   if (anyUnvoiced && ep.dialogue.length) warnings.push(`some lines have no generated voice (timing estimated) — run \`npm run cli -- voice ${ep.id}\``);
 
   // ---- places
@@ -614,6 +663,21 @@ const toShot = (
 };
 
 export { lineHash };
+
+/** Caption words for a `caption` override: the timed words' times when the counts match, else spread over the speech. */
+const captionWords = (caption: string, words: Word[]): Word[] => {
+  const shown = splitWords(caption);
+  if (shown.length === words.length) return words.map((w, i) => ({ ...w, text: shown[i] }));
+  const t0 = words[0]?.start ?? 0;
+  const t1 = words[words.length - 1]?.end ?? t0 + 0.4 * shown.length;
+  const total = shown.reduce((n, w) => n + w.length + 1, 0);
+  let acc = 0;
+  return shown.map((text) => {
+    const a = t0 + ((t1 - t0) * acc) / total;
+    acc += text.length + 1;
+    return { text, start: a, end: t0 + ((t1 - t0) * (acc - 1)) / total };
+  });
+};
 
 const spokenEnd = (l: ResolvedLine) => (l.words.length ? l.start + l.words[l.words.length - 1].end : l.end);
 

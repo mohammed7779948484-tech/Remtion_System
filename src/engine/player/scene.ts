@@ -2,7 +2,7 @@
 // Used by the player, the validator and tests (Node-safe: no React).
 import { ACTOR_DEFS } from "../actors/defs";
 import { actorBase, actorFinal, type ActorBase, type ActorDefinition, type ActorFrame, type ActorTrack, type ListenSpec } from "../actors/rig";
-import { sampleEnvelope } from "../audio/speech";
+import { sampleEnvelope, shapedTalk, slowTalk } from "../audio/speech";
 import { cameraAt, type CameraFrame, type SceneQuery } from "../camera/solve";
 import type { ResolvedActor, ResolvedEpisode, ResolvedLine } from "../core/timeline";
 import { moodAt, type Mood } from "../lighting/moods";
@@ -14,6 +14,13 @@ export const buildTracks = (r: ResolvedEpisode, defs: Record<string, ActorDefini
   return r.actors.map((a) => {
     const lines = r.lines.filter((l) => l.speaker === a.id);
     const listen = listenSpec(r, a, all[a.actor]);
+    // Speech motion (engine 2): per-speaker loudness, attack/release on the mouth, a slow envelope for the body.
+    const motion = r.behaviour.defaults.speechMotion;
+    const speech = (t: number, f: (l: (typeof lines)[number], local: number) => number) => {
+      let v = 0;
+      for (const l of lines) if (t >= l.start - 0.05 && t <= l.end + 0.3) v = Math.max(v, f(l, t - l.start));
+      return v;
+    };
     return {
       id: a.id,
       def: all[a.actor],
@@ -28,11 +35,14 @@ export const buildTracks = (r: ResolvedEpisode, defs: Record<string, ActorDefini
       turns: a.turns,
       overrides: a.overrides,
       holds: a.holds,
-      talk: (t: number) => {
-        let v = 0;
-        for (const l of lines) if (t >= l.start && t <= l.end) v = Math.max(v, sampleEnvelope(l.envelope, t - l.start));
-        return v;
-      },
+      talk: motion
+        ? (t: number) => speech(t, (l, local) => shapedTalk(l.envelope, local, l.talkScale ?? 1))
+        : (t: number) => {
+            let v = 0;
+            for (const l of lines) if (t >= l.start && t <= l.end) v = Math.max(v, sampleEnvelope(l.envelope, t - l.start));
+            return v;
+          },
+      ...(motion ? { talkBody: (t: number) => speech(t, (l, local) => slowTalk(l.envelope, local, l.talkScale ?? 1)) } : {}),
       ...(listen ? { listen } : {}),
     };
   });

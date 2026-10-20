@@ -149,11 +149,14 @@ export const claudeDef: ActorDefinition = {
     c["eyeL.y"] += ey;
     c["eyeR.y"] += ey;
 
+    // Talking: the whole body follows the (slow, with speech motion) speech energy; the eyes pulse with syllables.
+    if (s.talkBody > 0.01) {
+      c["body.y"] += s.talkBody * 0.012;
+      c.squash += s.talkBody * 0.065 * s.noise("talkSquash", 5);
+      c["body.rz"] += s.talkBody * 0.06 * s.noise("talkTilt", 3);
+      c["body.rx"] += s.talkBody * 0.04 * s.noise("talkPitch", 4);
+    }
     if (s.talk > 0.01) {
-      c["body.y"] += s.talk * 0.012;
-      c.squash += s.talk * 0.065 * s.noise("talkSquash", 5);
-      c["body.rz"] += s.talk * 0.06 * s.noise("talkTilt", 3);
-      c["body.rx"] += s.talk * 0.04 * s.noise("talkPitch", 4);
       const pulse = 1 + s.talk * 0.12 * s.noise("eyePulse", 6);
       c["eyeL.sy"] *= pulse;
       c["eyeR.sy"] *= pulse;

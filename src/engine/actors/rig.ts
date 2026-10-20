@@ -27,6 +27,8 @@ export type LifeSignals = {
   blink: number;
   /** 0..1 speech amplitude (stylized mouthing, not phonemes). */
   talk: number;
+  /** Speech energy for body motion: a slow envelope with speech motion on (engine 2), else the same as `talk`. */
+  talkBody: number;
   /** Radians relative to the body's forward axis. Positive yaw = actor's left (+X), positive pitch = up. */
   lookYaw: number;
   lookPitch: number;
@@ -153,6 +155,8 @@ export type ActorTrack = {
   overrides: OverrideCue[];
   holds: HoldCue[];
   talk?: (t: number) => number;
+  /** Slow speech energy for the body (speech motion); absent = `talk`. */
+  talkBody?: (t: number) => number;
   /** Opt-in listening: look at whoever speaks, nod at their phrase ends, blink on cuts. */
   listen?: ListenSpec;
 };
@@ -563,6 +567,7 @@ export const actorFinal = (track: ActorTrack, base: ActorBase, t: number, ctx: L
     breath: Math.sin(t * Math.PI * 2 * 0.24 + rand(seed, "breath") * 6) * (0.85 + 0.15 * noise(seed + "b", t, 0.3)),
     blink: blinkAt(seed, t, reactions),
     talk: clamp(track.talk?.(t) ?? 0, 0, 1),
+    talkBody: clamp(track.talkBody ? track.talkBody(t) : (track.talk?.(t) ?? 0), 0, 1),
     lookYaw: look.yaw,
     lookPitch: look.pitch,
     lookWeight: look.weight,

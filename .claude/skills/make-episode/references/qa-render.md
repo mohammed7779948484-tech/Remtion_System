@@ -25,6 +25,11 @@ recipe step) and the `allow` intent that would mark it deliberate:
 | `contact/unreachable`, `missed-contact` | move the actor closer to the target (or the target closer) |
 | `contact/floating` | put the actor on a mark / the surface height; `allow: ["floating"]` on the cast member if it hovers |
 | `overlay/caption-over-face`, `text-over-face` | reframe (shot `offset`/size) or move the accent (`position`) |
+| `line lN: [sighs] not performed` | another take (`--takes lN=3`, `--report`), or drop the tag |
+| `line lN: clipping`, `cut off` | another take; a cut-off tail can also be a too-tight hand `trim` |
+| `line lN: speech-to-text heard "…"` | listen-free check failed: another take, or reword (a small model can mishear names: read the transcript) |
+| `trim … cuts into word/sound/tag` | widen the line's `trim` (look at `voice <slug> --show lN`) |
+| `lN has N takes and no recorded choice` | `--audition lN` for the director (key lines) or `--report`'s measured pick → `"take": {n, by, why}` |
 | other `⚠` lines: stale/no voice clip, free plan, unknown rights, unknown params | `voice`; licensing in the report; typo |
 
 When a finding is unclear, `explain <slug> --t <time> --actor <id>` (or `--camera`) shows every layer at that moment —

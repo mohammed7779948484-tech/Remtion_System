@@ -17,6 +17,7 @@ npm run cli -- new <slug> [--env dev-office|micro-keyboard|floating-space|custom
 npm run cli -- voice <slug>                          # free offline voices (drafts)
 npm run cli -- voice --check                         # free: ElevenLabs plan, credits, models, voices
 npm run cli -- voice <slug> --provider elevenlabs    # paid (Eleven v4); never implied by a key in .env
+npm run cli -- voice <slug> --takes l3=3 [--max-credits N]   # alternative takes; --report / --audition l3 / --show l3
 npm run cli -- validate <slug>                       # beat sheet, audio readiness + every inspect finding (✖ ⚠ · ~)
 npm run cli -- inspect <slug> [--json]               # per-frame checks in Node (~1 s): framing, camera, motion, contact, overlays — with time, object, source
 npm run cli -- explain <slug> --t 4.2 [--actor rayan | --camera]   # every layer at that moment and the episode.json entry behind it

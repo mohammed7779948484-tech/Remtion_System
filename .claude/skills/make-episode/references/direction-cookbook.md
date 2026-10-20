@@ -46,6 +46,11 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
 { "id": "l2", "speaker": "claude", "text": "[cheerfully] Relax! Just press Control Z.", "gap": 0.2 },
 { "id": "l3", "speaker": "claude", "text": "[sighs] I weigh nothing.", "at": "l2.end+5.9" }
 ```
+Per line (all optional): `"take": { "n": 2, "by": "director", "why": "…" }` (which generated take plays; `by:
+"agent"` = measured, not heard), `"trim": false` or `{ "start": 0.2, "end": 2.4 }` (file seconds; engine 2 trims
+silent edges itself), `"gain": -6` (dB on top of levelling), `"caption": "Hey!!"` (shown instead of the spoken text).
+Engine-2 voice corrections, off with `"defaults": { "trim": false, "level": false, "speechMotion": false }`.
+
 Refs: `"l2.start"`, `"l2.end+0.3"`, `"l3.word:2"` (2nd spoken word; tags don't count), `"l3.word:2.end-0.1"`.
 Lines can only reference earlier lines, and refs only point at dialogue lines: beats before the first line use
 absolute seconds. A pause between words is the right spot for a UI ping:

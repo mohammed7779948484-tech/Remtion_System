@@ -27,8 +27,8 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
   automatic behaviour reads only from the resolved `behaviour`, never from the engine version directly.
   `profile` names the check thresholds (`list direction`). `allow: [...]` on the episode or a shot marks a
   finding as deliberate: it is reported as "accepted by intent", never hidden. `defaults` holds the switches:
-  corrections that engine 2 turns on (`focusPull`, `arcBlend`, `viaPoints`) and opt-in styles that stay off until
-  asked for (`cameraLife` 0..2, `listen` 0..1).
+  corrections that engine 2 turns on (`focusPull`, `arcBlend`, `viaPoints`, `trim`, `level`, `speechMotion`) and
+  opt-in styles that stay off until asked for (`cameraLife` 0..2, `listen` 0..1).
 - **Visual state** (`inspect/sweep.ts`): `createSweep(resolved).at(frame)` is everything the picture
   depends on (actors, the rendered camera incl. shake, mood, prop states, screen accents, caption page),
   ~1 ms per frame in Node. Goldens (`tests/goldens/`) hash it for every finished video, so `npm test`
@@ -50,7 +50,8 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
 | Splines | `core/spline.ts` (pure) | Hermite/Catmull-Rom keyframe interpolation shared by camera `keys` and keyed joints |
 | Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
 | Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
-| Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, playback |
+| Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, takes, playback (clip windows, gain) |
+| Voice analysis | `audio/analysis.ts`, `audio/voiceReport.ts` (pure); `scripts/stt.ts`, `scripts/voiceTools.ts` (Node) | floor, segments, LUFS, tags, f0; edge trim, levels, validation, take report; whisper STT; strips, auditions |
 | Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides (keyed joints), listening; `effectors` (body points/volumes for contact checks), `persona` |
 | Node tools | `scripts/cli.ts`, `scripts/video.ts` (loader), `scripts/catalog.ts` | CLI, video loading, catalog |
 
@@ -264,6 +265,21 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - SFX: library names resolve to the local CC0 kit in `public/sfx/` (`npm run cli -- list sfx`: description, tags,
   loudness, license; provenance in `src/engine/audio/sfx.data.ts` and `THIRD_PARTY_NOTICES.md`), then to legacy
   Remotion-hosted meme sounds (unknown rights → warned). Also URLs or files under `public/videos/<id>/`.
+- Analysis (`audio/analysis.ts`, stored per clip as `analysis` in `voice.json`, backfilled free by `voice <slug>`):
+  10 ms frame levels → noise floor (10th percentile), sound segments (≥ floor + 6 dB), BS.1770 loudness, peak,
+  clipping, the last 30 ms, tag spans (alignment times, else the gap between the neighbouring words) with the energy
+  inside them, pitch. Speech-to-text (`scripts/stt.ts`): ffmpeg's whisper filter with a local ggml model
+  (`$WHISPER_MODEL`), word error rate vs the script; without a model, validation says the words are unverified.
+- Engine-2 voice corrections (resolver): `trim` → `ResolvedLine.clip` in/out points on the untouched file (head cut
+  frame-aligned; never sound, a word — up to where its sound ends — or a performed tag; only edges with > 120 ms of
+  quiet, padded 60/200 ms), words/envelope shifted; `level` → `gain` dB toward the speaker's median loudness
+  (-12/+6 dB, peak ≤ -1 dBFS, plus the line's `gain`); `speechMotion` → `talkScale` (envelope peak relative to the
+  speaker's loudest line), mouth `shapedTalk` (30 ms lead, 70 ms release, closed form) and body `talkBody`
+  (`slowTalk`, ±0.2 s). The Soundtrack plays clip windows with `trimBefore` and a volume; sample-accurate fades
+  belong to the M5 mix plan (Remotion volumes are per frame; cuts land in ≥ 120 ms of near-floor audio).
+- Takes: `voice <slug> --takes l3=3` adds `l3#1`, `l3#2` (ElevenLabs/fixture: another seed; system voices: another
+  rate); take 0 keeps every existing fingerprint. The line's `take` picks one; `--max-credits` refuses an expensive
+  run before any request. `--report` (tiers 1–2 + a labelled measured pick), `--audition`, `--show`.
 - Voices: `voice --check` (free) shows plan, credits, models and usable voices. Paid generation needs
   `--provider elevenlabs`; the default model is `eleven_v4` (stability + similarity only; inline audio tags like
   `[sighs]` are performed, and stripped from captions, word refs and offline voices). Clips are cached by a

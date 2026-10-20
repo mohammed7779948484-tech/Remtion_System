@@ -67,6 +67,12 @@ export type Defaults = {
   listen: number;
   /** Self-touch recipes (facepalm, sip) aim at the bowed head and pass a point in front of the chest. */
   viaPoints: boolean;
+  /** Dialogue clips lose silent heads and tails (never sound, words or performed tags; pauses inside stay). */
+  trim: boolean;
+  /** Each line is brought to its speaker's measured speech loudness (a line's `gain` adds on top). */
+  level: boolean;
+  /** Mouths follow loudness relative to the speaker's loudest line, with attack/release; bodies follow a slow envelope. */
+  speechMotion: boolean;
 };
 
 export type Behaviour = { engine: EngineVersion; profile: ProfileName; allow: Intent[]; defaults: Defaults };
@@ -84,6 +90,9 @@ export const resolveBehaviour = (ep: { engine?: EngineVersion; profile?: Profile
       arcBlend: ep.defaults?.arcBlend ?? corrections,
       listen: ep.defaults?.listen ?? 0,
       viaPoints: ep.defaults?.viaPoints ?? corrections,
+      trim: ep.defaults?.trim ?? corrections,
+      level: ep.defaults?.level ?? corrections,
+      speechMotion: ep.defaults?.speechMotion ?? corrections,
     },
   };
 };

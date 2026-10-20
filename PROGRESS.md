@@ -209,6 +209,7 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 | M1 Diagnose and explain | ✅ done | see below |
 | M2 Camera choreography | ✅ done | see below |
 | M3 Performance layer | ✅ done (your review pending) | see below |
+| M4 Voice performance and speech motion | ✅ done (your take auditions pending) | see below |
 
 ## M0 — safety net, picture sweep and yardstick
 - `core/behaviour.ts`: `engine` (1 default = original behaviour, 2 = current; `new` writes 2), `profile` (only
@@ -344,3 +345,50 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
   too (the original was flagged at 23.83 s for the same ~0.45 m step: whether the rule fires depends on how the
   neighbouring frames fall). A peak-speed note for hands
   would catch it. The blind comparator review of the before/after material (plan M3) has not been run yet.
+
+## M4 — voice performance and speech motion
+Decisions (2026-10-19, user): speech-to-text = local whisper through ffmpeg (the installed ffmpeg 8.1 has the
+whisper.cpp filter; model `ggml-tiny.en-q5_1.bin`, ~32 MB, in `~/.cache/remotion-system/whisper/`, `$WHISPER_MODEL`
+overrides); key-line takes = the user auditions them, the agent picks the rest by measured criteria, labelled.
+- Clip analysis (`audio/analysis.ts`, pure; stored per clip in `voice.json`, computed at generation, backfilled free
+  by `voice <slug>`): 10 ms levels → noise floor, sound segments, BS.1770 loudness (tested: a 0.1-amplitude 997 Hz
+  sine reads -23.0 LUFS), peak/clipping, tail level, tag spans (ElevenLabs alignment times when they are real
+  spans, else the gap between the neighbouring words) with the energy inside them, pitch (autocorrelation).
+  ctrl-z's five real v4 clips, analysed read-only: l3's `[sighs]` found performed at 0.06–0.80 s; no clip fails
+  validation; Claude's three lines spread over 3 LU before levelling.
+- Edge trim (engine-2 correction `defaults.trim`, line `trim: false | {start, end}`): in/out points on the
+  untouched file, only edges with > 120 ms of quiet, padded 60 ms / 200 ms, frame-aligned in-point, never sound,
+  a word or a performed tag; pauses inside a line stay. Found on the first real strip: ElevenLabs alignment stretches
+  a line's last word to the end of the file, which would have blocked every tail trim → a word protects only as far
+  as its sound continues. A hand trim that cuts into protected audio warns.
+- Levels (`defaults.level`): each line toward its speaker's median loudness (-12/+6 dB, peak ≤ -1 dBFS), plus the
+  line's `gain`. Played as the Audio volume. Fades: Remotion volumes are per frame, so the 8/30 ms fades move to the
+  M5 mix plan; cuts land in ≥ 120 ms of near-floor audio (the preview measured -91 dB right after a trimmed tail).
+- Speech motion (`defaults.speechMotion`): `talkScale` = envelope peak relative to the speaker's loudest line (quiet
+  lines read smaller — tested: a line 12 dB down peaks at < 0.5 of the loud one, equal on engine 1), mouth with a
+  30 ms lead and 70 ms closed-form release, and a slow ±0.2 s envelope `talkBody` for Rayan's head/torso/hands and
+  the mascot's body (equal to `talk` on engine 1, so finished videos are unchanged).
+- `caption` overrides the shown text (words for refs and timing untouched). Takes: `voice <slug> --takes l3=3`
+  stores `l3#1`, `l3#2` (ElevenLabs/fixture: another seed; system voices: another rate), take 0 keeps every existing
+  fingerprint (tested), the line's `take: n | { n, by: director|agent, why }` selects and records the choice;
+  `--max-credits` refuses an expensive paid run before any request (tested with a counting fake fetch).
+- Take evaluation, three tiers kept apart (`audio/voiceReport.ts`, `scripts/voiceTools.ts`): tier 1 validation
+  (clipping, cut-off tail, nonverbal tag performed, speech-to-text word error ≤ 20 %); tier 2 facts (length and
+  trimmed length, fit to a slot when the next line's start doesn't follow from this one, words/s, pauses, LUFS,
+  peak, pitch range); tier 3 `--audition` (all takes in one WAV, announced by take + 1 beeps) for the director, or
+  `--report`'s measured pick labelled "measured, not heard". `validate` lists failed validation, multi-take lines
+  without a recorded choice, unverified words. `--show` draws the waveform strip (words, tags + energy, sound,
+  floor, trim) as a PNG.
+- Goldens: resolved hashes refreshed for three new `behaviour.defaults` fields; every per-second visual digest of
+  the finished videos identical (checked before refreshing; the resolved episodes equal the old ones without them).
+- Tests: 215 (21 files). `tests/voice-performance.test.ts`: loudness, floor/segments/sigh detection, failed
+  validation (missing sigh, clipping, cut-off), the sigh-tail fault keeps its sigh, no protected energy removed
+  across generated clips, levels and caps, WER, take fingerprints/seeds, takes end to end (generate, keep, select,
+  remove), free backfill, the credit cap, resolver trim/level/speech motion on engine 2 vs untouched on engine 1,
+  slower body envelope, `trim: false` / switches off / hand-trim warning, caption override, take report + findings.
+- Production acceptance (the pilot is M8, so on `videos/one-take`, voiced for the first time with free offline
+  voices): l1–l3 trimmed (SAPI's ~0.5 s tails; l2's 1.2 s inner pause kept, see `out/one-take/voice-l2.png`),
+  levelled, 3 takes on the two key lines l2 and l3, all passing tier 1; auditions `out/one-take/audition-l2.wav` and
+  `audition-l3.wav` wait for the director; `--report` suggests take 0 for both by measurement. A preview render
+  confirms the trimmed, levelled playback (audio in each line window, silence between). `ctrl-z-remaster` (engine 2,
+  now trimmed/levelled/speech motion) still inspects with 0 warnings. No ElevenLabs credits were spent.

@@ -13,7 +13,7 @@ export type CaptionPage = TikTokPage & { speaker: string; endMs: number };
 export const captionPages = (resolved: Pick<ResolvedEpisode, "lines" | "captions">): CaptionPage[] => {
   const out: CaptionPage[] = [];
   for (const l of resolved.lines) {
-    const { pages: ps } = createTikTokStyleCaptions({ captions: lineCaptions(l.words, l.start), combineTokensWithinMilliseconds: resolved.captions.pageSeconds * 1000 });
+    const { pages: ps } = createTikTokStyleCaptions({ captions: lineCaptions(l.display ?? l.words, l.start), combineTokensWithinMilliseconds: resolved.captions.pageSeconds * 1000 });
     ps.forEach((p, i) => out.push({ ...p, speaker: l.speaker, endMs: i < ps.length - 1 ? ps[i + 1].startMs : Math.round((l.end + 0.2) * 1000) }));
   }
   out.sort((a, b) => a.startMs - b.startMs);

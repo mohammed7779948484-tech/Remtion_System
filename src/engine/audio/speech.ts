@@ -4,6 +4,7 @@
 // opens the mouth. It is not phoneme lip-sync (no visemes); a phoneme track (e.g. from Rhubarb)
 // would be the upgrade path, consumed the same way through an actor's `life` signals.
 import type { Caption } from "@remotion/captions";
+import type { ClipAnalysis } from "./analysis";
 import { SFX_INFO } from "./sfx.data";
 
 export type Word = { text: string; start: number; end: number };
@@ -30,8 +31,16 @@ export type VoiceLine = {
   /** ElevenLabs plan tier at generation time ("free" clips are non-commercial). */
   tier?: string;
   generatedAt?: string;
+  /** Alternative take number (absent = take 0, the line's original seed). */
+  take?: number;
+  /** Measured in Node at voice time (backfilled for cached clips, free): energy, loudness, tags, validation. */
+  analysis?: ClipAnalysis;
 };
+/** Lines by id; alternative takes are stored as `<id>#<n>` (take 0 is the plain id, so old caches stay valid). */
 export type VoiceManifest = { version: 1; lines: Record<string, VoiceLine> };
+
+/** Manifest key of a line's take. */
+export const takeKey = (id: string, take = 0) => (take > 0 ? `${id}#${take}` : id);
 
 /** FNV-1a 32-bit — tiny, identical in Node and the browser. */
 export const hashString = (s: string) => {
@@ -85,13 +94,30 @@ export const TAG_RE = /\[[^\]\n]{1,40}\]/g;
 export const stripTags = (text: string) => text.replace(TAG_RE, " ").replace(/\s+/g, " ").trim();
 export const hasTags = (text: string) => new RegExp(TAG_RE.source).test(text);
 
-export type VoiceRequest =
+export type VoiceRequest = (
   | { provider: "elevenlabs"; text: string; voiceId: string; model: string; settings: Record<string, number>; format: string }
   | { provider: "system"; text: string; voice: string; rate: number; pitch?: string }
-  | { provider: "fixture"; text: string; speakerIndex: number };
+  | { provider: "fixture"; text: string; speakerIndex: number }
+) & { /** Alternative take (only present for take ≥ 1, so take-0 fingerprints never change). */ take?: number };
 
-/** Exactly what a provider will be asked to synthesise, with every default filled in. Pure. */
-export const voiceRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number): VoiceRequest => {
+/** Offline system voices vary a take by speaking rate (SAPI has no seed): take n → this offset in rate steps. */
+const SYSTEM_TAKE_RATE = [0, -1, 1, -2, 2];
+
+/**
+ * Exactly what a provider will be asked to synthesise, with every default filled in. Pure. A take ≥ 1 is a
+ * variant of the same line: another seed (ElevenLabs, fixture) or another speaking rate (system voices).
+ */
+export const voiceRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number, take = 0): VoiceRequest => {
+  const req = baseRequest(provider, text, voice, speakerIndex);
+  if (take <= 0) return req;
+  if (req.provider === "system") return { ...req, rate: req.rate + (SYSTEM_TAKE_RATE[take] ?? take), take };
+  return { ...req, take };
+};
+
+/** ElevenLabs seed of a take (take 0 = the seed every cached clip was made with). */
+export const takeSeed = (text: string, take = 0) => parseInt(hashString(take > 0 ? `${text}#${take}` : text).slice(0, 7), 16);
+
+const baseRequest = (provider: VoiceProvider, text: string, voice: CastVoice | undefined, speakerIndex: number): VoiceRequest => {
   if (provider === "elevenlabs") {
     const el = voice?.elevenlabs;
     const model = el?.model ?? DEFAULT_ELEVEN_MODEL;
@@ -125,7 +151,7 @@ export const voiceFingerprint = (req: VoiceRequest) => hashString(`v2|${stable(r
 export const voiceStaleReason = (entry: VoiceLine, text: string, voice: CastVoice | undefined, speakerIndex: number): string | null => {
   if (entry.text !== text) return "text changed";
   if (entry.scheme === 2) {
-    const req = voiceRequest(entry.provider, text, voice, speakerIndex);
+    const req = voiceRequest(entry.provider, text, voice, speakerIndex, entry.take ?? 0);
     if (voiceFingerprint(req) === entry.hash) return null;
     if (req.provider === "elevenlabs") {
       if (entry.model && entry.model !== req.model) return `model changed (${entry.model} → ${req.model})`;
@@ -183,6 +209,27 @@ export const sampleEnvelope = (env: Envelope, localT: number) => {
   const a = env.values[i];
   const b = env.values[i + 1] ?? 0;
   return a + (b - a) * (x - i);
+};
+
+/**
+ * Speech motion (engine 2): the mouth opens a hair before the sound (`lead`) and closes with a short exponential
+ * release instead of snapping shut between syllables; `scale` is the line's loudness relative to the speaker's
+ * loudest line, so quiet lines read smaller. Closed form in t (a max over a few past samples), no state.
+ */
+export const shapedTalk = (env: Envelope, localT: number, scale = 1, lead = 0.03, release = 0.07) => {
+  const t = localT + lead;
+  let v = sampleEnvelope(env, t);
+  const step = 1 / env.rate;
+  for (let j = 1; j * step <= release * 3; j++) v = Math.max(v, sampleEnvelope(env, t - j * step) * Math.exp(-(j * step) / release));
+  return v * scale;
+};
+
+/** Slow speech energy for body motion (head, torso, hands, the mascot's whole body): a ±0.2 s average, peak ≈ 1. */
+export const slowTalk = (env: Envelope, localT: number, scale = 1, half = 0.2) => {
+  let sum = 0;
+  const n = 9;
+  for (let i = 0; i < n; i++) sum += sampleEnvelope(env, localT - half + (2 * half * i) / (n - 1));
+  return Math.min(1, (sum / n) * 1.8) * scale;
 };
 
 /** Envelope synthesised from word timings, for lines without audio (keeps mouths moving in preview). */

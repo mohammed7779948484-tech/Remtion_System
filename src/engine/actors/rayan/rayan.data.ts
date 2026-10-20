@@ -331,15 +331,17 @@ export const rayanDef: ActorDefinition = {
     c.lidL = Math.max(c.lidL, s.blink);
     c.lidR = Math.max(c.lidR, s.blink);
 
-    // Stylized amplitude mouthing + head/torso beats.
+    // Stylized amplitude mouthing; head/torso beats and hands follow the (slow, with speech motion) body energy.
     if (s.talk > 0.01) {
       c["mouth.open"] = Math.max(c["mouth.open"] * 0.6, 0.18 + s.talk * 1.25);
       c["mouth.wide"] = lerp(c["mouth.wide"], 0.92 + s.noise("mouthW", 6) * 0.15, s.talk);
-      c["head.x"] += s.noise("talkNod", 3) * 0.035 * s.talk;
-      c["torso.x"] += s.noise("talkBounce", 4) * 0.015 * s.talk;
+    }
+    if (s.talkBody > 0.01) {
+      c["head.x"] += s.noise("talkNod", 3) * 0.035 * s.talkBody;
+      c["torso.x"] += s.noise("talkBounce", 4) * 0.015 * s.talkBody;
       if (s.pose === "explaining" || s.pose === "sit_explaining") {
-        c["elbowL.x"] += s.noise("gestL", 2.2) * 0.16 * s.talk;
-        c["elbowR.x"] += s.noise("gestR", 2.4) * 0.16 * s.talk;
+        c["elbowL.x"] += s.noise("gestL", 2.2) * 0.16 * s.talkBody;
+        c["elbowR.x"] += s.noise("gestR", 2.4) * 0.16 * s.talkBody;
       }
     }
     if (s.pose === "sit_typing") {

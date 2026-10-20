@@ -3,6 +3,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { auditAudio, isMissingFile } from "../../src/engine/audio/audit";
+import { voiceFindings } from "../../src/engine/audio/voiceReport";
 import { shotLayout } from "../../src/engine/camera/solve";
 import { beatSheet } from "../../src/engine/core/pacing";
 import { createTrace } from "../../src/engine/core/trace";
@@ -45,6 +46,8 @@ export const validate = async () => {
   for (const e of audio.errors) (isMissingFile(e) ? problems : notes).push(e);
   notes.push(...audio.warnings);
   const manifest = readManifest(ROOT, slug);
+  const vf = voiceFindings(r, manifest);
+  notes.push(...vf.warnings, ...vf.notes);
   if (process.env.ELEVENLABS_API_KEY && manifest && Object.values(manifest.lines).some((l) => l.provider !== "elevenlabs")) notes.push("info: clips use offline voices; `voice <slug> --provider elevenlabs` would re-voice them (paid, changes timing)");
   // Solver notes (authored angles that are blocked, corrections it made).
   const q = makeQuery(r, buildTracks(r, actorDefs));

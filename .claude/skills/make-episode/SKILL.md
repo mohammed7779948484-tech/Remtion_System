@@ -92,6 +92,27 @@ Inline tags like `[sighs]`, `[panicked]`, `[proudly]` are performed by v4 and st
 Unchanged lines are cached, so editing one line only re-buys that line. Free-plan clips are non-commercial and the
 post title must credit "elevenlabs.io" — `validate` reminds you; mention it in your report.
 
+Every clip is analysed when it's made (and `voice <slug>` backfills old clips for free): noise floor, where there is
+sound, loudness, peak, where each tag sits and whether a `[sighs]`/`[laughs]` actually made a sound, pitch. When the
+local whisper model exists (`~/.cache/remotion-system/whisper/ggml-tiny.en-q5_1.bin`, read by ffmpeg's whisper
+filter) it also transcribes each clip and compares the words with the script. On engine 2 this drives three
+corrections: silent heads/tails are trimmed (never sound, words or a performed tag; pauses inside a line stay), each
+line is levelled to its speaker, and mouths follow loudness relative to the speaker (quiet lines read smaller).
+
+```
+npm run cli -- voice <slug> --show l3          # waveform strip: words, tags + their energy, sound, floor, trim points
+npm run cli -- voice <slug> --takes l3=3,l5=2 [--max-credits 400]   # alternative takes (take 0 keeps the cache)
+npm run cli -- voice <slug> --report           # per take: ✔/✖ validation, length, pace, pauses, loudness, pitch
+npm run cli -- voice <slug> --audition l3      # every take of l3 in one WAV, announced by (take + 1) beeps
+```
+
+**Takes.** Ask for takes only on key lines. Look at the strip instead of guessing a trim. You can't hear: the
+director auditions key lines (give them the audition file) and records the choice on the line,
+`"take": { "n": 2, "by": "director", "why": "the tired sigh" }`; for other lines take `--report`'s measured pick and
+record it as `"by": "agent"` with its reason — say in your report that those were measured, not heard. Per line:
+`trim` (`false` or `{ "start", "end" }` in file seconds), `gain` (dB on top of levelling, e.g. -6 for a mutter),
+`caption` (on-screen text without re-voicing).
+
 ## 6. Check (loop here until it's right)
 
 ```

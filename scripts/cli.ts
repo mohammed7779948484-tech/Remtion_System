@@ -2,7 +2,8 @@
 //   list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos|direction]
 //   show <actor|prop|environment|mood|screen|fx|sfx> <id>
 //   new <slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title "..."]  (writes BRIEF.md)
-//   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
+//   voice <slug> [--provider elevenlabs|system|fixture] [--force] [--takes l3=3] [--max-credits N] [--no-stt]
+//   voice <slug> --show l3 | --audition l3 | --report   |   voice --check (free: plan, models, voices)
 //   validate <slug>   (direction, audio readiness, beat sheet and every inspect finding)
 //   inspect <slug> [--json]   (findings: time, object, source, intent; exits 1 on errors)
 //   explain <slug> --t <s> [--actor <id> | --camera]   (every layer at that time and where it came from)

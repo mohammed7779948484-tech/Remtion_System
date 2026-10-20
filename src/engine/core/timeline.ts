@@ -11,7 +11,7 @@ import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropC
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { CODE_LANGS, COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
 import { SFX_INFO } from "../audio/sfx.data";
-import { resolveBehaviour, type Behaviour, type Intent } from "./behaviour";
+import { resolveBehaviour, type Behaviour, type Defaults, type Intent } from "./behaviour";
 import { FX_INFO, type ResolvedFx } from "./fx";
 import type { Trace } from "./trace";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
@@ -458,7 +458,8 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   };
   const shotsIn = [...ep.camera].map((s, i) => ({ s, i, t: timeOf(s.at, `camera[${i}]`) })).sort((a, b) => a.t - b.t || a.i - b.i);
   for (const { i, t } of shotsIn) if (t >= duration) errors.push(`camera[${i}]: cut at ${t.toFixed(2)}s is at/after the end (${duration.toFixed(2)}s)`);
-  const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => traced(toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, castIds, itemIds, layout, focusTarget, timeOf }), `camera[${i}] (${s.shot})`, s.allow));
+  const behaviour = resolveBehaviour(ep);
+  const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => traced(toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, warnings, castIds, itemIds, layout, focusTarget, timeOf, defaults: behaviour.defaults }), `camera[${i}] (${s.shot})`, s.allow));
 
   // ---- lighting / props / sfx
   const checkMood = (m: MoodRef, where: string) => {
@@ -508,7 +509,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     duration,
     durationInFrames: Math.max(1, Math.ceil(duration * fps)),
     seed: ep.seed ?? ep.id,
-    behaviour: resolveBehaviour(ep),
+    behaviour,
     layout,
     initialMood,
     moods,
@@ -533,11 +534,13 @@ const toShot = (
   where: string,
   h: {
     errors: string[];
+    warnings: string[];
     castIds: string[];
     itemIds: Set<string>;
     layout: Layout;
     focusTarget: (f: Vec3 | string, where: string) => FocusTarget;
     timeOf: (ref: number | string, where: string) => number;
+    defaults: Defaults;
   },
 ): Shot => {
   const subjects = s.subject === undefined ? [] : Array.isArray(s.subject) ? s.subject : [s.subject];
@@ -548,7 +551,16 @@ const toShot = (
   if (s.shot === "establishing" && s.spot && !h.layout.cameras[s.spot]) h.errors.push(`${where}: unknown camera spot "${s.spot}" (has: ${Object.keys(h.layout.cameras).join(", ")})`);
   if (s.shot === "custom" && (!s.position || !s.target)) h.errors.push(`${where}: custom shot needs position and target`);
   if (!["establishing", "custom", "insert"].includes(s.shot) && !subjects.length && !s.position) h.errors.push(`${where}: ${s.shot} shot needs a subject`);
-  const moves: MoveSpec[] = (s.move === undefined ? [] : Array.isArray(s.move) ? s.move : [s.move]).map((m) => (typeof m === "string" ? { type: m } : { type: m.type, amount: m.amount, ease: m.ease }));
+  const moves: MoveSpec[] = (s.move === undefined ? [] : Array.isArray(s.move) ? s.move : [s.move]).map((m, j) =>
+    typeof m === "string" ? { type: m } : { type: m.type, amount: m.amount, ease: m.ease, ...(m.at !== undefined ? { at: h.timeOf(m.at, `${where}.move[${j}]`) } : {}), ...(m.duration !== undefined ? { duration: m.duration } : {}) },
+  );
+  const fixed = s.shot === "custom" || s.shot === "establishing" || s.shot === "over-shoulder" || (!!s.position && !!s.target);
+  const keys = s.keys?.map((k, j) => ({ ...k, at: h.timeOf(k.at, `${where}.keys[${j}]`) })).sort((a, b) => a.at - b.at);
+  if (keys?.length && fixed) h.warnings.push(`${where}: keys follow the subject and apply to framed shots (close, medium, full…); a ${s.shot} shot ignores them — use "path" for an authored flight`);
+  const path = s.path?.map((k, j) => ({ ...k, at: h.timeOf(k.at, `${where}.path[${j}]`) })).sort((a, b) => a.at - b.at);
+  for (const k of [...(keys ?? []), ...(path ?? [])]) if (k.at < at - 1e-6 || k.at > end + 1e-6) h.warnings.push(`${where}: a keyframe at ${k.at.toFixed(2)}s is outside the shot (${at.toFixed(2)}–${end.toFixed(2)}s)`);
+  // Opt-in subtle drift on shots without any authored motion.
+  if (h.defaults.cameraLife > 0 && s.move === undefined && !keys?.length && !path?.length && !s.lock) moves.push({ type: "life", amount: h.defaults.cameraLife });
   return {
     at,
     end,
@@ -578,6 +590,10 @@ const toShot = (
     allowOcclusion: s.allowOcclusion,
     blend: s.blend,
     ...(s.allow ? { allow: s.allow } : {}),
+    ...(keys?.length ? { keys } : {}),
+    ...(path?.length ? { path } : {}),
+    ...(h.defaults.focusPull ? { focusPull: 0.45 } : {}),
+    ...(h.defaults.arcBlend && s.blend ? { arcBlend: true } : {}),
   };
 };
 

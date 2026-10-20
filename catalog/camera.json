@@ -17,7 +17,8 @@
     "truck": "Slides sideways (amount = metres, default 0.6).",
     "orbit": "Circles the aim point (amount = degrees, default 30).",
     "crane": "Rises (amount = metres, default 0.6; negative descends).",
-    "handheld": "Seeded organic shake (amount = metres, default 0.012)."
+    "handheld": "Seeded organic shake (amount = metres, default 0.012).",
+    "life": "Barely visible breathing camera: slow push + drift (amount = intensity, default 1). Opt-in."
   },
   "notes": {
     "angle": "degrees around the subject from its facing (0 = frontal, + = toward its left). Authored angles are never auto-corrected.",

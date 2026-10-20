@@ -1,7 +1,9 @@
-// Framing: on every frame of every semantic shot, the subjects' faces are in frame and not turned
-// away from the camera (using the final head turn, so looks count).
+// Framing: on every frame of every semantic shot, the subjects' faces are in frame, not hidden behind
+// something (along the camera's real path: moves, keys and drift included) and not turned away from the
+// camera (using the final head turn, so looks count).
+import { segmentHitsBox } from "../camera/solve";
 import { sourceOf } from "../core/trace";
-import type { InspectContext } from "./context";
+import { segmentSegmentDistance, type InspectContext } from "./context";
 import { hitCollector, type Finding } from "./findings";
 
 /** Shots that are authored compositions or have no faces to keep (checked by other means). */
@@ -35,6 +37,21 @@ export const framingChecks = (ctx: InspectContext): Finding[] => {
         });
         continue;
       }
+      // Something between the camera and the face (the solver only clears its base position).
+      const excluded = new Set([...shot.subjects, ...(shot.allowOcclusion ?? []), ...(shot.over ? [shot.over] : []), ...(shot.item ? [shot.item] : []), ...fr.actors.flatMap((x) => Object.values(x.held))]);
+      const t = f / ctx.fps;
+      const blocker =
+        ctx.sweep.query.occluders.find((b) => !excluded.has(b.id) && segmentHitsBox(fr.camera.position, face, b))?.id ??
+        ctx.sweep.query.actorIds.find((other) => {
+          if (excluded.has(other)) return false;
+          // Bodies with volumes are tested against their capsules; others against their (coarse) box.
+          const parts = ctx.body(f, other)?.parts;
+          if (parts) return parts.some((p) => segmentSegmentDistance(fr.camera.position, face, p.a, p.b) < p.r);
+          const box = ctx.sweep.query.actorBox(other, t);
+          return !!box && segmentHitsBox(fr.camera.position, face, box);
+        });
+      if (blocker)
+        out.add(f, { key: `blocked:${k}:${id}:${blocker}`, check: "framing", kind: "face-blocked", level: "warning", object: `${id}.face`, with: blocker, source, message: `"${blocker}" is between the camera and ${id}'s face — change the angle/keys/move, or list it in the shot's \`allowOcclusion\` if the foreground is deliberate` });
       if (shot.type === "over-shoulder" || !head) continue;
       // Facing (head → face) against the direction to the camera, on the ground plane.
       const fx = face[0] - head[0];
@@ -57,5 +74,6 @@ export const framingChecks = (ctx: InspectContext): Finding[] => {
         });
     }
   });
-  return out.findings();
+  // Item volumes are coarse boxes: a sightline grazing one for a few frames is noise, a lasting block is not.
+  return out.findings().filter((x) => x.kind !== "face-blocked" || x.to - x.from >= 4 / ctx.fps);
 };

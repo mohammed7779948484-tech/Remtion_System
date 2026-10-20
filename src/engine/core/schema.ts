@@ -108,8 +108,37 @@ const Action = z.strictObject({
   allow: Allow.optional(),
 });
 
-const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld"]);
-const Move = z.union([MoveName, z.strictObject({ type: MoveName, amount: z.number().optional(), ease: Ease.optional() })]);
+const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld", "life"]);
+const Move = z.union([
+  MoveName,
+  z.strictObject({
+    type: MoveName,
+    amount: z.number().optional(),
+    ease: Ease.optional(),
+    /** When the move starts (default: the shot's start). */
+    at: TimeRef.optional(),
+    /** How long it takes (default: until the shot ends). */
+    duration: z.number().positive().optional(),
+  }),
+]);
+const Height = z.union([z.enum(["eye", "low", "high"]), z.number()]);
+/** Solver-space keyframe: values relative to the subject, so a moving subject carries the camera. */
+const ShotKey = z.strictObject({
+  at: TimeRef,
+  /** Degrees around the subject from where it faces (like the shot's `angle`). */
+  angle: z.number().optional(),
+  distance: z.number().positive().optional(),
+  /** Multiplier on the solved distance (<1 closer). */
+  size: z.number().positive().optional(),
+  height: Height.optional(),
+  lens: z.number().positive().optional(),
+  fov: z.number().positive().optional(),
+  offset: z.tuple([z.number(), z.number()]).optional(),
+  roll: z.number().optional(),
+});
+/** World-space keyframe for authored flights (crane, fly-through). */
+const PathKey = z.strictObject({ at: TimeRef, position: Vec3, target: Vec3, lens: z.number().positive().optional(), fov: z.number().positive().optional(), roll: z.number().optional() });
+const Tracking = z.union([z.boolean(), z.strictObject({ lag: z.number().min(0).optional(), lead: z.number().min(0).optional() })]);
 const FocusRef = z.union([Vec3, z.string()]);
 
 const Shot = z.strictObject({
@@ -122,7 +151,7 @@ const Shot = z.strictObject({
   anchor: z.string().optional(),
   size: z.number().positive().optional(),
   angle: z.number().optional(),
-  height: z.union([z.enum(["eye", "low", "high"]), z.number()]).optional(),
+  height: Height.optional(),
   distance: z.number().positive().optional(),
   lens: z.number().positive().optional(),
   fov: z.number().positive().optional(),
@@ -131,8 +160,14 @@ const Shot = z.strictObject({
   offset: z.tuple([z.number(), z.number()]).optional(),
   roll: z.number().optional(),
   move: z.union([Move, z.array(Move)]).optional(),
-  track: z.union([z.boolean(), z.strictObject({ lag: z.number().min(0) })]).optional(),
-  follow: z.union([z.boolean(), z.strictObject({ lag: z.number().min(0) })]).optional(),
+  /** Keyframes in the solver's terms (angle, distance/size, height, lens/fov, offset, roll), smooth through every key. */
+  keys: z.array(ShotKey).optional(),
+  /** World-space position/target keyframes (custom shots): crane moves, fly-throughs. */
+  path: z.array(PathKey).optional(),
+  /** Aim follows the subject (camera body stays); `lag` smooths, `lead` looks ahead (seconds). */
+  track: Tracking.optional(),
+  /** Camera body follows the subject too; `lag`, `lead`. */
+  follow: Tracking.optional(),
   focus: z.union([z.literal("auto"), z.literal("none"), FocusRef]).optional(),
   rack: z.array(z.strictObject({ at: TimeRef, to: FocusRef, duration: z.number().positive().optional() })).optional(),
   dof: z.union([z.literal("auto"), z.literal("off"), z.strictObject({ bokeh: z.number().min(0).optional(), range: z.number().positive().optional() })]).optional(),
@@ -155,6 +190,17 @@ export const EpisodeSchema = z.strictObject({
   profile: z.enum(PROFILE_NAMES).optional(),
   /** Findings that are deliberate for the whole episode, e.g. ["silence"] for a film built on pauses. */
   allow: Allow.optional(),
+  /**
+   * Automatic behaviour switches. Corrections default on with `engine: 2` (focus pulls between speakers, blends
+   * that arc around the subject); styles are opt-in (cameraLife: subtle drift on shots without a move, 0..2).
+   */
+  defaults: z
+    .strictObject({
+      cameraLife: z.number().min(0).max(2).optional(),
+      focusPull: z.boolean().optional(),
+      arcBlend: z.boolean().optional(),
+    })
+    .optional(),
   format: z
     .strictObject({
       width: z.number().int().positive().optional(),

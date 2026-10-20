@@ -85,6 +85,7 @@ export const makeQuery = (r: ResolvedEpisode, tracks: ActorTrack[]): SceneQuery 
     occluders: occluders(r.layout),
     bounds: r.layout.bounds,
     speakerAt: (t) => r.lines.find((l) => t >= l.start && t <= l.end)?.speaker,
+    lines: r.lines.map((l) => ({ speaker: l.speaker, start: l.start, end: l.end })).sort((a, b) => a.start - b.start),
   };
 };
 

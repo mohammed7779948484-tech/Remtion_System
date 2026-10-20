@@ -59,6 +59,8 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
 - `videos/it-works-on-my-machine/` — 16:9 skit in the shared `dev-office` set; JSON direction plus one overlay.
 - `videos/launch-promo/` — 9:16 promo on a **new location defined inside the video folder**
   (`video.data.ts` environment + custom stage components, holo-screen drawings, kinetic text overlays).
+- `videos/one-take/` — engine-2 camera choreography: one sustained `follow` shot with `keys` (an orbit from behind to a
+  low front ¾ across the floating-space bridge), an arcing blend, focus pulls, and deliberate shots marked with `allow`.
 
 ## Gotchas learned building the first videos
 

@@ -47,6 +47,23 @@
         ]
       }
     },
+    "defaults": {
+      "type": "object",
+      "properties": {
+        "cameraLife": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "focusPull": {
+          "type": "boolean"
+        },
+        "arcBlend": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
     "format": {
       "type": "object",
       "properties": {
@@ -954,7 +971,8 @@
                       "truck",
                       "orbit",
                       "crane",
-                      "handheld"
+                      "handheld",
+                      "life"
                     ]
                   },
                   {
@@ -969,7 +987,8 @@
                           "truck",
                           "orbit",
                           "crane",
-                          "handheld"
+                          "handheld",
+                          "life"
                         ]
                       },
                       "amount": {
@@ -986,6 +1005,22 @@
                           "backOut",
                           "snap"
                         ]
+                      },
+                      "at": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^([A-Za-z][\\w-]*)\\.(start|end|word:(\\d+)(?:\\.(start|end))?)([+-]\\d+(?:\\.\\d+)?)?$"
+                          }
+                        ]
+                      },
+                      "duration": {
+                        "type": "number",
+                        "exclusiveMinimum": 0
                       }
                     },
                     "required": [
@@ -1008,7 +1043,8 @@
                         "truck",
                         "orbit",
                         "crane",
-                        "handheld"
+                        "handheld",
+                        "life"
                       ]
                     },
                     {
@@ -1023,7 +1059,8 @@
                             "truck",
                             "orbit",
                             "crane",
-                            "handheld"
+                            "handheld",
+                            "life"
                           ]
                         },
                         "amount": {
@@ -1040,6 +1077,22 @@
                             "backOut",
                             "snap"
                           ]
+                        },
+                        "at": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "type": "string",
+                              "pattern": "^([A-Za-z][\\w-]*)\\.(start|end|word:(\\d+)(?:\\.(start|end))?)([+-]\\d+(?:\\.\\d+)?)?$"
+                            }
+                          ]
+                        },
+                        "duration": {
+                          "type": "number",
+                          "exclusiveMinimum": 0
                         }
                       },
                       "required": [
@@ -1052,6 +1105,152 @@
               }
             ]
           },
+          "keys": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^([A-Za-z][\\w-]*)\\.(start|end|word:(\\d+)(?:\\.(start|end))?)([+-]\\d+(?:\\.\\d+)?)?$"
+                    }
+                  ]
+                },
+                "angle": {
+                  "type": "number"
+                },
+                "distance": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "size": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "height": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "eye",
+                        "low",
+                        "high"
+                      ]
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ]
+                },
+                "lens": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "fov": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "offset": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 2,
+                  "maxItems": 2
+                },
+                "roll": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "path": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^([A-Za-z][\\w-]*)\\.(start|end|word:(\\d+)(?:\\.(start|end))?)([+-]\\d+(?:\\.\\d+)?)?$"
+                    }
+                  ]
+                },
+                "position": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "target": {
+                  "type": "array",
+                  "prefixItems": [
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    },
+                    {
+                      "type": "number"
+                    }
+                  ],
+                  "items": false,
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "lens": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "fov": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "roll": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "at",
+                "position",
+                "target"
+              ],
+              "additionalProperties": false
+            }
+          },
           "track": {
             "anyOf": [
               {
@@ -1063,11 +1262,12 @@
                   "lag": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "lead": {
+                    "type": "number",
+                    "minimum": 0
                   }
                 },
-                "required": [
-                  "lag"
-                ],
                 "additionalProperties": false
               }
             ]
@@ -1083,11 +1283,12 @@
                   "lag": {
                     "type": "number",
                     "minimum": 0
+                  },
+                  "lead": {
+                    "type": "number",
+                    "minimum": 0
                   }
                 },
-                "required": [
-                  "lag"
-                ],
                 "additionalProperties": false
               }
             ]

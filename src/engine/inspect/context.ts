@@ -131,3 +131,32 @@ export const segmentDistance = (p: Vec3, a: Vec3, b: Vec3) => {
 };
 
 export const dist3 = (a: Vec3, b: Vec3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/** Closest distance between segments p1–q1 and p2–q2. */
+export const segmentSegmentDistance = (p1: Vec3, q1: Vec3, p2: Vec3, q2: Vec3) => {
+  const d1 = [q1[0] - p1[0], q1[1] - p1[1], q1[2] - p1[2]];
+  const d2 = [q2[0] - p2[0], q2[1] - p2[1], q2[2] - p2[2]];
+  const r = [p1[0] - p2[0], p1[1] - p2[1], p1[2] - p2[2]];
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const a = dot(d1, d1);
+  const e = dot(d2, d2);
+  const f = dot(d2, r);
+  const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+  let s = 0;
+  let t = 0;
+  if (a <= 1e-12 && e <= 1e-12) return Math.hypot(...r);
+  if (a <= 1e-12) t = clamp01(f / e);
+  else {
+    const c = dot(d1, r);
+    if (e <= 1e-12) s = clamp01(-c / a);
+    else {
+      const b = dot(d1, d2);
+      const denom = a * e - b * b;
+      s = denom > 1e-12 ? clamp01((b * f - c * e) / denom) : 0;
+      t = (b * s + f) / e;
+      if (t < 0) (t = 0), (s = clamp01(-c / a));
+      else if (t > 1) (t = 1), (s = clamp01((b - c) / a));
+    }
+  }
+  return Math.hypot(p1[0] + d1[0] * s - (p2[0] + d2[0] * t), p1[1] + d1[1] * s - (p2[1] + d2[1] * t), p1[2] + d1[2] * s - (p2[2] + d2[2] * t));
+};

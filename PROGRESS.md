@@ -207,6 +207,7 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 |---|---|---|
 | M0 Safety net, picture sweep, yardstick | ✅ done | see below |
 | M1 Diagnose and explain | ✅ done | see below |
+| M2 Camera choreography | ✅ done | see below |
 
 ## M0 — safety net, picture sweep and yardstick
 - `core/behaviour.ts`: `engine` (1 default = original behaviour, 2 = current; `new` writes 2), `profile` (only
@@ -274,3 +275,30 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 - Known, for later milestones: the `facepalm` recipe aims at the face anchor (ignores the bowed head) → palm ~8 cm
   inside the head (M3 correction); the dev-office `beside-desk` mark puts an idle standing hand into the desk edge
   (shared set data; no finished video uses it — fix with M3/M8 when a production needs the mark).
+
+## M2 — camera choreography
+- Moves can start and stop inside a shot (`move.at` time ref, `duration`); without them the numbers are exactly the old
+  ones (tested equal).
+- `keys`: solver-space keyframes (angle around the subject, distance/size, height, lens/fov, offset, roll) through a
+  cubic Hermite spline with Catmull-Rom tangents in time (continuous speed through inner keys, eased ends), relative to
+  the subject so `follow` carries the camera. `path`: world-space position/target/lens/roll keys for authored flights.
+  `follow`/`track` take `lead`. New move `life` (subtle push + seeded drift), opt-in per shot or via `defaults.cameraLife`.
+- Engine 2 corrections, baked into shots by the resolver from `behaviour.defaults` (switchable): auto focus holds the
+  last speaker among the subjects and pulls over 0.45 s (sine ease) instead of snapping, also in pauses; blends arc
+  around the subject (aim straight, aim→camera vector turned and log-scaled) instead of cutting through it.
+  Module: `camera/choreo.ts` (pure math); `solve.ts` integration is small.
+- `inspect` framing now checks occlusion along the camera's real path every frame (`face-blocked`; actors with effectors
+  are tested by their capsules, coarse item boxes need ≥4 frames). On it-works it found two real monitor occlusions of
+  Rayan's face (shots 5 and 7, confirmed in `stills --at findings`).
+- Goldens: the resolved hash changed for all three finished videos (the added `behaviour.defaults`, all off for engine 1);
+  every per-second visual digest is identical — no frame changed.
+- Production acceptance — `videos/one-take/` (new example, engine 2, 14 s): a two-shot with focus pulls, an arcing
+  1.2 s blend into one `full` `follow` shot whose keys orbit from behind Rayan (stepping onto the light bridge) to his
+  side over the void to a low front ¾ as he arrives, then a locked-off wide. `inspect`: 0 warnings; the deliberate
+  back views are accepted by `allow`. Found and fixed with inspect/explain while directing it: the orbit ended behind
+  him; a mark arrival turned him away from the camera (→ `move.face: "path"`). preview-strip confirms one continuous
+  move. Not yet voiced; faces are dark (character light comes in M6).
+- Tests: 186 (choreo.test.ts: spline, windows, keys orbit around a walker + smoothness + order independence,
+  dolly-zoom, paths, lead, life only where asked, focus pull vs snap, arc vs straight blend, corrections switch off).
+- Skill: camera grammar now says shot length follows the scene (no 1–3 s rule), cookbook documents windows, keys,
+  path, lead, life and the engine-2 corrections.

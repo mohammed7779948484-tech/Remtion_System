@@ -152,6 +152,32 @@ used exactly; solver warnings in `validate` mean a blocked or out-of-frame shot,
 below a top toast. `fov` is vertical, as in three.js. In `dev-office` the monitors block many angles on the seated
 actor — try a few (`validate` is instant) before rendering stills. Close shots of the desk mascot work best from the front.
 
+**Moves inside a shot.** Moves span the shot unless timed: `{ "type": "push-in", "amount": 0.2, "at": "l3.word:4",
+"duration": 0.8 }` lands a push on a word. `move: "life"` is a barely visible breathing drift (opt-in, `amount` 0–2);
+`defaults.cameraLife` applies it to every shot without a move. `move: "static"` stays locked off.
+
+**Sustained choreography (`keys`).** Keyframes in the solver's terms, smooth through every key (no stop at each one),
+relative to the subject — with `follow` the camera rides along while orbiting:
+```json
+{ "at": "l2.end", "shot": "full", "subject": "rayan", "blend": 1.2, "follow": { "lag": 0.6, "lead": 0.3 },
+  "keys": [ { "at": "l2.end", "angle": 160 }, { "at": "l2.end+2.6", "angle": 95, "size": 1.15 },
+            { "at": "l2.end+5", "angle": 30, "size": 0.95, "height": "low" } ],
+  "allow": ["back-of-head"] }
+```
+(`videos/one-take`: a 7 s walk across the light bridge, from behind to a low front ¾.) Key fields: `angle` (as above),
+`distance` or `size`, `height`, `lens`/`fov` (key distance and lens together for a dolly-zoom), `offset`, `roll`. Values
+hold until a later key changes them. `angle` is measured from the subject's facing mid-shot: a mark arrival turns the
+actor to the mark's yaw — use `move.face: "path"` to keep the walking direction. Authored keys are never corrected:
+`inspect` checks the real path (faces blocked or out of frame, camera inside geometry). `follow`/`track` take
+`{ "lag": s, "lead": s }` (lead looks ahead of a walker).
+
+**Authored flights (`path`).** World-space keys on a `custom` shot: `"path": [{ "at": 0, "position": [0,1,4],
+"target": [0,1,0] }, { "at": 4, "position": [1,3,3], "target": [0,0.8,0], "lens": 28 }]` (crane, fly-through).
+
+**Engine 2 corrections** (on by default with `"engine": 2`, off with `"defaults": { "focusPull": false, "arcBlend":
+false }`): auto focus holds the last speaker and pulls (~0.45 s) instead of snapping; `blend` arcs around the subject
+instead of moving in a straight line through it.
+
 ## 10. Sound
 ```json
 "sfx": [{ "at": 0.48, "sound": "key-slam", "volume": 0.9 }, { "at": "l2.end+0.1", "sound": "whoosh", "volume": 0.5 }]

@@ -55,13 +55,32 @@ export const PROFILES = {
 export type ProfileName = keyof typeof PROFILES;
 export const PROFILE_NAMES = Object.keys(PROFILES) as [ProfileName, ...ProfileName[]];
 
-export type Behaviour = { engine: EngineVersion; profile: ProfileName; allow: Intent[] };
+/** Automatic behaviour, resolved: corrections default on with engine 2, styles are opt-in (0 / false = off). */
+export type Defaults = {
+  /** Subtle drift (`life` move) on shots that have no move, 0..2. */
+  cameraLife: number;
+  /** Auto focus holds the last speaker and pulls (≈0.45 s) instead of snapping. */
+  focusPull: boolean;
+  /** Blends between shots arc around the subject instead of moving in a straight line. */
+  arcBlend: boolean;
+};
 
-export const resolveBehaviour = (ep: { engine?: EngineVersion; profile?: ProfileName; allow?: Intent[] }): Behaviour => ({
-  engine: ep.engine ?? 1,
-  profile: ep.profile ?? "standard",
-  allow: ep.allow ?? [],
-});
+export type Behaviour = { engine: EngineVersion; profile: ProfileName; allow: Intent[]; defaults: Defaults };
+
+export const resolveBehaviour = (ep: { engine?: EngineVersion; profile?: ProfileName; allow?: Intent[]; defaults?: Partial<Defaults> }): Behaviour => {
+  const engine = ep.engine ?? 1;
+  const corrections = engine >= 2;
+  return {
+    engine,
+    profile: ep.profile ?? "standard",
+    allow: ep.allow ?? [],
+    defaults: {
+      cameraLife: ep.defaults?.cameraLife ?? 0,
+      focusPull: ep.defaults?.focusPull ?? corrections,
+      arcBlend: ep.defaults?.arcBlend ?? corrections,
+    },
+  };
+};
 
 export const profileOf = (b: Pick<Behaviour, "profile">): Profile => PROFILES[b.profile];
 

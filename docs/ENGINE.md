@@ -44,7 +44,7 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
 | Checks | `inspect/inspect.ts` + `framing/camera/motion/contact/overlay/grammar.ts`, `findings.ts`, `context.ts` | findings with time, object, level, source, intent |
 | Explain | `inspect/explain.ts` | every layer of an actor / the camera at a time, with sources |
 | Provenance | `core/trace.ts` | where each resolved cue came from (filled when inspect/explain ask) |
-| Camera | `camera/solve.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus |
+| Camera | `camera/solve.ts` (pure), `camera/choreo.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus; keyframe splines, paths, `life`, arc blends |
 | Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
 | Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
 | Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, playback |

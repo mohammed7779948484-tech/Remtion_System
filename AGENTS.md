@@ -11,7 +11,7 @@ repo are made with this engine, not with other video frameworks.
 ## Commands
 
 ```
-npm run cli -- list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos]
+npm run cli -- list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos|direction]
 npm run cli -- show actor rayan            # or: prop giant_keyboard | environment micro-keyboard | mood macro-warm | screen window | fx callout | sfx key-slam
 npm run cli -- new <slug> [--env dev-office|micro-keyboard|floating-space|custom] [--preset portrait] [--title "..."]   # writes BRIEF.md; 9:16 default
 npm run cli -- voice <slug>                          # free offline voices (drafts)
@@ -32,7 +32,12 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
   `set.remove / move / params / add` overrides, never by editing shared data. Import only from `src/engine`.
 - **Change the shared engine only for reusable capabilities** (a new prop, pose, recipe, accent, mood, shot
   behaviour). Then: add/adjust tests, `npm run catalog`, `npm test`, and re-run `stills` of existing videos to check
-  for regressions (byte-identical, or only harmless 1–3/255 GPU noise on translucent effects).
+  for regressions (byte-identical, or only harmless 1–3/255 GPU noise on translucent effects). `npm test` includes
+  golden hashes of every finished video's frame-by-frame visual state: a failure means the change reached the
+  picture of an existing video. New automatic behaviour must read the resolved `behaviour` (`engine: 2`, profile,
+  `allow`) so engine-1 videos stay exactly as they are; refresh goldens (`UPDATE_GOLDENS=1`) only for intended changes.
+- **Creative intent**: static shots, silence, darkness and restraint are valid. When a check reports something
+  you did on purpose, mark it with `allow` on the shot or episode (`list direction`); it is then listed as accepted.
 - **Determinism** (custom code too): everything must be a pure function of the frame. Use
   `useCurrentFrame()`/`useEpisode().t`, Remotion `interpolate`/`spring`/`random(seed)`, `@remotion/noise`.
   Never `Math.random`, `Date`, `useFrame` animation, damping/accumulation, or async-loaded content without

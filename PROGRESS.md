@@ -193,3 +193,44 @@ Method: watched by frame sheets from the real MP4 (`review` sheet: every shot + 
 - Deferred from the plan: `floating-space` preset (`new --env custom` covers new worlds today), a 3D chat screen,
   music ducking.
 - Optional: `render --master` the two V1 videos (−16.8 / −17.3 LUFS as originally mixed).
+
+---
+
+# V3 — Production Quality Upgrade (started 2026-10-19, branch `v3`)
+
+Plan (approved): M0 safety net and picture sweep → M1 diagnose/explain → M2 camera choreography → M3 performance →
+M4 voice performance and speech motion → M5 sound and mix → M6 look and captions → M7 delivery → M8 skill, pilot, evals.
+Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-in, engine 2 only corrects clear defects;
+`allow` marks deliberate choices; every milestone updates the skill/docs it affects.
+
+| Milestone | State | Notes |
+|---|---|---|
+| M0 Safety net, picture sweep, yardstick | ✅ done | see below |
+
+## M0 — safety net, picture sweep and yardstick
+- `core/behaviour.ts`: `engine` (1 default = original behaviour, 2 = current; `new` writes 2), `profile` (only
+  `standard`, reproducing today's thresholds), `allow` intents on the episode or a shot (`silence`, `slow-open`,
+  `offscreen`, `back-of-head`). `validate` reports matching findings as `~ accepted by intent`, never hides them.
+  Catalog: `catalog/direction.json`, `list direction`.
+- Pure extractions (no behaviour change): `fx/state.ts` (shake → `cameraWithFx`, glitch → `chromaAt`, active
+  screen accents, accent placement, callout geometry), `audio/captionLayout.ts` (pages, page at time, layout
+  constants). `scripts/video.ts`: shared Node loader for the CLI and tests.
+- `inspect/sweep.ts`: per-frame visual state (actors, rendered camera, mood, chroma, prop states, screen accents,
+  caption page) + per-second digests. `tests/golden.test.ts` + `tests/goldens/` freeze the three finished videos.
+- **No-op proof**: a dump of the resolved episodes and every frame's actors/camera/chroma/mood/props/caption pages
+  made with the v2 code equals the new code paths exactly (2,711 frames, 0 differing fields, no rounding). Stills vs a
+  fresh v2 baseline (`out/baseline-v3/`): 28/35 byte-identical, 7 at 91–116 dB PSNR with 0.0000 % of pixels over
+  3/255 (the known translucent-effect GPU noise). `validate` on the three videos: same warnings as v2 (header adds
+  engine/profile).
+- Latent bugs fixed: `validate` now evaluates scenes with the video's custom actor definitions; camera `move.ease`
+  is a checked enum (an unknown ease used to reach the renderer as `undefined`).
+- **Fault set** (`tests/faults/`, loader `tests/fault-set.ts`): 7 visual faults (teleport, arm through face during
+  a joints blend, caption over face, camera pushed into the desk, cut mid-word, floating feet, focus on an off-screen
+  actor), each with the expected check/time/object/source, plus 2 intent controls (deliberate silence, deliberate
+  exit). Detection is asserted from M1 on; audio/delivery faults arrive with their checks (M4/M5/M7).
+- Timing spike (ctrl-z, 1080×1920): `stills` CLI 11–14 s per video (8–15 frames incl. contact sheet); raw render
+  1 frame 7.4 s, 15 frames 9.1 s; `remotion bundle` alone 3.6 s ≈ 40 % of a stills run → bundle reuse is justified
+  (M7, with episode/voice injected as props so edits don't need a rebuild). Scene sweep: ~2,700 frames in ~3 s.
+- Baseline yardstick: skill-eval agents needed 1,017–1,421 s and ~250 k tokens to reach validated stills (V2 eval
+  round 2). Face exposure is measured from M6 on, against the baseline sheets kept in `out/baseline-v3/`.
+- Tests: 155 (16 files), tsc clean.

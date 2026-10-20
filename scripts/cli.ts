@@ -1,5 +1,5 @@
 // Agent-facing CLI:  npm run cli -- <command> [...]
-//   list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos]
+//   list [actors|props|environments|shots|moves|moods|screens|fx|sfx|videos|direction]
 //   show <actor|prop|environment|mood|screen|fx|sfx> <id>
 //   new <slug> [--preset portrait|landscape|square] [--env <environment>|custom] [--title "..."]  (writes BRIEF.md)
 //   voice <slug> [--provider elevenlabs|system|fixture] [--force]   |   voice --check (free: plan, models, voices)
@@ -11,15 +11,15 @@
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { auditAudio, isMissingFile } from "../src/engine/audio/audit";
-import { cameraAt, project, shotLayout } from "../src/engine/camera/solve";
-import { beatSheet, pacingNotes } from "../src/engine/core/pacing";
-import { resolveEpisode, type ResolvedEpisode } from "../src/engine/core/timeline";
+import { cameraAt, project, shotLayout, type Shot } from "../src/engine/camera/solve";
+import { accepts, profileOf, type Intent } from "../src/engine/core/behaviour";
+import { beatSheet, pacingFindings } from "../src/engine/core/pacing";
+import type { ResolvedEpisode } from "../src/engine/core/timeline";
 import { ENVIRONMENTS } from "../src/engine/world/environments";
-import type { VideoData } from "../src/engine/player/defineVideo";
 import { buildTracks, makeQuery } from "../src/engine/player/scene";
 import { buildCatalog, writeCatalog } from "./catalog";
+import { resolveVideo } from "./video";
 import { elevenLabsAccount, generateVoices, parseProvider, readManifest } from "./voice";
 
 const ROOT = process.cwd();
@@ -49,24 +49,11 @@ const hasFfmpeg = () => spawnSync("ffmpeg", ["-version"], { shell: true }).statu
 
 const videoDir = (slug: string) => path.join(ROOT, "videos", slug);
 const publicExists = (p: string) => fs.existsSync(path.join(ROOT, "public", p));
-const loadVideo = async (slug: string) => {
-  const dir = videoDir(slug);
-  if (!fs.existsSync(path.join(dir, "episode.json"))) fail(`videos/${slug}/episode.json not found (npm run cli -- list videos)`);
-  const episode = JSON.parse(fs.readFileSync(path.join(dir, "episode.json"), "utf8"));
-  let data: VideoData = {};
-  const dataFile = path.join(dir, "video.data.ts");
-  if (fs.existsSync(dataFile)) {
-    const mod = await import(pathToFileURL(dataFile).href);
-    data = (mod.default?.default ?? mod.default ?? mod.data ?? {}) as VideoData;
-  }
-  const ctx = { environments: data.environments, actors: data.actorDefs, components: data.componentKinds ?? [], screens: data.screenKinds ?? [] };
-  return { episode, ctx, manifest: readManifest(ROOT, slug) };
-};
 
-const resolve = async (slug: string): Promise<ResolvedEpisode> => {
-  const { episode, ctx, manifest } = await loadVideo(slug);
+/** Resolved episode plus the video's custom actor definitions (for scene evaluation). */
+const resolve = async (slug: string) => {
   try {
-    return resolveEpisode(episode, manifest, ctx);
+    return await resolveVideo(ROOT, slug);
   } catch (e) {
     return fail((e as Error).message);
   }
@@ -113,6 +100,13 @@ const list = async () => {
             use for: ${v.pickWhen}
             params: ${v.params.join(", ")}`)),
     videos: () => fs.readdirSync(path.join(ROOT, "videos"), { withFileTypes: true }).filter((d) => d.isDirectory()).forEach((d) => console.log(`  ${d.name}`)),
+    direction: () => {
+      const d = cat["direction.json"] as { profiles: Record<string, { description: string }>; intents: Record<string, string> };
+      console.log("  profiles (episode `profile`):");
+      for (const [k, v] of Object.entries(d.profiles)) console.log(`    ${k.padEnd(14)} ${v.description}`);
+      console.log("  intents (`allow` on the episode or a shot — reported as accepted, never hidden):");
+      for (const [k, v] of Object.entries(d.intents)) console.log(`    ${k.padEnd(14)} ${v}`);
+    },
   };
   if (kind && !sections[kind]) fail(`unknown list kind "${kind}" (${Object.keys(sections).join(", ")})`);
   for (const [name, fn] of Object.entries(sections)) {
@@ -227,6 +221,9 @@ const newVideo = () => {
     $schema: "../../catalog/episode.schema.json",
     id: slug,
     title: flag("title") ?? slug,
+    // Current engine behaviour and the profile's checks, written out so they are visible and editable.
+    engine: 2,
+    profile: "standard",
     format: { preset },
     set: { environment: envId },
     cast: {
@@ -289,9 +286,14 @@ const voice = async () => {
 
 const validate = async () => {
   const slug = positional[1] ?? fail("usage: validate <slug>");
-  const r = await resolve(slug);
+  const { resolved: r, actorDefs } = await resolve(slug);
   const problems: string[] = [];
-  const notes: string[] = [...r.warnings, ...pacingNotes(r)];
+  const notes: string[] = [...r.warnings];
+  // Findings the director marked as deliberate (`allow`) stay listed, as accepted.
+  const accepted: string[] = [];
+  const observe = (intent: Intent, text: string, shot?: Shot) => (accepts(intent, r.behaviour, shot) ? accepted.push(`${text} (allow: ${intent})`) : notes.push(text));
+  const profile = profileOf(r.behaviour);
+  for (const p of pacingFindings(r, { hook: profile.hook, deadAir: profile.deadAir })) observe(p.intent, p.text);
   if (!fs.existsSync(path.join(videoDir(slug), "BRIEF.md"))) notes.push("no BRIEF.md: write the hook, beats and payoff before directing (npm run cli -- new writes a template)");
   // Missing files are errors even for drafts; unvoiced/stale lines only block final renders.
   const audio = auditAudio(r, publicExists);
@@ -300,7 +302,7 @@ const validate = async () => {
   const manifest = readManifest(ROOT, slug);
   if (process.env.ELEVENLABS_API_KEY && manifest && Object.values(manifest.lines).some((l) => l.provider !== "elevenlabs")) notes.push("info: clips use offline voices; `voice <slug> --provider elevenlabs` would re-voice them (paid, changes timing)");
 
-  const tracks = buildTracks(r);
+  const tracks = buildTracks(r, actorDefs);
   const q = makeQuery(r, tracks);
   const aspect = r.width / r.height;
   r.shots.forEach((shot, i) => {
@@ -315,7 +317,7 @@ const validate = async () => {
         const p = q.anchor(id, "face", t);
         if (!p) continue;
         const n = project(f, p, aspect);
-        if (n.depth <= 0 || Math.abs(n.x) > 1 || Math.abs(n.y) > 1) notes.push(`${label}: ${id}'s face is out of frame at ${t.toFixed(2)}s`);
+        if (n.depth <= 0 || Math.abs(n.x) > 1 || Math.abs(n.y) > 1) observe("offscreen", `${label}: ${id}'s face is out of frame at ${t.toFixed(2)}s`, shot);
         // Back of the head: the body faces away from the camera (looks/turns during the shot change this).
         const head = q.anchor(id, "head", t);
         if (head && u === 0.5 && shot.type !== "over-shoulder") {
@@ -324,16 +326,17 @@ const validate = async () => {
           const cx = f.position[0] - p[0];
           const cz = f.position[2] - p[2];
           const cos = (fx * cx + fz * cz) / Math.max(1e-6, Math.hypot(fx, fz) * Math.hypot(cx, cz));
-          if (cos < -0.2) notes.push(`${label}: the camera sees the back of ${id} at ${t.toFixed(2)}s — author an \`angle\`, add \`look: "camera"\`, or cut elsewhere`);
+          if (cos < -0.2) observe("back-of-head", `${label}: the camera sees the back of ${id} at ${t.toFixed(2)}s — author an \`angle\`, add \`look: "camera"\`, or cut elsewhere`, shot);
         }
       }
     }
   });
 
-  console.log(`${r.title} — ${r.width}×${r.height} @ ${r.fps}fps, ${r.duration.toFixed(2)}s (${r.durationInFrames} frames), ${r.shots.length} shots, ${r.lines.length} lines`);
+  console.log(`${r.title} — ${r.width}×${r.height} @ ${r.fps}fps, ${r.duration.toFixed(2)}s (${r.durationInFrames} frames), ${r.shots.length} shots, ${r.lines.length} lines · engine ${r.behaviour.engine}, profile ${r.behaviour.profile}`);
   // Beat sheet: everything that happens, in time order (review pacing without rendering).
   for (const b of beatSheet(r)) console.log(`  ${b.at.toFixed(2).padStart(6)}${b.kind === "line" ? `–${b.end!.toFixed(2).padEnd(6)}` : " ".repeat(7)} ${b.kind.padEnd(6)} ${b.text}`);
   for (const n of notes) console.log(`⚠ ${n}`);
+  for (const a of accepted) console.log(`~ accepted by intent: ${a}`);
   for (const p of problems) console.log(`✖ ${p}`);
   if (problems.length) process.exit(1);
   console.log(`✔ ${slug} is valid${notes.length ? ` (${notes.length} warning${notes.length > 1 ? "s" : ""})` : ""}`);
@@ -349,7 +352,7 @@ const stillFrames = (r: ResolvedEpisode) => {
 
 const stills = async () => {
   const slug = positional[1] ?? fail("usage: stills <slug>");
-  const r = await resolve(slug);
+  const { resolved: r } = await resolve(slug);
   const frames = stillFrames(r);
   const out = path.join("out", slug, "stills");
   fs.rmSync(path.join(ROOT, out), { recursive: true, force: true });
@@ -403,7 +406,7 @@ const stills = async () => {
 
 const render = async () => {
   const slug = positional[1] ?? fail("usage: render <slug> [--draft] [--out file] [--timeout ms]");
-  const r = await resolve(slug); // fail fast on invalid direction
+  const { resolved: r } = await resolve(slug); // fail fast on invalid direction
   const draft = has("draft");
   const audio = auditAudio(r, publicExists);
   for (const w of audio.warnings) console.log(`⚠ ${w}`);
@@ -437,7 +440,7 @@ const review = async () => {
   const mp4 = flag("file") ?? path.join("out", `${slug}.mp4`);
   if (!fs.existsSync(path.join(ROOT, mp4))) fail(`${mp4} not found — run \`npm run cli -- render ${slug}\` first`);
   if (!hasFfmpeg()) fail("review needs ffmpeg on PATH");
-  const r = await resolve(slug);
+  const { resolved: r } = await resolve(slug);
   const run = (a: string[]) => spawnSync("ffmpeg", a, { cwd: ROOT, encoding: "utf8", maxBuffer: 1 << 28 });
 
   // Frames: the middle of every shot and the peak of every screen accent, in time order.

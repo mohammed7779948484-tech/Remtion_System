@@ -1,7 +1,9 @@
 // Episode direction schema (zod). Strict objects so typos fail validation instead of being
 // silently ignored. `npm run catalog` exports this as catalog/episode.schema.json.
 import { z } from "zod";
+import { ENGINE_VERSIONS, INTENT_NAMES, PROFILE_NAMES } from "./behaviour";
 import { FxEntry } from "./fx";
+import { EASINGS, type EaseName } from "./time";
 
 /** Seconds, or a reference: "l2.start", "l2.end+0.3", "l3.word:4" (4th word start), "l3.word:4.end-0.1". */
 export const TIME_REF_RE = /^([A-Za-z][\w-]*)\.(start|end|word:(\d+)(?:\.(start|end))?)([+-]\d+(?:\.\d+)?)?$/;
@@ -10,6 +12,9 @@ export const TimeRef = z.union([z.number().min(0), z.string().regex(TIME_REF_RE,
 const Vec3 = z.tuple([z.number(), z.number(), z.number()]);
 /** A world point, a set mark name, or "<actor>[.<anchor>]" / "camera" for look targets. */
 const Place = z.union([Vec3, z.string()]);
+const Ease = z.enum(Object.keys(EASINGS) as [EaseName, ...EaseName[]]);
+/** Findings accepted on purpose (see core/behaviour.ts INTENTS): reported as "accepted by intent". */
+const Allow = z.array(z.enum(INTENT_NAMES));
 
 const Voice = z.strictObject({
   elevenlabs: z
@@ -65,7 +70,7 @@ const Action = z.strictObject({
       speed: z.number().positive().optional(),
       face: z.union([z.literal("path"), z.literal("keep"), z.number()]).optional(),
       /** Timing curve: smooth (default), in (accelerate — falls), out (decelerate — lands softly), linear, snap, backOut, inOut. */
-      ease: z.enum(["linear", "in", "out", "inOut", "smooth", "backOut", "snap"]).optional(),
+      ease: Ease.optional(),
     })
     .optional(),
   /** Turn to a yaw (degrees) or toward a place/actor. */
@@ -100,7 +105,7 @@ const Action = z.strictObject({
 });
 
 const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld"]);
-const Move = z.union([MoveName, z.strictObject({ type: MoveName, amount: z.number().optional(), ease: z.string().optional() })]);
+const Move = z.union([MoveName, z.strictObject({ type: MoveName, amount: z.number().optional(), ease: Ease.optional() })]);
 const FocusRef = z.union([Vec3, z.string()]);
 
 const Shot = z.strictObject({
@@ -130,6 +135,8 @@ const Shot = z.strictObject({
   lock: z.boolean().optional(),
   allowOcclusion: z.array(z.string()).optional(),
   blend: z.number().min(0).optional(),
+  /** Findings in this shot that are deliberate, e.g. ["offscreen"], ["back-of-head"]. */
+  allow: Allow.optional(),
 });
 
 const MoodRef = z.union([z.string(), z.record(z.string(), z.unknown())]);
@@ -138,6 +145,12 @@ export const EpisodeSchema = z.strictObject({
   $schema: z.string().optional(),
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "kebab-case id"),
   title: z.string(),
+  /** Engine behaviour version: 2 = current defaults (what `new` writes); omitted = 1, the original behaviour. */
+  engine: z.literal(ENGINE_VERSIONS).optional(),
+  /** Production profile: default behaviours and check thresholds (catalog/direction.json). */
+  profile: z.enum(PROFILE_NAMES).optional(),
+  /** Findings that are deliberate for the whole episode, e.g. ["silence"] for a film built on pauses. */
+  allow: Allow.optional(),
   format: z
     .strictObject({
       width: z.number().int().positive().optional(),

@@ -1,0 +1,25 @@
+{
+  "engine": {
+    "versions": [
+      1,
+      2
+    ],
+    "note": "`engine: 2` = current behaviour (what `new` writes); omitted = 1, the original behaviour, kept exactly for older videos."
+  },
+  "profiles": {
+    "standard": {
+      "description": "Short-form defaults: something happens within 1.5 s and no stretch of more than 1.5 s without a line, action, cut or sound.",
+      "hook": 1.5,
+      "deadAir": 1.5
+    }
+  },
+  "intents": {
+    "silence": "long pauses are deliberate (dead-air notes are accepted)",
+    "slow-open": "the opening is deliberately slow (no-hook notes are accepted)",
+    "offscreen": "a subject's face leaves the frame on purpose",
+    "back-of-head": "seeing the back of a subject is deliberate"
+  },
+  "notes": {
+    "allow": "`allow: [intent, ...]` on the episode or a shot marks a finding as deliberate: it is reported as accepted by intent, never hidden."
+  }
+}

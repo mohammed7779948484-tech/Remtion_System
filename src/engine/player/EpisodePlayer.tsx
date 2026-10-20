@@ -21,9 +21,8 @@ import { itemParamsAt } from "../world/layout";
 import { PROP_VIEWS, type PropViewProps } from "../world/props";
 import type { DrawFn } from "../world/Screen";
 import { SetView } from "../world/SetView";
-import { fxEnvelope } from "../core/fx";
-import { noise } from "../core/time";
 import { FxOverlay } from "../fx/FxOverlay";
+import { cameraWithFx, chromaAt } from "../fx/state";
 import { FxWorld } from "../fx/FxWorld";
 import { buildTracks, evaluateScene, makeQuery } from "./scene";
 
@@ -100,19 +99,8 @@ export const EpisodePlayer: React.FC<{ resolved: ResolvedEpisode; children?: Rea
   const scene = evaluateScene(resolved, tracks, query, t);
   // Accents that act on the camera / post: shake offsets the one frame everything uses (camera,
   // callout projection), the glitch drives the chromatic aberration. Pure in t.
-  let camera = scene.camera;
-  for (const f of resolved.fx) {
-    if (f.type !== "shake") continue;
-    const w = fxEnvelope(f, t, 0.01);
-    if (w <= 0) continue;
-    const amt = Number(f.data.amount ?? 0.06) * w;
-    const hz = Number(f.data.frequency ?? 18);
-    const o = (k: string) => noise(`${f.seed}${k}`, t, hz) * amt;
-    camera = { ...camera, position: [camera.position[0] + o("px"), camera.position[1] + o("py"), camera.position[2] + o("pz")], target: [camera.target[0] + o("tx") * 1.6, camera.target[1] + o("ty") * 1.6, camera.target[2] + o("tz") * 1.6] };
-  }
-  const chroma = resolved.post?.chroma
-    ? resolved.fx.reduce((sum, f) => (f.type === "glitch" ? sum + Number(f.data.amount ?? 1) * fxEnvelope(f, t, 0.03) * (0.6 + 0.4 * noise(`${f.seed}g`, t, 30)) : sum), 0)
-    : undefined;
+  const camera = cameraWithFx(resolved.fx, scene.camera, t);
+  const chroma = chromaAt(resolved.fx, resolved.post, t);
 
   const held = new Set<string>();
   for (const a of scene.actors) for (const item of Object.values(a.held)) held.add(item);

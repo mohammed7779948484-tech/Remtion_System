@@ -30,6 +30,7 @@
     "dof": "auto | off | { bokeh, range }",
     "lock": "true = no automatic corrections at all",
     "allowOcclusion": "ids allowed to block the view (deliberate foreground)",
-    "blend": "seconds to blend from the previous shot instead of cutting"
+    "blend": "seconds to blend from the previous shot instead of cutting",
+    "allow": "findings in this shot that are deliberate, e.g. [\"offscreen\"] (catalog/direction.json intents)"
   }
 }

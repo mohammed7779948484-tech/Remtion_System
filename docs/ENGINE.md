@@ -22,6 +22,33 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
   the cue history; idle motion uses seeded noise; mouths read precomputed envelopes; the camera's shot
   layout is computed once per shot and tracking uses a fixed time window over pure trajectories.
   `npm run cli -- stills <slug> --verify` renders frames in two different orders and compares bytes.
+- **Engine version, profile, intent** (`core/behaviour.ts`): `engine: 2` (what `new` writes) opts into
+  current defaults; omitted means 1, the original behaviour, kept exactly for older videos. Every new
+  automatic behaviour reads only from the resolved `behaviour`, never from the engine version directly.
+  `profile` names the check thresholds (`list direction`). `allow: [...]` on the episode or a shot marks a
+  finding as deliberate: it is reported as "accepted by intent", never hidden.
+- **Visual state** (`inspect/sweep.ts`): `createSweep(resolved).at(frame)` is everything the picture
+  depends on (actors, the rendered camera incl. shake, mood, prop states, screen accents, caption page),
+  ~1 ms per frame in Node. Goldens (`tests/goldens/`) hash it for every finished video, so `npm test`
+  fails on any unintended change; accept an intended one with `UPDATE_GOLDENS=1 npx vitest run tests/golden.test.ts`.
+
+### Module map (where things live)
+
+| Area | Module | Responsibility |
+|---|---|---|
+| Direction | `core/schema.ts`, `core/timeline.ts`, `core/recipes.ts`, `core/fx.ts` | episode.json schema → resolved, absolute-time data |
+| Behaviour | `core/behaviour.ts` | engine version, profiles, intents (the only switch for new defaults) |
+| Pacing | `core/pacing.ts` | beat sheet, pacing findings |
+| Scene | `player/scene.ts` | pure per-frame evaluation (actors, camera, mood) |
+| Visual state | `inspect/sweep.ts` | per-frame picture state + digests (goldens, checks, remix gate) |
+| Camera | `camera/solve.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus |
+| Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
+| Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
+| Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, playback |
+| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides |
+| Node tools | `scripts/cli.ts`, `scripts/video.ts` (loader), `scripts/catalog.ts` | CLI, video loading, catalog |
+
+Engine code stays pure and browser-safe; file system, ffmpeg and HTTP live in `scripts/`.
 
 ## 2. `episode.json`
 

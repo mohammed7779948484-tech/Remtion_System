@@ -12,6 +12,31 @@
     "title": {
       "type": "string"
     },
+    "engine": {
+      "type": "number",
+      "enum": [
+        1,
+        2
+      ]
+    },
+    "profile": {
+      "type": "string",
+      "enum": [
+        "standard"
+      ]
+    },
+    "allow": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "silence",
+          "slow-open",
+          "offscreen",
+          "back-of-head"
+        ]
+      }
+    },
     "format": {
       "type": "object",
       "properties": {
@@ -897,7 +922,16 @@
                         "type": "number"
                       },
                       "ease": {
-                        "type": "string"
+                        "type": "string",
+                        "enum": [
+                          "linear",
+                          "in",
+                          "out",
+                          "inOut",
+                          "smooth",
+                          "backOut",
+                          "snap"
+                        ]
                       }
                     },
                     "required": [
@@ -942,7 +976,16 @@
                           "type": "number"
                         },
                         "ease": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "linear",
+                            "in",
+                            "out",
+                            "inOut",
+                            "smooth",
+                            "backOut",
+                            "snap"
+                          ]
                         }
                       },
                       "required": [
@@ -1122,6 +1165,18 @@
           "blend": {
             "type": "number",
             "minimum": 0
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "silence",
+                "slow-open",
+                "offscreen",
+                "back-of-head"
+              ]
+            }
           }
         },
         "required": [

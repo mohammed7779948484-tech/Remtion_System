@@ -11,6 +11,9 @@ Prints a beat sheet (everything in time order) and then:
 - `⚠ … has no param …` / `unknown screen preset` — typo; the item would silently ignore it.
 - `⚠ shot N … sees the back of <actor>` — that actor faces away from the camera mid-shot (looking at someone, turned by
   a recipe). Author an `angle`, add `look: "camera"`, or cut elsewhere.
+- `~ accepted by intent: …` — a finding you marked as deliberate with `allow` (on the shot or the episode; intents:
+  `npm run cli -- list direction`). Use it when the choice is creative — a long silence, a slow open, an exit from
+  frame, a back-of-head shot — not to hide a mistake. Accepted findings stay in the output and go in your report.
 
 ## stills
 `stills <slug> --guides` renders the middle of every shot into `out/<slug>/contact.png`, shading the vertical-video

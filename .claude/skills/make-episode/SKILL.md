@@ -99,7 +99,9 @@ npm run cli -- stills <slug> --frames 18,360 --verify   # spot checks → contac
 
 Look at the contact sheet like a viewer on a phone: faces visible and lit, the gag readable in each shot, text big
 enough and outside the shaded platform-UI zones, nothing important cropped. `references/qa-render.md` lists what
-each warning means and the fixes that came up in practice.
+each warning means and the fixes that came up in practice. Warnings are questions, not rules: when something is a
+deliberate choice (a held silence, a slow open, a character leaving frame), mark it with `allow` on the shot or the
+episode and it is reported as accepted instead.
 
 ## 7. Render and review
 

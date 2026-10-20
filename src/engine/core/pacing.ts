@@ -25,20 +25,26 @@ export const beatSheet = (r: ResolvedEpisode): Beat[] => {
   return beats.sort((x, y) => x.at - y.at);
 };
 
-/** Short-form pacing notes: a hook in the first 1.5 s and no dead air longer than 1.5 s. */
-export const pacingNotes = (r: ResolvedEpisode, opts: { hook?: number; deadAir?: number } = {}): string[] => {
+/** A pacing observation; `intent` names the `allow` entry that marks it as deliberate. */
+export type PacingFinding = { kind: "hook" | "dead-air"; intent: "slow-open" | "silence"; at: number; text: string };
+
+/** Pacing observations: nothing happening in the first `hook` seconds, or stretches over `deadAir` seconds. */
+export const pacingFindings = (r: ResolvedEpisode, opts: { hook?: number; deadAir?: number } = {}): PacingFinding[] => {
   const hook = opts.hook ?? 1.5;
   const dead = opts.deadAir ?? 1.5;
   const beats = beatSheet(r).filter((b) => !(b.kind === "cut" && b.at === 0));
-  const notes: string[] = [];
-  if (!beats.some((b) => b.at < hook)) notes.push(`pacing: nothing is said, heard or changes in the first ${hook}s — open on the hook (a line, a sound hit, an action or a cut)`);
+  const found: PacingFinding[] = [];
+  if (!beats.some((b) => b.at < hook)) found.push({ kind: "hook", intent: "slow-open", at: 0, text: `pacing: nothing is said, heard or changes in the first ${hook}s — open on the hook (a line, a sound hit, an action or a cut)` });
   // Gaps where nothing is active (lines, moves, events span time; cuts/sfx/props count as instants).
   const spans = beats.map((b) => [b.at, Math.max(b.end ?? b.at, b.at + 0.25)] as const).sort((a, b) => a[0] - b[0]);
   let cursor = 0;
   const lastBusy = Math.max(0, ...spans.map((s) => s[1]));
   for (const [a, b] of spans) {
-    if (a - cursor > dead && cursor < lastBusy) notes.push(`pacing: ${(a - cursor).toFixed(1)}s of dead air ${cursor.toFixed(2)}–${a.toFixed(2)}s (no line, action, cut or sound)`);
+    if (a - cursor > dead && cursor < lastBusy) found.push({ kind: "dead-air", intent: "silence", at: cursor, text: `pacing: ${(a - cursor).toFixed(1)}s of dead air ${cursor.toFixed(2)}–${a.toFixed(2)}s (no line, action, cut or sound)` });
     cursor = Math.max(cursor, b);
   }
-  return notes;
+  return found;
 };
+
+/** Short-form pacing notes: a hook in the first 1.5 s and no dead air longer than 1.5 s. */
+export const pacingNotes = (r: ResolvedEpisode, opts: { hook?: number; deadAir?: number } = {}): string[] => pacingFindings(r, opts).map((f) => f.text);

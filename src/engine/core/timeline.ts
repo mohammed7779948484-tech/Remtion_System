@@ -11,6 +11,7 @@ import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropC
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { CODE_LANGS, COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
 import { SFX_INFO } from "../audio/sfx.data";
+import { resolveBehaviour, type Behaviour } from "./behaviour";
 import { FX_INFO, type ResolvedFx } from "./fx";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
 import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeAction, type EpisodeShot } from "./schema";
@@ -62,6 +63,8 @@ export type ResolvedEpisode = {
   duration: number;
   durationInFrames: number;
   seed: string;
+  /** Engine version, profile and episode-level intent: the only switch for new automatic behaviour. */
+  behaviour: Behaviour;
   layout: Layout;
   initialMood: MoodRef;
   moods: MoodCue[];
@@ -495,6 +498,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     duration,
     durationInFrames: Math.max(1, Math.ceil(duration * fps)),
     seed: ep.seed ?? ep.id,
+    behaviour: resolveBehaviour(ep),
     layout,
     initialMood,
     moods,
@@ -534,7 +538,7 @@ const toShot = (
   if (s.shot === "establishing" && s.spot && !h.layout.cameras[s.spot]) h.errors.push(`${where}: unknown camera spot "${s.spot}" (has: ${Object.keys(h.layout.cameras).join(", ")})`);
   if (s.shot === "custom" && (!s.position || !s.target)) h.errors.push(`${where}: custom shot needs position and target`);
   if (!["establishing", "custom", "insert"].includes(s.shot) && !subjects.length && !s.position) h.errors.push(`${where}: ${s.shot} shot needs a subject`);
-  const moves: MoveSpec[] = (s.move === undefined ? [] : Array.isArray(s.move) ? s.move : [s.move]).map((m) => (typeof m === "string" ? { type: m } : { type: m.type, amount: m.amount, ease: m.ease as MoveSpec["ease"] }));
+  const moves: MoveSpec[] = (s.move === undefined ? [] : Array.isArray(s.move) ? s.move : [s.move]).map((m) => (typeof m === "string" ? { type: m } : { type: m.type, amount: m.amount, ease: m.ease }));
   return {
     at,
     end,
@@ -563,6 +567,7 @@ const toShot = (
     lock: s.lock,
     allowOcclusion: s.allowOcclusion,
     blend: s.blend,
+    ...(s.allow ? { allow: s.allow } : {}),
   };
 };
 

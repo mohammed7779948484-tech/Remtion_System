@@ -7,6 +7,7 @@
 //      Tracking uses a fixed time-window average over the subject's pure trajectory, so it is
 //      smooth, continuous and identical for any frame visit order.
 // Corrections only touch values the solver derived; authored values are used exactly.
+import type { Intent } from "../core/behaviour";
 import { clamp, lerp, lerpVec3, noise, progress, type EaseName, type Vec3 } from "../core/time";
 import type { Box, CameraSpot } from "../world/layout";
 
@@ -65,6 +66,8 @@ export type Shot = {
   lock?: boolean;
   allowOcclusion?: string[];
   blend?: number;
+  /** Findings in this shot the director accepts on purpose (core/behaviour.ts INTENTS). */
+  allow?: Intent[];
 };
 
 /** What the solver needs to know about the world. All functions must be pure in their args. */

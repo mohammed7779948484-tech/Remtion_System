@@ -1,0 +1,14 @@
+{
+  "description": "Intent control: Rayan walks out of a locked-off frame on purpose, marked allow: [\"offscreen\"] on the shot.",
+  "expect": null,
+  "accepted": ["offscreen"],
+  "episode": {
+    "id": "control-offscreen",
+    "title": "control: deliberate exit",
+    "set": { "environment": "dev-office" },
+    "cast": { "rayan": { "actor": "rayan", "at": "beside-desk", "pose": "stand_idle" } },
+    "actions": [{ "at": 0.5, "actor": "rayan", "move": { "to": "door" } }],
+    "camera": [{ "at": 0, "shot": "medium", "subject": "rayan", "allow": ["offscreen"] }],
+    "end": 4
+  }
+}

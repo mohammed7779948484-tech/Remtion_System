@@ -45,6 +45,8 @@ const CastMember = z.strictObject({
   color: z.string().optional(),
   /** Display name for captions. */
   name: z.string().optional(),
+  /** Findings about this character that are deliberate, e.g. ["floating"] for a hovering ghost. */
+  allow: Allow.optional(),
 });
 
 const Line = z.strictObject({
@@ -102,6 +104,8 @@ const Action = z.strictObject({
   volume: z.number().min(0).optional(),
   /** place: yaw (degrees) of the put-down item. */
   rotation: z.number().optional(),
+  /** Findings this action causes on purpose, e.g. ["abrupt"] for a snap move, ["clipping"]. */
+  allow: Allow.optional(),
 });
 
 const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld"]);

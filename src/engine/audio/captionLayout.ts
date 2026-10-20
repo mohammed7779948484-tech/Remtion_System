@@ -32,3 +32,39 @@ export const CAPTION_LAYOUT = {
   pop: { bottom: { portrait: 0.24, landscape: 0.12 }, fontSize: 78, lineHeight: 1.1, maxWidth: 0.86 },
   subtitle: { bottom: { portrait: 0.2, landscape: 0.07 }, fontSize: 46, lineHeight: 1.25, maxWidth: 0.8, nameSize: 26, gap: 10, padX: 24, padY: 10 },
 } as const;
+
+export type Rect = { x: number; y: number; w: number; h: number };
+
+/**
+ * Approximate on-screen rectangle (pixels) of a caption page, from the layout constants and the text
+ * length (glyph widths are estimated: there is no text measurement outside the browser). For checks.
+ */
+export const captionRect = (page: CaptionPage, style: "subtitle" | "pop", width: number, height: number, name = ""): Rect => {
+  const orient = height > width ? "portrait" : "landscape";
+  const u = Math.min(width, height) / 1080;
+  const chars = page.tokens.map((t) => t.text).join("").trim().length;
+  if (style === "pop") {
+    const L = CAPTION_LAYOUT.pop;
+    const font = L.fontSize * u;
+    const maxW = width * L.maxWidth;
+    const textW = chars * font * 0.68; // heavy uppercase display face
+    const lines = Math.max(1, Math.ceil(textW / maxW));
+    const w = Math.min(maxW, textW);
+    const h = lines * font * L.lineHeight;
+    const bottom = height * (1 - L.bottom[orient]);
+    return { x: (width - w) / 2, y: bottom - h, w, h };
+  }
+  const L = CAPTION_LAYOUT.subtitle;
+  const font = L.fontSize * u;
+  const inner = width * L.maxWidth - 2 * L.padX * u;
+  const textW = chars * font * 0.52;
+  const lines = Math.max(1, Math.ceil(textW / inner));
+  const boxW = Math.min(inner, textW) + 2 * L.padX * u;
+  const boxH = lines * font * L.lineHeight + 2 * L.padY * u;
+  const nameH = L.nameSize * u * 1.2 + 6 * u;
+  const nameW = name.length * L.nameSize * u * 0.62 + 28 * u;
+  const w = Math.max(boxW, nameW);
+  const h = nameH + L.gap * u + boxH;
+  const bottom = height * (1 - L.bottom[orient]);
+  return { x: (width - w) / 2, y: bottom - h, w, h };
+};

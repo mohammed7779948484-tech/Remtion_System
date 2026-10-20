@@ -14,7 +14,8 @@ import type { EpisodeAction } from "./schema";
 import type { Vec3 } from "./time";
 import type { ResolvedActor } from "./timeline";
 
-export type SubAction = Omit<EpisodeAction, "at" | "actor" | "do"> & { at: number };
+/** One cue a recipe produces; `step` names its part of the interaction (provenance for inspect/explain). */
+export type SubAction = Omit<EpisodeAction, "at" | "actor" | "do"> & { at: number; step?: string };
 
 export type RecipeHost = {
   ra: ResolvedActor;
@@ -30,6 +31,8 @@ export type RecipeHost = {
   addProp: (at: number, item: string, set: Record<string, unknown>) => void;
   addSfx: (at: number, sound: string, volume?: number) => void;
   addItem: (item: SetItem) => void;
+  /** A moment the recipe expects a hand on `point` (checked by inspect). */
+  contact?: (c: { at: number; point: Vec3; side?: "L" | "R"; reached?: boolean; what: string; step?: string }) => void;
   error: (msg: string) => void;
 };
 
@@ -87,15 +90,15 @@ const approach = (h: RecipeHost, t: number, point: Vec3, reach: number, turnBack
   const dz = point[2] - pz;
   const dist = Math.hypot(dx, dz);
   if (dist <= reach) {
-    h.apply({ at: t, turn: point, transition: 0.25 });
-    if (turnBackAt !== undefined) h.apply({ at: t + 0.2 + turnBackAt, turn: (b.placement.yaw * 180) / Math.PI, transition: 0.35 });
+    h.apply({ at: t, turn: point, transition: 0.25, step: "turn to" });
+    if (turnBackAt !== undefined) h.apply({ at: t + 0.2 + turnBackAt, turn: (b.placement.yaw * 180) / Math.PI, transition: 0.35, step: "turn back" });
     return t + 0.2;
   }
   const k = (dist - reach * 0.85) / dist;
   const to: Vec3 = [px + dx * k, py, pz + dz * k];
   const duration = Math.max(0.35, (dist - reach * 0.85) / (h.def.walk.speed * h.ra.scale * 1.3));
-  h.apply({ at: t, move: { to, duration } });
-  h.apply({ at: t + duration - 0.1, turn: point, transition: 0.2 });
+  h.apply({ at: t, move: { to, duration }, step: "approach" });
+  h.apply({ at: t + duration - 0.1, turn: point, transition: 0.2, step: "turn to" });
   return t + duration + 0.05;
 };
 
@@ -136,19 +139,24 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
         if (!gd) return h.error(`${h.where}: ${def.id} has no "${gesture}" gesture for press`), t;
         const speed = a.speed ?? 1;
         contact = t + (gd.duration / speed) * (g.stompContact ?? 0.5);
-        h.apply({ at: t, gesture, speed });
-        if (weight && press && standing) h.apply({ at: contact, move: { to: [px, py - press.travel, pz], duration: 0.07, face: "keep" } });
+        h.apply({ at: t, gesture, speed, step: "stomp" });
+        // The drop with the key is an impact: fast on purpose.
+        if (weight && press && standing) h.apply({ at: contact, move: { to: [px, py - press.travel, pz], duration: 0.07, face: "keep" }, step: "press down", allow: ["abrupt"] });
       } else {
         // Hand tap.
-        const r = reachAt(h, t, [point[0], point[1] + 0.04, point[2]]);
+        const tap: Vec3 = [point[0], point[1] + 0.04, point[2]];
+        const r = reachAt(h, t, tap);
         contact = t + 0.28;
-        if (r) h.apply({ at: t, look: point, joints: r.set, duration: 0.28 + (a.duration ?? 0.3), transition: 0.2 });
+        if (r) {
+          h.apply({ at: t, look: point, joints: r.set, duration: 0.28 + (a.duration ?? 0.3), transition: 0.2, step: "tap" });
+          h.contact?.({ at: contact, point: tap, side: r.side, reached: r.reached, what: "press", step: "tap" });
+        }
       }
       if (weight && press) {
         h.addProp(contact, press.item, press.set(true));
         if (a.duration !== undefined) {
           h.addProp(contact + a.duration, press.item, press.set(false));
-          if (standing) h.apply({ at: contact + a.duration, move: { to: [px, py, pz], duration: 0.1, face: "keep" } });
+          if (standing) h.apply({ at: contact + a.duration, move: { to: [px, py, pz], duration: 0.1, face: "keep" }, step: "release", allow: ["abrupt"] });
         }
       }
       if (a.sound) h.addSfx(contact, a.sound, a.volume);
@@ -160,14 +168,14 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const point = h.pointOf(a.target, t);
       if (!point) return t;
       const hold = a.duration ?? 1.2;
-      h.apply({ at: t, look: point, transition: 0.2 });
+      h.apply({ at: t, look: point, transition: 0.2, step: "look" });
       // Point near shoulder height: an arm aimed steeply at something low just looks like it's hanging.
       const b = baseAt(h.ra, def, t);
       const chest = b.anchors.chest ?? b.placement.position;
       const dist = Math.hypot(point[0] - chest[0], point[2] - chest[2]);
       const aim: Vec3 = [point[0], Math.max(point[1], chest[1] - 0.35 * dist), point[2]];
       const r = reachAt(h, t, aim);
-      if (r) h.apply({ at: t, joints: r.set, duration: hold, transition: 0.22 });
+      if (r) h.apply({ at: t, joints: r.set, duration: hold, transition: 0.22, step: "point" });
       if (a.sound) h.addSfx(t, a.sound, a.volume);
       return t + hold;
     }
@@ -183,22 +191,25 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
         // Armless: hop and balance it on top.
         const tA = approach(h, t, center, 0.2 * scale);
         const socket = def.sockets.top ? "top" : Object.keys(def.sockets)[0];
-        h.apply({ at: tA, gesture: g.stomp ?? "hop", look: grip });
-        h.apply({ at: tA + 0.35, hold: { [socket]: item } });
+        h.apply({ at: tA, gesture: g.stomp ?? "hop", look: grip, step: "hop" });
+        h.apply({ at: tA + 0.35, hold: { [socket]: item }, step: "hold" });
         return tA + 0.7;
       }
       const tA = approach(h, t, center, humanoidReach, 0.8);
       const before = poseAt(h.ra, def, tA);
       const low = isLow(h, tA, grip[1]);
-      h.apply({ at: tA, look: grip, transition: 0.2 });
-      if (low && g.crouchPose) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32 });
+      h.apply({ at: tA, look: grip, transition: 0.2, step: "look" });
+      if (low && g.crouchPose) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32, step: "crouch" });
       const r = reachAt(h, tA + 0.32, grip, a.hand === "handL" ? "L" : a.hand === "handR" ? "R" : undefined);
       const socket = a.hand ?? (r?.side === "L" ? "handL" : "handR");
       const contact = tA + 0.45;
-      if (r) h.apply({ at: tA + 0.08, joints: r.set, duration: 0.5, transition: 0.3 });
-      h.apply({ at: contact, hold: { [socket]: item } });
-      if (low && g.crouchPose) h.apply({ at: contact + 0.15, pose: before, transition: 0.35 });
-      h.apply({ at: contact + 0.3, look: null, transition: 0.3 });
+      if (r) {
+        h.apply({ at: tA + 0.08, joints: r.set, duration: 0.5, transition: 0.3, step: "reach" });
+        h.contact?.({ at: contact, point: grip, side: r.side, reached: r.reached, what: "pick-up", step: "reach" });
+      }
+      h.apply({ at: contact, hold: { [socket]: item }, step: "grab" });
+      if (low && g.crouchPose) h.apply({ at: contact + 0.15, pose: before, transition: 0.35, step: "stand" });
+      h.apply({ at: contact + 0.3, look: null, transition: 0.3, step: "look away" });
       if (a.sound) h.addSfx(contact, a.sound, a.volume);
       return contact + 0.5;
     }
@@ -217,14 +228,18 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const tA = approach(h, t, point, handSockets(def).length ? humanoidReach : 0.2 * scale, 0.8);
       const before = poseAt(h.ra, def, tA);
       const low = isLow(h, tA, point[1]);
-      h.apply({ at: tA, look: point, transition: 0.2 });
-      if (low && g.crouchPose && handSockets(def).length) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32 });
-      const r = handSockets(def).includes(socket) ? reachAt(h, tA + 0.32, [point[0], point[1] + 0.12, point[2]], socket === "handL" ? "L" : "R") : null;
+      h.apply({ at: tA, look: point, transition: 0.2, step: "look" });
+      if (low && g.crouchPose && handSockets(def).length) h.apply({ at: tA, pose: g.crouchPose, transition: 0.32, step: "crouch" });
+      const drop: Vec3 = [point[0], point[1] + 0.12, point[2]];
+      const r = handSockets(def).includes(socket) ? reachAt(h, tA + 0.32, drop, socket === "handL" ? "L" : "R") : null;
       const contact = tA + 0.45;
-      if (r) h.apply({ at: tA + 0.08, joints: r.set, duration: 0.5, transition: 0.3 });
-      h.apply({ at: contact, hold: { [socket]: null } });
-      if (low && g.crouchPose && handSockets(def).length) h.apply({ at: contact + 0.15, pose: before, transition: 0.35 });
-      h.apply({ at: contact + 0.3, look: null, transition: 0.3 });
+      if (r) {
+        h.apply({ at: tA + 0.08, joints: r.set, duration: 0.5, transition: 0.3, step: "reach" });
+        h.contact?.({ at: contact, point: drop, side: r.side, reached: r.reached, what: "place", step: "reach" });
+      }
+      h.apply({ at: contact, hold: { [socket]: null }, step: "release" });
+      if (low && g.crouchPose && handSockets(def).length) h.apply({ at: contact + 0.15, pose: before, transition: 0.35, step: "stand" });
+      h.apply({ at: contact + 0.3, look: null, transition: 0.3, step: "look away" });
       // The carried item stays gone; a copy (hidden until now) appears where it was put down.
       const original = h.layout.items.find((i) => i.id === item);
       const copyId = `${item}@${h.ra.id}-${contact.toFixed(2)}`;
@@ -239,7 +254,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
     case "react": {
       const flinch = g.flinch ?? "flinch";
       if (!def.gestures[flinch]) return h.error(`${h.where}: ${def.id} has no "${flinch}" gesture for react`), t;
-      h.apply({ at: t, gesture: flinch, intensity: a.intensity, ...(a.emotion ? {} : def.emotions.shocked ? { emotion: "shocked" } : {}), ...(a.target !== undefined ? { look: a.target } : {}) });
+      h.apply({ at: t, gesture: flinch, intensity: a.intensity, ...(a.emotion ? {} : def.emotions.shocked ? { emotion: "shocked" } : {}), ...(a.target !== undefined ? { look: a.target } : {}), step: "flinch" });
       if (a.sound) h.addSfx(t, a.sound, a.volume);
       return t + def.gestures[flinch].duration;
     }
@@ -249,7 +264,7 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const sockets = handSockets(def);
       if (!def.selfReach || !sockets.length) {
         // Armless actors: the closest equivalent is an emotion + their own gesture.
-        if (a.do === "facepalm" && def.emotions.tired) h.apply({ at: t, emotion: "tired", ...(def.gestures.shake ? { gesture: "shake" } : {}) });
+        if (a.do === "facepalm" && def.emotions.tired) h.apply({ at: t, emotion: "tired", ...(def.gestures.shake ? { gesture: "shake" } : {}), step: "tired" });
         else return h.error(`${h.where}: ${def.id} has no hands for "${a.do}"`), t;
         if (a.sound) h.addSfx(t, a.sound, a.volume);
         return t + 1;
@@ -262,8 +277,8 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       const side = (socket ?? "handR") === "handL" ? "L" : "R";
       const hold = a.duration ?? (a.do === "facepalm" ? 1.6 : 1.1);
       const r = def.selfReach(baseAt(h.ra, def, t).layered, a.do, side);
-      if (a.do === "facepalm" && def.emotions.tired && !a.emotion) h.apply({ at: t, emotion: "tired", transition: 0.3 });
-      h.apply({ at: t, look: null, joints: r.set, duration: hold, transition: a.do === "facepalm" ? 0.3 : 0.35 });
+      if (a.do === "facepalm" && def.emotions.tired && !a.emotion) h.apply({ at: t, emotion: "tired", transition: 0.3, step: "tired" });
+      h.apply({ at: t, look: null, joints: r.set, duration: hold, transition: a.do === "facepalm" ? 0.3 : 0.35, step: a.do === "facepalm" ? "palm to face" : "cup to mouth" });
       if (a.sound) h.addSfx(t + 0.25, a.sound, a.volume);
       return t + hold + 0.3;
     }
@@ -280,18 +295,18 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
         const dist = Math.hypot(p[0] - b.placement.position[0], p[2] - b.placement.position[2]);
         if (dist > 0.05) {
           const duration = Math.max(0.4, dist / (def.walk.speed * h.ra.scale));
-          h.apply({ at, move: { to: seat } });
+          h.apply({ at, move: { to: seat }, step: "walk to seat" });
           at += duration;
         }
       }
-      h.apply({ at, pose: sitPose, transition: 0.6 });
+      h.apply({ at, pose: sitPose, transition: 0.6, step: "sit" });
       return at + 0.6;
     }
 
     case "stand-up": {
       const standPose = a.pose && !a.pose.startsWith("sit") ? a.pose : def.poses.stand_idle ? "stand_idle" : def.defaultPose;
-      h.apply({ at: t, pose: standPose, transition: 0.5 });
-      if (a.target !== undefined) h.apply({ at: t + 0.5, move: { to: a.target as Vec3 | string } });
+      h.apply({ at: t, pose: standPose, transition: 0.5, step: "stand" });
+      if (a.target !== undefined) h.apply({ at: t + 0.5, move: { to: a.target as Vec3 | string }, step: "walk off" });
       return t + 0.5;
     }
   }

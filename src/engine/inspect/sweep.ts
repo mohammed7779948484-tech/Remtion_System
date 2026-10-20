@@ -2,7 +2,7 @@
 // is derived from the direction (actors, the rendered camera, mood, prop states, screen accents,
 // the caption page), evaluated in Node without rendering (~1 ms per frame). It is the single
 // source for the golden tests, `inspect` and the remix gate, so they always agree on what changed.
-import type { ActorDefinition, ActorFrame } from "../actors/rig";
+import type { ActorDefinition, ActorFrame, ActorTrack } from "../actors/rig";
 import { captionIndexAt, captionPages, type CaptionPage } from "../audio/captionLayout";
 import type { CameraFrame, SceneQuery } from "../camera/solve";
 import type { ResolvedEpisode } from "../core/timeline";
@@ -30,6 +30,7 @@ export type VisualFrame = {
 
 export type Sweep = {
   resolved: ResolvedEpisode;
+  tracks: ActorTrack[];
   query: SceneQuery;
   pages: CaptionPage[];
   frames: number;
@@ -55,7 +56,7 @@ export const createSweep = (r: ResolvedEpisode, actorDefs: Record<string, ActorD
       caption: captionIndexAt(pages, t * 1000),
     };
   };
-  return { resolved: r, query, pages, frames: r.durationInFrames, at };
+  return { resolved: r, tracks, query, pages, frames: r.durationInFrames, at };
 };
 
 const round6 = (x: number) => {

@@ -33,7 +33,17 @@
           "silence",
           "slow-open",
           "offscreen",
-          "back-of-head"
+          "back-of-head",
+          "abrupt",
+          "clipping",
+          "floating",
+          "text-over-face",
+          "jump-cut",
+          "cross-line",
+          "mid-word-cut",
+          "soft-focus",
+          "static",
+          "quick-cuts"
         ]
       }
     },
@@ -422,6 +432,28 @@
           },
           "name": {
             "type": "string"
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "silence",
+                "slow-open",
+                "offscreen",
+                "back-of-head",
+                "abrupt",
+                "clipping",
+                "floating",
+                "text-over-face",
+                "jump-cut",
+                "cross-line",
+                "mid-word-cut",
+                "soft-focus",
+                "static",
+                "quick-cuts"
+              ]
+            }
           }
         },
         "required": [
@@ -736,6 +768,28 @@
           },
           "rotation": {
             "type": "number"
+          },
+          "allow": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "silence",
+                "slow-open",
+                "offscreen",
+                "back-of-head",
+                "abrupt",
+                "clipping",
+                "floating",
+                "text-over-face",
+                "jump-cut",
+                "cross-line",
+                "mid-word-cut",
+                "soft-focus",
+                "static",
+                "quick-cuts"
+              ]
+            }
           }
         },
         "required": [
@@ -1174,7 +1228,17 @@
                 "silence",
                 "slow-open",
                 "offscreen",
-                "back-of-head"
+                "back-of-head",
+                "abrupt",
+                "clipping",
+                "floating",
+                "text-over-face",
+                "jump-cut",
+                "cross-line",
+                "mid-word-cut",
+                "soft-focus",
+                "static",
+                "quick-cuts"
               ]
             }
           }
@@ -1398,6 +1462,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "text": {
                 "type": "string",
                 "minLength": 1
@@ -1489,6 +1575,28 @@
               "volume": {
                 "type": "number",
                 "minimum": 0
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
               },
               "kind": {
                 "type": "string",
@@ -1632,6 +1740,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "on": {
                 "anyOf": [
                   {
@@ -1707,6 +1837,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "on": {
                 "anyOf": [
                   {
@@ -1780,6 +1932,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "amount": {
                 "type": "number",
                 "exclusiveMinimum": 0
@@ -1824,6 +1998,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "amount": {
                 "type": "number",
                 "exclusiveMinimum": 0
@@ -1864,6 +2060,28 @@
                 "type": "number",
                 "minimum": 0
               },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
+              },
               "color": {
                 "type": "string"
               }
@@ -1902,6 +2120,28 @@
               "volume": {
                 "type": "number",
                 "minimum": 0
+              },
+              "allow": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "silence",
+                    "slow-open",
+                    "offscreen",
+                    "back-of-head",
+                    "abrupt",
+                    "clipping",
+                    "floating",
+                    "text-over-face",
+                    "jump-cut",
+                    "cross-line",
+                    "mid-word-cut",
+                    "soft-focus",
+                    "static",
+                    "quick-cuts"
+                  ]
+                }
               },
               "color": {
                 "type": "string"

@@ -17,12 +17,15 @@ npm run cli -- new <slug> [--env dev-office|micro-keyboard|floating-space|custom
 npm run cli -- voice <slug>                          # free offline voices (drafts)
 npm run cli -- voice --check                         # free: ElevenLabs plan, credits, models, voices
 npm run cli -- voice <slug> --provider elevenlabs    # paid (Eleven v4); never implied by a key in .env
-npm run cli -- validate <slug>                       # beat sheet, ✖ errors, ⚠ camera/pacing/audio/licensing
-npm run cli -- stills <slug> [--frames 0,90] [--verify] [--guides]   # → out/<slug>/contact.png (--frames: contact-frames.png)
+npm run cli -- validate <slug>                       # beat sheet, audio readiness + every inspect finding (✖ ⚠ · ~)
+npm run cli -- inspect <slug> [--json]               # per-frame checks in Node (~1 s): framing, camera, motion, contact, overlays — with time, object, source
+npm run cli -- explain <slug> --t 4.2 [--actor rayan | --camera]   # every layer at that moment and the episode.json entry behind it
+npm run cli -- stills <slug> [--edges | --at findings | --frames 0,90] [--verify] [--guides]   # labelled contact sheets → out/<slug>/contact*.png
+npm run cli -- preview <slug> --from 3 --to 6        # short low-res MP4 + preview-strip.png to judge motion
 npm run cli -- render <slug> [--master] [--draft]    # → out/<slug>.mp4 (--master: -14 LUFS)
 npm run cli -- review <slug>                         # after render: frame sheet + loudness/mix report
 npm run dev        # Remotion Studio preview
-npm test           # engine tests (determinism, camera, resolver, recipes, fx, voice, audit, catalog freshness)
+npm test           # engine tests (determinism, goldens, fault set, camera, resolver, recipes, fx, voice, audit, catalog freshness)
 npm run catalog    # regenerate catalog/ after changing the shared engine
 ```
 

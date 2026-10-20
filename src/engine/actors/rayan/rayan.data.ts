@@ -2,9 +2,9 @@
 // CLI and tests can import it in Node. Geometry lives in Rayan.tsx.
 // Conventions: metres, +Y up, actor faces +Z; joint angles in radians (XYZ order).
 // head.x / torso.x positive = tilt forward/down; hip.x negative = leg forward; knee.x positive = bend.
-import type { ActorDefinition, Channels, ChannelSpec } from "../rig";
+import type { ActorDefinition, Channels, ChannelSpec, Effectors } from "../rig";
 import { clamp, lerp, type Vec3 } from "../../core/time";
-import { armFK, armIK, inFrame, outOfFrame, type ArmRig, type Frame } from "../ik";
+import { armFK, armIK, childFrame, inFrame, outOfFrame, type ArmRig, type Frame } from "../ik";
 
 // Arm geometry, mirrored from Rayan.tsx (pelvis → torso (+0.06) → shoulder (±0.25, 0.38) → elbow
 // (±0.02, -0.23) → wrist (0, -0.22) → palm socket (0, -0.04, 0.04)). Keep in sync with the view.
@@ -23,6 +23,52 @@ const torsoFrame = (c: Channels): Frame => {
 export const rayanHand = (c: Channels, side: "L" | "R"): Vec3 => {
   const local = armFK(armRig(side === "L" ? 1 : -1), [c[`shoulder${side}.x`], c[`shoulder${side}.y`], c[`shoulder${side}.z`]], c[`elbow${side}.x`]);
   return outOfFrame(torsoFrame(c), local);
+};
+
+/**
+ * Body points and volumes for contact checks, following Rayan.tsx group by group (pelvis → torso → neck →
+ * head; shoulder → elbow → wrist → palm; hip → knee → ankle → sole). Keep in sync with the view.
+ */
+const rayanEffectors = (c: Channels): Effectors => {
+  const rot = (name: string): Vec3 => [c[`${name}.x`] ?? 0, c[`${name}.y`] ?? 0, c[`${name}.z`] ?? 0];
+  const pelvis: Frame = { position: [0, c["pelvis.y"], 0], rotations: [[c["pelvis.x"], 0, 0]] };
+  const torso = childFrame(pelvis, [0, 0.06, 0], rot("torso"));
+  const neck = childFrame(torso, [0, 0.46, 0], [0, 0, 0]);
+  const head = childFrame(neck, [0, 0.07, 0], rot("head"));
+  const headCentre = outOfFrame(head, [0, 0.19, 0]);
+  const arm = (side: 1 | -1) => {
+    const s = side === 1 ? "L" : "R";
+    const shoulder = childFrame(torso, [side * 0.25, 0.38, 0], rot(`shoulder${s}`));
+    const elbow = childFrame(shoulder, [side * 0.02, -0.23, 0], rot(`elbow${s}`));
+    const wrist = childFrame(elbow, [0, -0.22, 0], rot(`wrist${s}`));
+    return { shoulder: shoulder.position, elbow: elbow.position, wrist: wrist.position, hand: outOfFrame(wrist, [0, -0.04, 0.04]) };
+  };
+  const leg = (side: 1 | -1) => {
+    const s = side === 1 ? "L" : "R";
+    const hip = childFrame(pelvis, [side * 0.1, -0.05, 0], rot(`hip${s}`));
+    const knee = childFrame(hip, [0, -0.34, 0], [c[`knee${s}.x`], 0, 0]);
+    const ankle = childFrame(knee, [0, -0.31, 0.035], [0, 0, 0]);
+    return { hip: hip.position, knee: knee.position, ankle: ankle.position, sole: outOfFrame(ankle, [0, -0.0375, 0]) };
+  };
+  const [aL, aR, lL, lR] = [arm(1), arm(-1), leg(1), leg(-1)];
+  const limb = (name: string, a: Vec3, b: Vec3, r: number) => ({ name, a, b, r });
+  return {
+    points: { head: headCentre, face: outOfFrame(head, [0, 0.19, 0.23]), handL: aL.hand, handR: aR.hand, elbowL: aL.elbow, elbowR: aR.elbow, footL: lL.sole, footR: lR.sole, pelvis: pelvis.position },
+    parts: [
+      limb("head", headCentre, headCentre, 0.23),
+      limb("torso", torso.position, neck.position, 0.2),
+      limb("upperArmL", aL.shoulder, aL.elbow, 0.07),
+      limb("forearmL", aL.elbow, aL.wrist, 0.06),
+      limb("handL", aL.hand, aL.hand, 0.05),
+      limb("upperArmR", aR.shoulder, aR.elbow, 0.07),
+      limb("forearmR", aR.elbow, aR.wrist, 0.06),
+      limb("handR", aR.hand, aR.hand, 0.05),
+      limb("thighL", lL.hip, lL.knee, 0.075),
+      limb("shinL", lL.knee, lL.ankle, 0.06),
+      limb("thighR", lR.hip, lR.knee, 0.075),
+      limb("shinR", lR.knee, lR.ankle, 0.06),
+    ],
+  };
 };
 
 const HALF_PI = Math.PI / 2;
@@ -222,6 +268,7 @@ export const rayanDef: ActorDefinition = {
       reached: r.reached,
     };
   },
+  effectors: rayanEffectors,
   anchors: (c) => {
     const pelvis = c["pelvis.y"];
     const lean = c["torso.x"];

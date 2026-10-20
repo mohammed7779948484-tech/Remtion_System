@@ -88,7 +88,17 @@ export type ActorDefinition = {
   selfReach?: (c: Channels, what: "facepalm" | "sip", side: "L" | "R") => { set: Channels; reached: boolean };
   /** Optional: gesture names the recipes use for this anatomy (defaults: flinch, stomp/hop). */
   recipeGestures?: { flinch?: string; stomp?: string; crouchPose?: string; /** Fraction of the stomp gesture where it lands (default 0.5). */ stompContact?: number };
+  /**
+   * Optional: where the body is for contact checks (inspect), from the FINAL channels: named points (at least
+   * `head` = head centre and `face` = front of the face, so facing follows head turns; `handL`/`handR`/`footL`/
+   * `footR` when the anatomy has them) and simple volumes. Root-local, unscaled. Mirrors the view's hierarchy.
+   */
+  effectors?: (c: Channels) => Effectors;
 };
+
+/** A body volume, root-local and unscaled: a capsule from `a` to `b` with radius `r` (a sphere when a = b). */
+export type BodyPart = { name: string; a: Vec3; b: Vec3; r: number };
+export type Effectors = { points: Record<string, Vec3>; parts: BodyPart[] };
 
 // ---------------------------------------------------------------- track (resolved direction)
 
@@ -227,9 +237,10 @@ const emotionChannels = (def: ActorDefinition, emotion: string): Channels => {
 
 // ---------------------------------------------------------------- placement & locomotion
 
-type Segment = { start: number; end: number; from: Vec3; to: Vec3; ease: EaseName; distBefore: number; cue: MoveCue };
+export type Segment = { start: number; end: number; from: Vec3; to: Vec3; ease: EaseName; distBefore: number; cue: MoveCue };
 
-const moveSegments = (track: ActorTrack): Segment[] => {
+/** Move cues as queued segments (a move starting before the previous one ends waits for it). */
+export const moveSegments = (track: ActorTrack): Segment[] => {
   const segs: Segment[] = [];
   let pos = track.start.position;
   let dist = 0;
@@ -485,6 +496,18 @@ export const actorFinal = (track: ActorTrack, base: ActorBase, t: number, ctx: L
     anchors: base.anchors,
     held,
     pose: base.pose,
+  };
+};
+
+/** An actor's effectors in world space (points and volumes scaled and placed), or undefined if it has none. */
+export const worldEffectors = (frame: ActorFrame, def: ActorDefinition): Effectors | undefined => {
+  if (!def.effectors) return undefined;
+  const local = def.effectors(frame.channels);
+  const p = { position: frame.position, yaw: frame.yaw, walk: 0, walkPhase: 0 };
+  const w = (v: Vec3) => localToWorld(p, frame.scale, v);
+  return {
+    points: Object.fromEntries(Object.entries(local.points).map(([k, v]) => [k, w(v)])),
+    parts: local.parts.map((b) => ({ name: b.name, a: w(b.a), b: w(b.b), r: b.r * frame.scale })),
   };
 };
 

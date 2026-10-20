@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import type { ActorDefinition } from "../src/engine/actors/rig";
 import type { VideoData } from "../src/engine/player/defineVideo";
 import { resolveEpisode, type ResolveContext, type ResolvedEpisode } from "../src/engine/core/timeline";
+import type { Trace } from "../src/engine/core/trace";
 import { readManifest } from "./voice";
 
 /** Video folders (each has an episode.json), sorted. */
@@ -31,8 +32,11 @@ export const loadVideo = async (root: string, slug: string) => {
   return { episode, data, ctx, manifest: readManifest(root, slug) };
 };
 
-/** Resolve a video (throws the resolver's problem list). `actorDefs` are its custom actors, for scene evaluation. */
-export const resolveVideo = async (root: string, slug: string): Promise<{ resolved: ResolvedEpisode; actorDefs: Record<string, ActorDefinition> }> => {
+/**
+ * Resolve a video (throws the resolver's problem list). `actorDefs` are its custom actors, for scene evaluation;
+ * pass a `trace` to record where every cue came from (inspect, explain).
+ */
+export const resolveVideo = async (root: string, slug: string, opts: { trace?: Trace } = {}): Promise<{ resolved: ResolvedEpisode; actorDefs: Record<string, ActorDefinition> }> => {
   const { episode, ctx, manifest } = await loadVideo(root, slug);
-  return { resolved: resolveEpisode(episode, manifest, ctx), actorDefs: ctx.actors ?? {} };
+  return { resolved: resolveEpisode(episode, manifest, { ...ctx, trace: opts.trace }), actorDefs: ctx.actors ?? {} };
 };

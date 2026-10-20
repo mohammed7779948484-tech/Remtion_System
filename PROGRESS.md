@@ -206,6 +206,7 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 | Milestone | State | Notes |
 |---|---|---|
 | M0 Safety net, picture sweep, yardstick | ✅ done | see below |
+| M1 Diagnose and explain | ✅ done | see below |
 
 ## M0 — safety net, picture sweep and yardstick
 - `core/behaviour.ts`: `engine` (1 default = original behaviour, 2 = current; `new` writes 2), `profile` (only
@@ -234,3 +235,42 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 - Baseline yardstick: skill-eval agents needed 1,017–1,421 s and ~250 k tokens to reach validated stills (V2 eval
   round 2). Face exposure is measured from M6 on, against the baseline sheets kept in `out/baseline-v3/`.
 - Tests: 155 (16 files), tsc clean.
+
+## M1 — diagnose and explain
+- CLI split mechanically: `scripts/cli.ts` dispatches to `scripts/cli/{shared,discover,scaffold,voices,check,media}.ts`.
+- `effectors(c)` for Rayan and the mascot (head centre, front of face, hands, elbows, soles + capsules), mirroring the
+  views and computed from the FINAL channels (so looks/turns count). Tested against the arm FK and the framing anchors.
+- Provenance: `core/trace.ts`; the resolver records the source of every cue/shot/accent/sound/prop cue and the cast
+  start, recipes label their steps (`do:pick-up step 'reach'`) and report contact moments (point, hand, IK reached).
+  `allow` now also sits on actions, cast members and accents (intents: abrupt, clipping, floating, text-over-face,
+  jump-cut, cross-line, mid-word-cut, soft-focus, static, quick-cuts + the M0 ones). Recipe impacts (key press-down,
+  release) declare themselves `abrupt`. None of this changes resolved output (goldens unchanged).
+- `inspect` (`src/engine/inspect/`): framing (faces in frame, back of head — every frame), camera (inside geometry,
+  cut mid-word, jump cut, crossing the line, focus off screen/jumping), motion (teleports as discontinuities, jitter on
+  root/head/camera), contact (limb through head, forearm through a furniture top, unreachable/missed recipe contacts,
+  floating), overlays (caption/accent over a face — estimated rects), grammar + pacing notes (profile thresholds).
+  Levels error/warning/note; findings carry source, related active cues and the intent that would accept them.
+  `validate` now prints all findings instead of its own 3-sample framing checks.
+- `explain <slug> --t s [--actor id | --camera]`: every layer at that moment with progress and source.
+- `stills --edges` (shot starts/ends + contact moments), `--at findings`, labelled tiles; `preview --from --to` (half-size
+  MP4 + an 8-frame strip to judge motion).
+- **Fault set**: 8/8 visual faults found with the right check, object, time and source (jump cut added after a sampling
+  bug — see below); both intent controls produce only accepted findings. 173 tests.
+- **Speed**: inspect of a 30 s episode incl. resolving: 0.2–1.0 s (ctrl-z 937 frames 0.9 s).
+- **Triage of the finished videos** (every open finding checked against `stills --at findings` frames):
+  | Video | Open findings | Verdict |
+  |---|---|---|
+  | ctrl-z | arm through the face 28.4–31.2 s (payoff joints override) | real — the clip visible in the V2 sheet |
+  | | arms snap overhead 23.83 s (`celebrate` pose, 0.25 s transition) | real — confirmed with `explain` + `preview` strip |
+  | | back of head 20.5/22.1/22.7 s (duck pick-up/place), mascot 10.0 s | real (frames show the backs) |
+  | | pick-up/place IK targets unreachable 20.6/22.2 s | real (the duck snaps into a hand that doesn't reach it) |
+  | | dialog window over the mascot's face 13.3–13.7 s | real overlap (arguably deliberate) |
+  | | suspended 3 frames before the opening fall | real, deliberate (would be `allow: ["floating"]`) |
+  | it-works, launch-promo | no warnings; notes only (pacing, crossing the line) | — |
+  False positives found and fixed during triage: hands "inside" the desk box (boxes include the empty space under a
+  desktop → only forearms coming down through a top count); camera jitter right after a shake; a fast smooth slide read
+  as a teleport (→ discontinuity rule); three "jump cuts" that compared two frames of the same shot (cut sampled by
+  rounding → first frame after the cut; a jump-cut fault now guards it). Frozen videos are not edited.
+- Known, for later milestones: the `facepalm` recipe aims at the face anchor (ignores the bowed head) → palm ~8 cm
+  inside the head (M3 correction); the dev-office `beside-desk` mark puts an idle standing hand into the desk edge
+  (shared set data; no finished video uses it — fix with M3/M8 when a production needs the mark).

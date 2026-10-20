@@ -7,14 +7,25 @@ export const ENGINE_VERSIONS = [1, 2] as const;
 export type EngineVersion = (typeof ENGINE_VERSIONS)[number];
 
 /**
- * Findings the director accepts on purpose (`allow` on the episode or a shot). A check that would
- * report one of these lists it as "accepted by intent" instead — still visible, never hidden.
+ * Findings the director accepts on purpose (`allow` on the episode, a shot, an action, a cast member or an
+ * accent). A check that would report one of these lists it as "accepted by intent" instead — still visible,
+ * never hidden.
  */
 export const INTENTS = {
   silence: "long pauses are deliberate (dead-air notes are accepted)",
   "slow-open": "the opening is deliberately slow (no-hook notes are accepted)",
   offscreen: "a subject's face leaves the frame on purpose",
   "back-of-head": "seeing the back of a subject is deliberate",
+  abrupt: "a sudden jump or jitter in motion is deliberate (a snap, a glitchy character)",
+  clipping: "a body part passing through something is deliberate",
+  floating: "a character is off the ground on purpose (hovering, flying)",
+  "text-over-face": "a caption or on-screen text covering a face is deliberate",
+  "jump-cut": "cutting between near-identical framings is deliberate",
+  "cross-line": "crossing the line of action between two characters is deliberate",
+  "mid-word-cut": "cutting in the middle of a spoken word is deliberate",
+  "soft-focus": "focus away from the subject (or on nothing visible) is deliberate",
+  static: "a run of static shots is deliberate",
+  "quick-cuts": "very short shots are deliberate (a rapid montage)",
 } as const;
 export type Intent = keyof typeof INTENTS;
 export const INTENT_NAMES = Object.keys(INTENTS) as [Intent, ...Intent[]];
@@ -26,10 +37,20 @@ export type Profile = {
   hook: number;
   /** Longest stretch with nothing happening before a pacing note. */
   deadAir: number;
+  /** Consecutive static shots (no move, track or follow) before a shot-grammar note. */
+  staticRun: number;
+  /** Shots shorter than this (seconds, except the last) get a shot-grammar note. */
+  minShot: number;
 };
 
 export const PROFILES = {
-  standard: { description: "Short-form defaults: something happens within 1.5 s and no stretch of more than 1.5 s without a line, action, cut or sound.", hook: 1.5, deadAir: 1.5 },
+  standard: {
+    description: "Short-form defaults: something happens within 1.5 s, no stretch of more than 1.5 s without a line, action, cut or sound; notes on 3+ static shots in a row and shots under 0.6 s.",
+    hook: 1.5,
+    deadAir: 1.5,
+    staticRun: 3,
+    minShot: 0.6,
+  },
 } as const satisfies Record<string, Profile>;
 export type ProfileName = keyof typeof PROFILES;
 export const PROFILE_NAMES = Object.keys(PROFILES) as [ProfileName, ...ProfileName[]];

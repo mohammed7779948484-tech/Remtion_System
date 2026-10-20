@@ -2,7 +2,8 @@
 // stubby feet. No arms or skeleton, so its channels and acting vocabulary are its own.
 // Conventions: actor faces +Z; actor's left = +X; small by default (≈0.29 m at scale 1).
 import type { ActorDefinition, Channels, ChannelSpec } from "../rig";
-import { EASINGS, clamp, lerp } from "../../core/time";
+import { EASINGS, clamp, lerp, type Vec3 } from "../../core/time";
+import { outOfFrame, type Frame } from "../ik";
 
 const ch = (rest: number, min: number, max: number, description?: string): ChannelSpec => ({ rest, min, max, description });
 const eyes = (l: Partial<Record<"x" | "y" | "sx" | "sy" | "rz", number>>, r: Partial<Record<"x" | "y" | "sx" | "sy" | "rz", number>>): Channels => {
@@ -106,6 +107,16 @@ export const claudeDef: ActorDefinition = {
     return {
       set: { "body.rx": clamp(Math.atan2(forward, Math.max(0.05, 0.12 - up)) * 0.6, -0.4, 0.75), "body.rz": clamp(-target[0] * 2.5, -0.45, 0.45), "body.z": clamp(target[2] * 0.25, -0.04, 0.06), squash: 1.06 },
       reached: Math.hypot(target[0], target[2]) < 0.25,
+    };
+  },
+  // Contact-check volumes (mirrors Claude.tsx): the body group turns with body.rx/ry/rz, so `face` follows it.
+  effectors: (c) => {
+    const body: Frame = { position: [0, c["body.y"], c["body.z"]], rotations: [[c["body.rx"], c["body.ry"], c["body.rz"]]] };
+    const centre = body.position;
+    const foot = (s: "L" | "R"): Vec3 => [(s === "L" ? 1 : -1) * 0.052, c[`foot${s}.y`] - 0.02, c[`foot${s}.z`]];
+    return {
+      points: { head: centre, face: outOfFrame(body, [0, 0, 0.09]), footL: foot("L"), footR: foot("R") },
+      parts: [{ name: "body", a: centre, b: centre, r: 0.13 }],
     };
   },
   anchors: (c) => {

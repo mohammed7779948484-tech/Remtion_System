@@ -92,12 +92,17 @@ post title must credit "elevenlabs.io" — `validate` reminds you; mention it in
 ## 6. Check (loop here until it's right)
 
 ```
-npm run cli -- validate <slug>          # fix every ✖; read every ⚠ (camera, pacing, audio, licensing); beat sheet
-npm run cli -- stills <slug> --guides   # then LOOK at out/<slug>/contact.png
+npm run cli -- validate <slug>          # fix every ✖; read every ⚠ (framing, camera, motion, contact, overlays, audio); beat sheet
+npm run cli -- explain <slug> --t 12.4 --actor rayan   # WHY something is the way it is at that moment (layers + sources)
+npm run cli -- stills <slug> --guides   # then LOOK at out/<slug>/contact.png (middle of each shot)
+npm run cli -- stills <slug> --edges    # start/end of every shot + recipe contacts → contact-edges.png
+npm run cli -- stills <slug> --at findings             # one labelled frame per open finding → contact-findings.png
+npm run cli -- preview <slug> --from 8 --to 11         # motion: preview.mp4 + preview-strip.png to look at
 npm run cli -- stills <slug> --frames 18,360 --verify   # spot checks → contact-frames.png + render-order determinism
 ```
 
-Look at the contact sheet like a viewer on a phone: faces visible and lit, the gag readable in each shot, text big
+Fix findings from their `source` (the episode.json entry named after ←) instead of guessing; `inspect` runs in about a
+second, so re-check after each fix and render stills only to confirm. Look at the contact sheet like a viewer on a phone: faces visible and lit, the gag readable in each shot, text big
 enough and outside the shaded platform-UI zones, nothing important cropped. `references/qa-render.md` lists what
 each warning means and the fixes that came up in practice. Warnings are questions, not rules: when something is a
 deliberate choice (a held silence, a slow open, a character leaving frame), mark it with `allow` on the shot or the

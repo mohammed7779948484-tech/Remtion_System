@@ -41,14 +41,28 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
 | Pacing | `core/pacing.ts` | beat sheet, pacing findings |
 | Scene | `player/scene.ts` | pure per-frame evaluation (actors, camera, mood) |
 | Visual state | `inspect/sweep.ts` | per-frame picture state + digests (goldens, checks, remix gate) |
+| Checks | `inspect/inspect.ts` + `framing/camera/motion/contact/overlay/grammar.ts`, `findings.ts`, `context.ts` | findings with time, object, level, source, intent |
+| Explain | `inspect/explain.ts` | every layer of an actor / the camera at a time, with sources |
+| Provenance | `core/trace.ts` | where each resolved cue came from (filled when inspect/explain ask) |
 | Camera | `camera/solve.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus |
 | Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
 | Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
 | Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, playback |
-| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides |
+| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides; `effectors` (body points/volumes for contact checks) |
 | Node tools | `scripts/cli.ts`, `scripts/video.ts` (loader), `scripts/catalog.ts` | CLI, video loading, catalog |
 
-Engine code stays pure and browser-safe; file system, ffmpeg and HTTP live in `scripts/`.
+Engine code stays pure and browser-safe; file system, ffmpeg and HTTP live in `scripts/` (`scripts/cli.ts` dispatches
+to `scripts/cli/*.ts`: discover, scaffold, voices, check, media; `scripts/video.ts` loads video folders).
+
+**Diagnosis loop.** `inspect` evaluates every frame in Node and reports findings: an *error* is objectively broken
+(camera inside geometry), a *warning* probably unintended (a teleport, a limb through the head, a caption over a face,
+a cut mid-word, a jump cut, floating feet, an unreachable recipe target), a *note* a question (static runs, short shots,
+pacing, crossing the line). Each names the episode.json entry most likely responsible (recipe cues carry their step,
+e.g. `actions[22] … do:pick-up step 'reach'`) and the `allow` intent that would mark it deliberate. `explain` shows
+why a state is what it is at a time. Contact checks use each actor's `effectors(c)` (head/face/hands/feet points and
+capsules from the FINAL channels); thresholds are depths, not touching (a palm on a face is contact, not clipping).
+Furniture boxes are coarse, so hands count only when the forearm comes down through an item's top. Teleports are
+discontinuities (a big step that is also ≥3× the surrounding steps), so fast smooth moves pass.
 
 ## 2. `episode.json`
 

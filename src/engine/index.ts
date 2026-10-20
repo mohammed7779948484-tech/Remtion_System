@@ -17,8 +17,13 @@ export { expandRecipe } from "./core/recipes";
 export { beatSheet, pacingNotes, pacingFindings, type PacingFinding } from "./core/pacing";
 export * from "./core/behaviour";
 
-// Inspection: the frame-by-frame visual state (golden tests, inspect, remix gate)
+// Inspection: the frame-by-frame visual state (golden tests, inspect, remix gate), checks and explanations
 export { createSweep, digestSweep, canonical, digest, type Sweep, type SweepDigest, type VisualFrame } from "./inspect/sweep";
+export { inspectEpisode, CHECKS } from "./inspect/inspect";
+export { createContext, type InspectContext } from "./inspect/context";
+export { explainActor, explainCamera } from "./inspect/explain";
+export { formatFinding, sortFindings, type Finding, type Level, type Check } from "./inspect/findings";
+export { createTrace, sourceOf, allowOf, type Trace, type TraceEntry, type Contact } from "./core/trace";
 
 // Reusable screen-space components (also used by the `fx` cues and the "window" screen preset)
 export { AppWindow, type AppWindowProps } from "./ui/AppWindow";

@@ -11,8 +11,9 @@ import { itemAnchor, resolveLayout, type EnvironmentDef, type Layout, type PropC
 import { COMMON_ITEM_PARAMS, PROPS } from "../world/props.data";
 import { CODE_LANGS, COMMON_SCREEN_PARAMS, SCREEN_META } from "../world/screens.data";
 import { SFX_INFO } from "../audio/sfx.data";
-import { resolveBehaviour, type Behaviour } from "./behaviour";
+import { resolveBehaviour, type Behaviour, type Intent } from "./behaviour";
 import { FX_INFO, type ResolvedFx } from "./fx";
+import type { Trace } from "./trace";
 import { baseAt, expandRecipe, type SubAction } from "./recipes";
 import { parseEpisode, TIME_REF_RE, type Episode, type EpisodeAction, type EpisodeShot } from "./schema";
 import type { Vec3 } from "./time";
@@ -89,6 +90,8 @@ export type ResolveContext = {
   components?: string[];
   /** Names of custom screen presets the video provides (`screens` in index.tsx / `screenKinds`). */
   screens?: string[];
+  /** When given, filled with where each resolved cue came from (inspect/explain). */
+  trace?: Trace;
 };
 
 const FORMATS = { landscape: [1920, 1080], portrait: [1080, 1920], square: [1080, 1080] } as const;
@@ -100,6 +103,11 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const warnings: string[] = [];
   const actorDefs = { ...ACTOR_DEFS, ...ctx.actors };
   const envs = { ...ENVIRONMENTS, ...ctx.environments };
+  /** Records where a resolved object came from and its intents (only when tracing). */
+  const traced = <T extends object>(obj: T, where: string, allow?: Intent[]): T => {
+    ctx.trace?.entries.set(obj, allow?.length ? { source: where, allow } : { source: where });
+    return obj;
+  };
 
   // ---- format
   const preset = ep.format?.preset ? FORMATS[ep.format.preset] : FORMATS.landscape;
@@ -238,9 +246,9 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       color: c.color ?? PALETTE[i % PALETTE.length],
       scale: c.scale ?? 1,
       appearance: c.appearance ?? {},
-      start: { position, yaw },
-      poses: c.pose ? [{ at: 0, pose: c.pose, transition: 0 }] : [],
-      emotions: c.emotion ? [{ at: 0, emotion: c.emotion, transition: 0 }] : [],
+      start: traced({ position, yaw }, `cast.${id}`, c.allow),
+      poses: c.pose ? [traced({ at: 0, pose: c.pose, transition: 0 }, `cast.${id}`)] : [],
+      emotions: c.emotion ? [traced({ at: 0, emotion: c.emotion, transition: 0 }, `cast.${id}`)] : [],
       gestures: [],
       looks: [],
       moves: [],
@@ -265,6 +273,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const recipeProps: PropCue[] = [];
   const recipeSfx: { at: number; sound: string; volume?: number; where: string }[] = [];
   const applyAction = (a: Omit<EpisodeAction, "at">, t: number, where: string) => {
+    const allow = a.allow;
     contentEnd = Math.max(contentEnd, t + (a.transition ?? 0));
     const ra = actorById.get(a.actor);
     if (!ra) {
@@ -274,19 +283,19 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     const def = actorDefs[ra.actor];
     if (a.pose) {
       if (def && !def.poses[a.pose]) errors.push(`${where}: unknown pose "${a.pose}" (has: ${Object.keys(def.poses).join(", ")})`);
-      ra.poses.push({ at: t, pose: a.pose, transition: a.transition });
+      ra.poses.push(traced({ at: t, pose: a.pose, transition: a.transition }, where, allow));
     }
     if (a.emotion) {
       if (def && !def.emotions[a.emotion]) errors.push(`${where}: unknown emotion "${a.emotion}" (has: ${Object.keys(def.emotions).join(", ")})`);
-      ra.emotions.push({ at: t, emotion: a.emotion, transition: a.transition });
+      ra.emotions.push(traced({ at: t, emotion: a.emotion, transition: a.transition }, where, allow));
     }
     if (a.gesture) {
       if (def && !def.gestures[a.gesture]) errors.push(`${where}: unknown gesture "${a.gesture}" (has: ${Object.keys(def.gestures).join(", ")})`);
-      ra.gestures.push({ at: t, gesture: a.gesture, speed: a.speed, intensity: a.intensity });
+      ra.gestures.push(traced({ at: t, gesture: a.gesture, speed: a.speed, intensity: a.intensity }, where, allow));
       const gd = def?.gestures[a.gesture];
       if (gd) contentEnd = Math.max(contentEnd, t + gd.duration / (a.speed ?? 1));
     }
-    if (a.look !== undefined) ra.looks.push({ at: t, target: lookTarget(a.look, where), transition: a.transition });
+    if (a.look !== undefined) ra.looks.push(traced({ at: t, target: lookTarget(a.look, where), transition: a.transition }, where, allow));
     if (a.move) {
       const to = markOrPoint(a.move.to, where);
       const from = lastPos.get(ra.id)!;
@@ -295,32 +304,32 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       const duration = a.move.duration ?? Math.max(0.2, dist / speed);
       const start = Math.max(t, moveFree.get(ra.id)!);
       if (start > t + 1e-6) warnings.push(`${where}: move starts before the previous move ends; it waits until ${start.toFixed(2)}s`);
-      ra.moves.push({ at: t, to, duration, face: a.move.face, ...(a.move.ease ? { ease: a.move.ease } : {}) });
+      ra.moves.push(traced({ at: t, to, duration, face: a.move.face, ...(a.move.ease ? { ease: a.move.ease } : {}) }, where, allow));
       lastPos.set(ra.id, to);
       moveFree.set(ra.id, start + duration);
       contentEnd = Math.max(contentEnd, start + duration);
       if (typeof a.move.to === "string" && layout.marks[a.move.to] && a.move.face === undefined) {
-        ra.turns.push({ at: start + duration - 0.15, yaw: layout.marks[a.move.to].yaw, duration: 0.45 });
+        ra.turns.push(traced({ at: start + duration - 0.15, yaw: layout.marks[a.move.to].yaw, duration: 0.45 }, `${where} (turn on arrival)`, allow));
       }
     }
     if (a.turn !== undefined) {
-      if (typeof a.turn === "number") ra.turns.push({ at: t, yaw: a.turn, duration: a.transition });
+      if (typeof a.turn === "number") ra.turns.push(traced({ at: t, yaw: a.turn, duration: a.transition }, where, allow));
       else {
         const other = typeof a.turn === "string" ? actorById.get(a.turn.split(".")[0]) : undefined;
         const toward = other ? lastPos.get(other.id)! : markOrPoint(a.turn, where);
-        ra.turns.push({ at: t, toward, duration: a.transition });
+        ra.turns.push(traced({ at: t, toward, duration: a.transition }, where, allow));
       }
     }
     if (a.hold) {
       for (const [socket, item] of Object.entries(a.hold)) {
         if (def && !def.sockets[socket]) errors.push(`${where}: ${ra.actor} has no socket "${socket}" (has: ${Object.keys(def.sockets).join(", ")})`);
         if (item !== null && !itemIds.has(item) && !PROPS[item] && !(ctx.components ?? []).includes(item)) errors.push(`${where}: hold item "${item}" is not a set item or prop kind`);
-        ra.holds.push({ at: t, socket, item });
+        ra.holds.push(traced({ at: t, socket, item }, where, allow));
       }
     }
     if (a.joints) {
       if (def) for (const k of Object.keys(a.joints)) if (!def.channels[k]) errors.push(`${where}: ${ra.actor} has no channel "${k}"`);
-      ra.overrides.push({ at: t, set: a.joints, duration: a.duration, blend: a.transition, mode: a.mode });
+      ra.overrides.push(traced({ at: t, set: a.joints, duration: a.duration, blend: a.transition, mode: a.mode }, where, allow));
       if (a.duration !== undefined) contentEnd = Math.max(contentEnd, t + a.duration + (a.transition ?? 0.25));
     }
   };
@@ -378,10 +387,11 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       def,
       layout,
       where: `${where} do:${a.do}`,
-      apply: (sub: SubAction) => applyAction({ ...sub, actor: a.actor }, sub.at, `${where} do:${a.do}`),
+      apply: (sub: SubAction) => applyAction({ ...sub, actor: a.actor, allow: [...(a.allow ?? []), ...(sub.allow ?? [])] }, sub.at, `${where} do:${a.do}${sub.step ? ` step '${sub.step}'` : ""}`),
+      contact: (c) => ctx.trace?.contacts.push({ ...c, actor: a.actor, source: `${where} do:${a.do}${c.step ? ` step '${c.step}'` : ""}` }),
       pointOf: (ref, at) => pointOf(ref, at, `${where} do:${a.do}`),
       pressable,
-      addProp: (at, item, set) => recipeProps.push({ at, item, set }),
+      addProp: (at, item, set) => recipeProps.push(traced({ at, item, set }, `${where} do:${a.do}`)),
       addSfx: (at, sound, volume) => recipeSfx.push({ at, sound, volume, where: `${where} do:${a.do}` }),
       addItem: (item) => {
         layout.items.push(item);
@@ -395,7 +405,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   // ---- accents (fx): times, 3D targets, and their sounds
   const fx: ResolvedFx[] = ep.fx.map((f, i) => {
     const at = timeOf(f.at, `fx[${i}]`);
-    const { type, at: _at, duration, sound, volume, ...data } = f as typeof f & { on?: Vec3 | string };
+    const { type, at: _at, duration, sound, volume, allow, ...data } = f as typeof f & { on?: Vec3 | string };
     const where = `fx[${i}] (${type})`;
     let on: ResolvedFx["on"];
     const ref = (f as { on?: Vec3 | string }).on;
@@ -413,7 +423,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       }
     }
     if (sound) recipeSfx.push({ at, sound, volume, where });
-    return { type, at, end: at + (duration ?? FX_INFO[type].duration), data, ...(on ? { on } : {}), seed: `${ep.seed ?? ep.id}:fx${i}` };
+    return traced({ type, at, end: at + (duration ?? FX_INFO[type].duration), data, ...(on ? { on } : {}), seed: `${ep.seed ?? ep.id}:fx${i}` }, where, allow);
   });
   contentEnd = Math.max(contentEnd, ...fx.map((f) => f.end));
 
@@ -448,7 +458,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   };
   const shotsIn = [...ep.camera].map((s, i) => ({ s, i, t: timeOf(s.at, `camera[${i}]`) })).sort((a, b) => a.t - b.t || a.i - b.i);
   for (const { i, t } of shotsIn) if (t >= duration) errors.push(`camera[${i}]: cut at ${t.toFixed(2)}s is at/after the end (${duration.toFixed(2)}s)`);
-  const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, castIds, itemIds, layout, focusTarget, timeOf }));
+  const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => traced(toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, castIds, itemIds, layout, focusTarget, timeOf }), `camera[${i}] (${s.shot})`, s.allow));
 
   // ---- lighting / props / sfx
   const checkMood = (m: MoodRef, where: string) => {
@@ -460,14 +470,14 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const moods: MoodCue[] = ep.lighting
     .map((l, i) => {
       checkMood(l.mood as MoodRef, `lighting[${i}]`);
-      return { at: timeOf(l.at, `lighting[${i}]`), mood: l.mood as MoodRef, transition: l.transition };
+      return traced({ at: timeOf(l.at, `lighting[${i}]`), mood: l.mood as MoodRef, transition: l.transition }, `lighting[${i}]`);
     })
     .sort((a, b) => a.at - b.at);
   const props: PropCue[] = [...ep.props
     .map((p, i) => {
       if (!itemIds.has(p.item)) errors.push(`props[${i}]: unknown set item "${p.item}"`);
       else checkItemParams(layout.items.find((it) => it.id === p.item)!.kind, p.set, `props[${i}] (${p.item})`, ctx.screens ?? [], warnings);
-      return { at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set };
+      return traced({ at: timeOf(p.at, `props[${i}]`), item: p.item, set: p.set }, `props[${i}]`);
     }), ...recipeProps]
     .sort((a, b) => a.at - b.at);
   // Sounds from recipes and fx[].sound are validated here too; `where` names the author's entry, not a merged index.
@@ -480,7 +490,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
         errors.push(`${s.where}: "${s.sound}" is not a library sound, URL or audio file in public/`);
       }
       const info = SFX_INFO[s.sound];
-      return { at: timeOf(s.at, s.where), src, volume: s.volume ?? 1, ...(info ? { name: s.sound, license: info.license } : {}) };
+      return traced({ at: timeOf(s.at, s.where), src, volume: s.volume ?? 1, ...(info ? { name: s.sound, license: info.license } : {}) }, s.where);
     })
     .sort((a, b) => a.at - b.at);
 

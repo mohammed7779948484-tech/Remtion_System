@@ -1,6 +1,6 @@
 {
   "description": "A cut lands in the middle of a spoken word instead of on a word boundary or a pause.",
-  "expect": { "check": "camera", "kind": "cut-mid-word", "object": "camera", "from": 0, "to": 0, "source": "camera[1]" },
+  "expect": { "check": "camera", "kind": "cut-mid-word", "object": "camera", "from": 1.4, "to": 1.7, "source": "camera[1]" },
   "episode": {
     "id": "fault-cut-mid-word",
     "title": "fault: cut mid-word",

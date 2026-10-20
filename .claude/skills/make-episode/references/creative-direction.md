@@ -55,6 +55,9 @@ For 9:16, 20–35 s is a good range. Cut anything that doesn't set up or pay off
 - Claude mascot: no arms — it acts with squash, tilt, hops, wiggles and its eyes. Make its physical limits part of
   the joke instead of fighting them.
 - Use `look` to direct attention: characters looking at the thing tell the viewer where to look.
+- A listener sells the line: cut to their reaction during it. Listening (`defaults.listen`) gives a live listener for
+  free — the look at the speaker, a nod as a phrase lands. A stone-faced listener (`listen: 0`) is also a choice:
+  deadpan comedy lives on stillness; the mascot's persona is already late and small.
 - Audio tags in lines (`[sighs]`, `[panicked]`, `[whispers]`, `[laughs]`) give v4 delivery; one per line is plenty.
 
 ## Sound design

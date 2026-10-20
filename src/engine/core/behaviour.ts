@@ -63,6 +63,10 @@ export type Defaults = {
   focusPull: boolean;
   /** Blends between shots arc around the subject instead of moving in a straight line. */
   arcBlend: boolean;
+  /** Listening: characters look at whoever speaks, nod at phrase ends, blink on cuts, 0 (off, restrained)..1. */
+  listen: number;
+  /** Self-touch recipes (facepalm, sip) aim at the bowed head and pass a point in front of the chest. */
+  viaPoints: boolean;
 };
 
 export type Behaviour = { engine: EngineVersion; profile: ProfileName; allow: Intent[]; defaults: Defaults };
@@ -78,6 +82,8 @@ export const resolveBehaviour = (ep: { engine?: EngineVersion; profile?: Profile
       cameraLife: ep.defaults?.cameraLife ?? 0,
       focusPull: ep.defaults?.focusPull ?? corrections,
       arcBlend: ep.defaults?.arcBlend ?? corrections,
+      listen: ep.defaults?.listen ?? 0,
+      viaPoints: ep.defaults?.viaPoints ?? corrections,
     },
   };
 };

@@ -61,12 +61,15 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
   (`video.data.ts` environment + custom stage components, holo-screen drawings, kinetic text overlays).
 - `videos/one-take/` — engine-2 camera choreography: one sustained `follow` shot with `keys` (an orbit from behind to a
   low front ¾ across the floating-space bridge), an arcing blend, focus pulls, and deliberate shots marked with `allow`.
+- `videos/ctrl-z-remaster/` — engine-2 performance: the ctrl-z payoff copied (ctrl-z itself stays frozen) and redirected
+  with opt-in listening plus a reaction shot, the via-point `do: "facepalm"` instead of raw joints, and a slower `celebrate`.
 
 ## Gotchas learned building the first videos
 
 - Seated actors need seated poses (`sit_idle`, `sit_typing`, `sit_explaining`, `sit_arms_crossed`); standing
   poses bring standing legs. The stock `facepalm` gesture stops at chest height; for a palm on the face use the
-  `do: "facepalm"` recipe (seated or standing). `do: "sip"` brings a held mug to the mouth.
+  `do: "facepalm"` recipe (seated or standing; on engine 2 it lands over the eye and never passes through the head).
+  `do: "sip"` brings a held mug to the mouth.
 - Scene presets: `dev-office` (desk set), `micro-keyboard` (giant laptop), `floating-space` (two rock islands joined
   by a light bridge in a starfield: stand on `stand-left`/`stand-right`, walk `stand-right` → `far-spot` across the
   bridge; island tops are at y = 0, no ground below), or `new --env custom` for a place of your own.

@@ -26,7 +26,9 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
   current defaults; omitted means 1, the original behaviour, kept exactly for older videos. Every new
   automatic behaviour reads only from the resolved `behaviour`, never from the engine version directly.
   `profile` names the check thresholds (`list direction`). `allow: [...]` on the episode or a shot marks a
-  finding as deliberate: it is reported as "accepted by intent", never hidden.
+  finding as deliberate: it is reported as "accepted by intent", never hidden. `defaults` holds the switches:
+  corrections that engine 2 turns on (`focusPull`, `arcBlend`, `viaPoints`) and opt-in styles that stay off until
+  asked for (`cameraLife` 0..2, `listen` 0..1).
 - **Visual state** (`inspect/sweep.ts`): `createSweep(resolved).at(frame)` is everything the picture
   depends on (actors, the rendered camera incl. shake, mood, prop states, screen accents, caption page),
   ~1 ms per frame in Node. Goldens (`tests/goldens/`) hash it for every finished video, so `npm test`
@@ -44,11 +46,12 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
 | Checks | `inspect/inspect.ts` + `framing/camera/motion/contact/overlay/grammar.ts`, `findings.ts`, `context.ts` | findings with time, object, level, source, intent |
 | Explain | `inspect/explain.ts` | every layer of an actor / the camera at a time, with sources |
 | Provenance | `core/trace.ts` | where each resolved cue came from (filled when inspect/explain ask) |
-| Camera | `camera/solve.ts` (pure), `camera/choreo.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus; keyframe splines, paths, `life`, arc blends |
+| Camera | `camera/solve.ts` (pure), `camera/choreo.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus; paths, `life`, arc blends |
+| Splines | `core/spline.ts` (pure) | Hermite/Catmull-Rom keyframe interpolation shared by camera `keys` and keyed joints |
 | Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
 | Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
 | Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, playback |
-| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides; `effectors` (body points/volumes for contact checks) |
+| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides (keyed joints), listening; `effectors` (body points/volumes for contact checks), `persona` |
 | Node tools | `scripts/cli.ts`, `scripts/video.ts` (loader), `scripts/catalog.ts` | CLI, video loading, catalog |
 
 Engine code stays pure and browser-safe; file system, ffmpeg and HTTP live in `scripts/` (`scripts/cli.ts` dispatches
@@ -126,7 +129,9 @@ earlier lines.
 (`null` = straight ahead), `move` (`to`, `speed|duration`, `face`: `path|keep|<deg>`, `ease`: `in` for falls;
 arriving at a mark turns to its yaw), `turn` (deg or target), `hold` (`{ socket: item|null }`; a held set item
 hides from the set), `joints` (precise channel overrides, see the actor manifest's `channels`; `mode: add` for
-offsets, `duration` to release), `transition` (blend seconds).
+offsets, `duration` to release; `keys: [{ at, joints }]` for a smooth spline through via points, `joints` being
+the values at `at`), `transition` (blend seconds). `intensity` is the gesture's strength, or — on an action without
+a gesture — how far toward the `emotion` (0..1).
 
 **Interaction recipes** — `"do"` expands at resolve time into the cues above (plus props cues and sfx), so
 nothing new runs per frame and every anatomy uses its own channels (`reach`, `recipeGestures` in its definition):
@@ -139,8 +144,8 @@ nothing new runs per frame and every anatomy uses its own channels (`reach`, `re
 | `place` | `target` | walks close, reaches, releases; the carried item reappears there (a copy toggled visible, so camera occluders stay static). On a pressable anchor its weight presses it. |
 | `react` | `target?` | flinch + shocked + look at the source. |
 | `sit-down` / `stand-up` | `target?` (seat mark / where to walk) | walk + slow pose blend. |
-| `facepalm` | — | palm on the face, head bowed, eyes shut (seated or standing, via the actor's `selfReach`); armless actors get `tired` + a head shake. |
-| `sip` | a held item | brings it to the mouth (`hand` picks which). |
+| `facepalm` | — | palm on the face, head bowed, eyes shut (seated or standing, via the actor's `selfReach`); armless actors get `tired` + a head shake. Engine 2 (`defaults.viaPoints`): `selfReach(…, { precise: true })` aims at the bowed head (palm over the eye), holds the head's turn, and a keyed override rises through a point in front of the chest (0.6 s); a contact is recorded for `inspect`. |
+| `sip` | a held item | brings it to the mouth (`hand` picks which); same engine-2 via point. |
 
 Every recipe takes `sound` (played at the moment of contact). Only `emotion` is applied alongside a `do`. For
 choreography the recipes can't express, use `joints` or a custom `scene` component.
@@ -209,6 +214,11 @@ itself (Rayan: joint angles + face; the mascot: squash, tilt, eye shapes). A def
 `sockets`, `appearance`, framing `anchors(channels)` (`feet, waist, chest, head, face, top`) and
 `life(channels, signals)` mapping breath, blinks, amplitude talk, look yaw/pitch and gait onto its channels.
 Layering: placement/locomotion → pose → emotion → gestures → life → `joints` overrides.
+Optional `persona` (`{ description, listen: { delay, nod } }`) holds acting defaults read only by opt-in behaviours.
+Listening (`ActorTrack.listen`, built by `player/scene.ts` from `defaults.listen` / cast `listen`, the other speakers'
+lines and their phrase ends, and the cut times) is a look source below authored looks — it fills `1 − authored
+weight` — plus a `beat` life signal (a seeded nod 0.12 s after some phrase ends) and blinks on cuts. Off (no
+`listen`) everything is exactly as before.
 
 **Add an actor**: `src/engine/actors/<id>/<id>.data.ts` (pure) + `<Id>.tsx` (R3F view taking `channels`,
 `appearance`, `held`); register in `actors/defs.ts` and `actors/index.ts`; `npm run catalog && npm test`.

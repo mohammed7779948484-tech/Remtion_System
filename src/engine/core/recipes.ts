@@ -8,8 +8,9 @@
 //   place      target place              walk close, reach, release; a copy appears there (weight presses it)
 //   react      target? (impact source)   flinch + shocked + look
 //   sit-down   target seat mark          walk there, sit;   stand-up: back to standing (optionally walk off)
-import { actorBase, type ActorDefinition, type ActorTrack, type Channels } from "../actors/rig";
+import { actorBase, localToWorld, type ActorDefinition, type ActorTrack, type Channels } from "../actors/rig";
 import type { Layout, SetItem } from "../world/layout";
+import type { Defaults } from "./behaviour";
 import type { EpisodeAction } from "./schema";
 import type { Vec3 } from "./time";
 import type { ResolvedActor } from "./timeline";
@@ -21,6 +22,8 @@ export type RecipeHost = {
   ra: ResolvedActor;
   def: ActorDefinition;
   layout: Layout;
+  /** The episode's automatic behaviour (engine-2 corrections such as `viaPoints`). */
+  defaults: Defaults;
   where: string;
   /** Applies a sub-action exactly like an authored action. */
   apply: (sub: SubAction) => void;
@@ -276,10 +279,23 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
       }
       const side = (socket ?? "handR") === "handL" ? "L" : "R";
       const hold = a.duration ?? (a.do === "facepalm" ? 1.6 : 1.1);
-      const r = def.selfReach(baseAt(h.ra, def, t).layered, a.do, side);
+      const step = a.do === "facepalm" ? "palm to face" : "cup to mouth";
+      const b = baseAt(h.ra, def, t);
+      const precise = h.defaults.viaPoints;
+      const r = def.selfReach(b.layered, a.do, side, precise ? { precise: true } : undefined);
       if (a.do === "facepalm" && def.emotions.tired && !a.emotion) h.apply({ at: t, emotion: "tired", transition: 0.3, step: "tired" });
-      h.apply({ at: t, look: null, joints: r.set, duration: hold, transition: a.do === "facepalm" ? 0.3 : 0.35, step: a.do === "facepalm" ? "palm to face" : "cup to mouth" });
-      if (a.sound) h.addSfx(t + 0.25, a.sound, a.volume);
+      const via = precise ? viaChest(def, b.layered, r.set, side) : null;
+      const rise = 0.6;
+      if (via) {
+        // Engine 2: the hand rises in front of the chest (head half bowed) before it meets the face, so the arm
+        // never sweeps through the head; the joints follow a smooth spline through the three keys.
+        const from: Channels = {};
+        for (const k in r.set) if (k in b.layered) from[k] = b.layered[k];
+        h.apply({ at: t, look: null, joints: from, keys: [{ at: t + rise * 0.5, joints: via }, { at: t + rise, joints: r.set }], duration: hold, transition: 0.3, step: `${step} (via the chest)` });
+        if (r.target) h.contact?.({ at: t + rise, point: localToWorld(baseAt(h.ra, def, t + rise).placement, h.ra.scale, r.target), side, reached: r.reached, what: a.do, step });
+      } else h.apply({ at: t, look: null, joints: r.set, duration: hold, transition: a.do === "facepalm" ? 0.3 : 0.35, step });
+      // The sound lands with the hand.
+      if (a.sound) h.addSfx(via ? t + rise - 0.05 : t + 0.25, a.sound, a.volume);
       return t + hold + 0.3;
     }
 
@@ -311,6 +327,23 @@ export const expandRecipe = (a: EpisodeAction, t: number, h: RecipeHost): number
     }
   }
   return t;
+};
+
+/**
+ * Via point for a self-touch: the hand in front of the upper chest with the head/torso bow (and lids) part-way, as
+ * joint values. Null when the anatomy has no reach or chest anchor (the recipe then blends straight).
+ */
+const viaChest = (def: ActorDefinition, c: Channels, final: Channels, side: "L" | "R"): Channels | null => {
+  if (!def.reach) return null;
+  const mid: Channels = { ...c };
+  for (const k in final) mid[k] = (c[k] ?? final[k]) + (final[k] - (c[k] ?? final[k])) * 0.4;
+  const chest = def.anchors(mid).chest;
+  if (!chest) return null;
+  const s = side === "L" ? 1 : -1;
+  const r = def.reach(mid, [chest[0] + s * 0.1, chest[1] + 0.08, chest[2] + 0.3], side);
+  const out: Channels = {};
+  for (const k in final) out[k] = k in r.set ? r.set[k] : mid[k];
+  return out;
 };
 
 export type { Channels };

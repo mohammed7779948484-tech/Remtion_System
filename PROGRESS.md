@@ -208,6 +208,7 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
 | M0 Safety net, picture sweep, yardstick | ✅ done | see below |
 | M1 Diagnose and explain | ✅ done | see below |
 | M2 Camera choreography | ✅ done | see below |
+| M3 Performance layer | ✅ done (your review pending) | see below |
 
 ## M0 — safety net, picture sweep and yardstick
 - `core/behaviour.ts`: `engine` (1 default = original behaviour, 2 = current; `new` writes 2), `profile` (only
@@ -302,3 +303,44 @@ Rules: engine-1 videos must not change (goldens); stylistic behaviours are opt-i
   dolly-zoom, paths, lead, life only where asked, focus pull vs snap, arc vs straight blend, corrections switch off).
 - Skill: camera grammar now says shot length follows the scene (no 1–3 s rule), cookbook documents windows, keys,
   path, lead, life and the engine-2 corrections.
+
+## M3 — performance layer
+- Listening (opt-in, `defaults.listen` / cast `listen`, 0..1; 0 = restrained = exactly off): `player/scene.ts` builds an
+  `ActorTrack.listen` from the other speakers' lines, their phrase ends (word gaps ≥ 0.3 s + the last word) and the cut
+  times; `rig.ts` adds it as a look source *below* authored looks (fills `1 − authored weight`, so `look: null` hands
+  control back), after the persona's reaction delay, held ~1 s after the line, seeded glances away in lines > 3 s;
+  `LifeSignals.beat` drives a seeded nod 0.12 s after some phrase ends; blinks on cuts.
+- `persona` on the actor definitions (Rayan: quick, nods along — delay 0.2 s, nod 1; mascot: late and small — 0.35 s,
+  0.5). `beat` gesture for word emphasis on both. Emotion `intensity` (on an action without a gesture; with one it stays
+  the gesture's strength). Keyed joints: action `keys: [{ at, joints }]` → `OverrideCue.keys`, a Hermite spline through
+  every key (`core/spline.ts`, now shared with the camera); `joints` are the values at `at`; keys before the action are
+  errors, keys after its `duration` warnings.
+- Engine-2 correction `defaults.viaPoints`: `facepalm`/`sip` call `selfReach(…, { precise: true })` — targets on the
+  bowed head itself (palm over the eye on that side, cup in front of the mouth), the head's turn held so a look or
+  listening can't swing the face away from the hand — through a keyed override that rises via a point in front of the
+  chest (head half bowed) over 0.6 s; the recipe records a contact so `inspect` checks the landing. Measured (Rayan,
+  seated and standing): engine 1 palm 7.6 cm inside the head (flagged), engine 2 3.4 cm off the head surface, contact
+  missed by 0.5 cm, no penetration during the rise. The first precise target (y 0.12 in the head frame) landed at the
+  mouth and was raised after looking at the frames: with a ~37° bow "in front of the eyes" projects below the glasses,
+  and the visible fist sits ~4 cm behind the effector point.
+- Goldens: resolved hashes of the three finished videos refreshed (two new `behaviour.defaults` fields); every frame's
+  visual digest identical — verified before refreshing, and the resolved episodes equal the old ones with the two fields
+  removed.
+- Tests: 199 (20 files). `tests/performance.test.ts`: listening off unless asked, looks at the speaker only after the
+  delay and lets go, restrained identical to off (episode or one character), authored looks win, nods only after phrase
+  ends, word gaps become phrase ends, emotion intensity halfway, keyed joints pass through via points + validation, engine
+  1 facepalm still penetrates / engine 2 doesn't (seated + standing), via key + contact, `viaPoints: false` = legacy, sip.
+- Production acceptance — `videos/ctrl-z-remaster/` (engine 2, 9.2 s): the ctrl-z payoff (22.04–31.2 s of the
+  original) copied with the l5 clip and its manifest entry; ctrl-z untouched. Directed changes: `do: "facepalm"` instead
+  of the raw joints; `celebrate` 0.45 s (the original 0.25 s swings the hands up at 13 m/s, 44 cm in one frame; 0.45 s
+  peaks at 7 m/s); listening on, Rayan's authored look at the mascot during l5 removed, and a reaction cut to him at
+  "for you." so the listening is on screen (turn to the speaker, nod at the phrase end). `inspect`: 0 errors, 0 warnings,
+  1 accepted (he runs away from the lens to Z — `allow: ["back-of-head"]` on that shot; the opening glance at the duck
+  starts in place, `transition: 0`). Comparison material in `out/ctrl-z-remaster/compare/`: matched-frame sheets
+  `before-frames.png` / `after-frames.png` / `restrained-frames.png`, previews `before|after|restrained.mp4` and strips.
+  The restrained cut (listening 0) stares ahead through the line — restraint stays restraint.
+- Found while directing, for later: the teleport rule (a step ≥ 3× its neighbours) misses motion that is continuous but
+  far too fast — the remaster's 0.25 s `celebrate` passes inspect at 44 cm/frame because neighbouring frames are fast
+  too (the original was flagged at 23.83 s for the same ~0.45 m step: whether the rule fires depends on how the
+  neighbouring frames fall). A peak-speed note for hands
+  would catch it. The blind comparator review of the before/after material (plan M3) has not been run yet.

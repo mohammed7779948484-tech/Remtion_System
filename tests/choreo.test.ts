@@ -1,7 +1,7 @@
 // Camera choreography: move windows, solver-space keyframes, world paths, follow lead, the `life`
 // drift, focus that pulls between speakers and blends that arc around the subject.
 import { describe, expect, it } from "vitest";
-import { splineAt } from "../src/engine/camera/choreo";
+import { splineAt } from "../src/engine/core/spline";
 import { cameraAt, project, shotFrame, type CameraFrame } from "../src/engine/camera/solve";
 import type { Vec3 } from "../src/engine/core/time";
 import { resolveEpisode } from "../src/engine/core/timeline";

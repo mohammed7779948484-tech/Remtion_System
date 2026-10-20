@@ -55,7 +55,7 @@ absolute seconds. A pause between words is the right spot for a UI ping:
 ```json
 { "at": "l1.start", "actor": "rayan", "emotion": "shocked", "look": "camera" },
 { "at": "l2.word:3", "actor": "claude", "gesture": "nod" },
-{ "at": 4, "actor": "rayan", "pose": "celebrate", "transition": 0.25 },
+{ "at": 4, "actor": "rayan", "pose": "celebrate", "transition": 0.45 },
 { "at": 5, "actor": "rayan", "move": { "to": "on-z", "duration": 2.3 } },
 { "at": 0.1, "actor": "rayan", "move": { "to": "on-enter", "duration": 0.38, "ease": "in", "face": "keep" } },
 { "at": 7, "actor": "rayan", "turn": 0, "transition": 0.2 },
@@ -63,7 +63,25 @@ absolute seconds. A pause between words is the right spot for a UI ping:
 ```
 `look`: actor (`"claude"`, `"claude.face"`), item (`"keyboard.key:ctrl"`), mark, `[x,y,z]`, `"camera"`, `null`.
 `turn`: degrees or a place/actor — not `"camera"` (use `look: "camera"` to face the lens).
-A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
+A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls. Big pose changes need time: arms
+thrown overhead in 0.25 s (`celebrate`) move the hands 44 cm in one frame — give them ≥ ~0.4 s.
+
+**Performance.**
+- `intensity` on an action without a `gesture` is how far toward its `emotion` (0..1):
+  `{ "emotion": "angry", "intensity": 0.4 }` reads irritated, not furious. With a gesture it stays the gesture's strength.
+- `gesture: "beat"` (Rayan: head dip + brow lift; mascot: forward dip) is a small emphasis accent — put it on a word:
+  `{ "at": "l3.word:4", "actor": "rayan", "gesture": "beat" }`.
+- Keyed joints pass smoothly through every key (via points), so a limb goes around the body instead of through it:
+  `{ "at": 2, "actor": "rayan", "joints": { "shoulderR.x": -0.3 }, "keys": [{ "at": 2.3, "joints": { "shoulderR.x": -1.2, "elbowR.x": -1.6 } },
+  { "at": 2.6, "joints": { "shoulderR.x": -2.0, "elbowR.x": -1.1 } }], "duration": 1.5, "transition": 0.3 }`.
+  `joints` are the values at `at`; a channel first keyed later takes that first keyed value from the start.
+
+**Listening (opt-in).** `"defaults": { "listen": 1 }` for the episode, or `"listen": 0..1` on a cast member (0 =
+restrained: exactly off). Characters then look at whoever is speaking after their persona's reaction delay (Rayan
+0.2 s, the mascot 0.35 s), glance away now and then in long lines, nod at some phrase ends (word gaps ≥ 0.3 s and the
+line end) and blink on cuts. It never overrides an authored `look`: it only fills the weight a look leaves
+(`look: null` hands control back to it). It shows only when the listener is on screen — cut to a reaction shot during
+the line (`videos/ctrl-z-remaster`).
 
 ## 5. Recipes (`do`)
 ```json
@@ -79,7 +97,10 @@ A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
 { "at": "l5.end+0.4",  "actor": "rayan",  "do": "facepalm", "duration": 1.8 }
 ```
 - `facepalm` (palm on the face, head bowed, eyes shut) and `sip` (held cup to the mouth) work seated and standing.
-  `sip` needs a `pick-up` first; the armless mascot's `facepalm` becomes a tired head shake.
+  `sip` needs a `pick-up` first; the armless mascot's `facepalm` becomes a tired head shake. On engine 2
+  (`defaults.viaPoints`, on by default) the palm lands over the eye of the bowed head, the hand rises in front of the
+  chest first (no sweep through the head), and the head's turn is held meanwhile, so a look or listening can't swing
+  the face away from the hand. Prefer the recipe to raw `joints` for a hand on the face.
 - `press` while standing on the key = stomp/hop and the actor sinks with the key; otherwise a hand tap. Keys stay
   down unless you give `duration`. Release a key you stood on by moving off it and a props cue `{ "keys": { "z": false } }`.
 - `place` on a pressable anchor presses it (the weight); the carried item reappears there.
@@ -176,7 +197,7 @@ actor to the mark's yaw — use `move.face: "path"` to keep the walking directio
 
 **Engine 2 corrections** (on by default with `"engine": 2`, off with `"defaults": { "focusPull": false, "arcBlend":
 false }`): auto focus holds the last speaker and pulls (~0.45 s) instead of snapping; `blend` arcs around the subject
-instead of moving in a straight line through it.
+instead of moving in a straight line through it. (The third correction, `viaPoints`, is in the recipes — section 5.)
 
 ## 10. Sound
 ```json

@@ -71,6 +71,14 @@ const rayanEffectors = (c: Channels): Effectors => {
   };
 };
 
+/** A point in the head's own frame (centre at [0, 0.19, 0], face front at +z 0.23), in root-local space. */
+const headPoint = (c: Channels, local: Vec3): Vec3 => {
+  const rot = (name: string): Vec3 => [c[`${name}.x`] ?? 0, c[`${name}.y`] ?? 0, c[`${name}.z`] ?? 0];
+  const pelvis: Frame = { position: [0, c["pelvis.y"], 0], rotations: [[c["pelvis.x"], 0, 0]] };
+  const head = childFrame(childFrame(childFrame(pelvis, [0, 0.06, 0], rot("torso")), [0, 0.46, 0], [0, 0, 0]), [0, 0.07, 0], rot("head"));
+  return outOfFrame(head, local);
+};
+
 const HALF_PI = Math.PI / 2;
 const ch = (rest: number, min: number, max: number, description?: string): ChannelSpec => ({ rest, min, max, description });
 const rot3 = (name: string, rest: [number, number, number], range: [number, number]) => ({
@@ -229,6 +237,14 @@ export const rayanDef: ActorDefinition = {
       set: { "browL.y": 0.128, "browR.y": 0.128, "torso.x": -0.12 },
       add: (u) => ({ "head.y": u < 0.35 ? Math.sin((u / 0.35) * Math.PI) * 0.55 : 0, "head.x": u > 0.35 ? -Math.sin(((u - 0.35) / 0.65) * Math.PI) * 0.12 : 0 }),
     },
+    beat: {
+      description: "A small emphasis accent on a word: a quick head dip and brow lift (put it on `lN.word:K`).",
+      duration: 0.45,
+      add: (u) => {
+        const b = Math.sin(u * Math.PI);
+        return { "head.x": b * 0.11, "torso.x": b * 0.03, "browL.y": b * 0.012, "browR.y": b * 0.012 };
+      },
+    },
     type_burst: {
       description: "Frantic typing (use while seated at a keyboard).",
       duration: 1.5,
@@ -251,15 +267,21 @@ export const rayanDef: ActorDefinition = {
     headphones: { type: "boolean", default: true, description: "Headphones around the neck" },
   },
   recipeGestures: { flinch: "flinch", stomp: "stomp", crouchPose: "crouch", stompContact: 0.45 },
-  selfReach: (c0, what, side) => {
+  selfReach: (c0, what, side, opts) => {
     // Bow into the palm / tilt back to drink, then reach the hand there (works seated and standing).
     const bow = what === "facepalm" ? { head: 0.45, torso: 0.2 } : { head: -0.12, torso: 0.05 };
     const c = { ...c0, "head.x": c0["head.x"] + bow.head, "torso.x": c0["torso.x"] + bow.torso };
-    const face = rayanDef.anchors(c).face;
     const s = side === "L" ? 1 : -1;
-    const target: Vec3 = what === "facepalm" ? [face[0] + s * 0.11, face[1] - 0.07, face[2] - 0.06] : [face[0] + s * 0.03, face[1] - 0.2, face[2] + 0.05];
+    // Precise (engine 2): targets on the bowed head itself — the palm over the eye on that side, the cup just in
+    // front of the mouth — with the head's turn held so a look can't swing the face away from the hand. Legacy:
+    // relative to the face anchor, which ignores the bow (the palm ends ~8 cm inside the head).
+    const face = rayanDef.anchors(c).face;
+    const target: Vec3 = opts?.precise
+      ? headPoint(c, what === "facepalm" ? [s * 0.06, 0.25, 0.25] : [s * 0.03, 0.0, 0.3])
+      : what === "facepalm" ? [face[0] + s * 0.11, face[1] - 0.07, face[2] - 0.06] : [face[0] + s * 0.03, face[1] - 0.2, face[2] + 0.05];
     const r = rayanDef.reach!(c, target, side);
-    return { set: { ...r.set, "head.x": c["head.x"], "torso.x": c["torso.x"], ...(what === "facepalm" ? { lidL: 0.85, lidR: 0.85 } : {}) }, reached: r.reached };
+    const held: Channels = opts?.precise ? { "head.y": c0["head.y"] } : {};
+    return { set: { ...r.set, "head.x": c["head.x"], "torso.x": c["torso.x"], ...held, ...(what === "facepalm" ? { lidL: 0.85, lidR: 0.85 } : {}) }, reached: r.reached, ...(opts?.precise ? { target } : {}) };
   },
   reach: (c, target, side) => {
     const r = armIK(armRig(side === "L" ? 1 : -1), inFrame(torsoFrame(c), target));
@@ -269,6 +291,7 @@ export const rayanDef: ActorDefinition = {
     };
   },
   effectors: rayanEffectors,
+  persona: { description: "Expressive developer: reacts quickly, nods along, talks with his hands.", listen: { delay: 0.2, nod: 1 } },
   anchors: (c) => {
     const pelvis = c["pelvis.y"];
     const lean = c["torso.x"];
@@ -300,6 +323,9 @@ export const rayanDef: ActorDefinition = {
     c["head.x"] -= clamp(s.lookPitch * 0.5, -0.45, 0.45) * w;
     c["pupil.x"] = clamp(s.lookYaw * 0.025, -0.012, 0.012) * w + s.noise("saccadeX", 1.3) * 0.002;
     c["pupil.y"] = clamp(s.lookPitch * 0.025, -0.01, 0.01) * w + s.noise("saccadeY", 1.1) * 0.0015;
+
+    // Listening nod (opt-in listening only).
+    if (s.beat > 0) c["head.x"] += s.beat * 0.09;
 
     // Blinks never open a lid further than the emotion has it.
     c.lidL = Math.max(c.lidL, s.blink);

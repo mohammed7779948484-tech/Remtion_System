@@ -60,6 +60,14 @@
         },
         "arcBlend": {
           "type": "boolean"
+        },
+        "listen": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "viaPoints": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -471,6 +479,11 @@
                 "quick-cuts"
               ]
             }
+          },
+          "listen": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
           }
         },
         "required": [
@@ -699,6 +712,41 @@
             },
             "additionalProperties": {
               "type": "number"
+            }
+          },
+          "keys": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "at": {
+                  "anyOf": [
+                    {
+                      "type": "number",
+                      "minimum": 0
+                    },
+                    {
+                      "type": "string",
+                      "pattern": "^([A-Za-z][\\w-]*)\\.(start|end|word:(\\d+)(?:\\.(start|end))?)([+-]\\d+(?:\\.\\d+)?)?$"
+                    }
+                  ]
+                },
+                "joints": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
+              },
+              "required": [
+                "at",
+                "joints"
+              ],
+              "additionalProperties": false
             }
           },
           "mode": {

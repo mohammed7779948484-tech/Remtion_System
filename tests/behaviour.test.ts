@@ -15,19 +15,19 @@ const ep = (extra: object) => ({
 describe("engine version, profile and intent", () => {
   it("defaults to the original engine and the standard profile", () => {
     const r = resolveEpisode(ep({}), null);
-    expect(r.behaviour).toEqual({ engine: 1, profile: "standard", allow: [], defaults: { cameraLife: 0, focusPull: false, arcBlend: false } });
+    expect(r.behaviour).toEqual({ engine: 1, profile: "standard", allow: [], defaults: { cameraLife: 0, focusPull: false, arcBlend: false, listen: 0, viaPoints: false } });
     expect(profileOf(r.behaviour)).toMatchObject({ hook: 1.5, deadAir: 1.5 });
   });
 
   it("reads engine 2, a profile and episode/shot intents", () => {
     const r = resolveEpisode(ep({ engine: 2, profile: "standard", allow: ["silence"], camera: [{ at: 0, shot: "medium", subject: "rayan", allow: ["offscreen"] }] }), null);
-    expect(r.behaviour).toEqual({ engine: 2, profile: "standard", allow: ["silence"], defaults: { cameraLife: 0, focusPull: true, arcBlend: true } });
+    expect(r.behaviour).toEqual({ engine: 2, profile: "standard", allow: ["silence"], defaults: { cameraLife: 0, focusPull: true, arcBlend: true, listen: 0, viaPoints: true } });
     expect(accepts("silence", r.behaviour)).toBe(true);
     expect(accepts("offscreen", r.behaviour)).toBe(false);
     expect(accepts("offscreen", r.behaviour, r.shots[0])).toBe(true);
-    expect(resolveBehaviour({})).toEqual({ engine: 1, profile: "standard", allow: [], defaults: { cameraLife: 0, focusPull: false, arcBlend: false } });
+    expect(resolveBehaviour({})).toEqual({ engine: 1, profile: "standard", allow: [], defaults: { cameraLife: 0, focusPull: false, arcBlend: false, listen: 0, viaPoints: false } });
     // Corrections can be switched off on engine 2 and on for engine 1; styles stay opt-in.
-    expect(resolveBehaviour({ engine: 2, defaults: { focusPull: false, cameraLife: 0.5 } }).defaults).toEqual({ cameraLife: 0.5, focusPull: false, arcBlend: true });
+    expect(resolveBehaviour({ engine: 2, defaults: { focusPull: false, cameraLife: 0.5, listen: 0.6 } }).defaults).toEqual({ cameraLife: 0.5, focusPull: false, arcBlend: true, listen: 0.6, viaPoints: true });
   });
 
   it("rejects unknown engines, profiles, intents and eases instead of ignoring them", () => {

@@ -89,6 +89,7 @@ export const claudeDef: ActorDefinition = {
     shake: { description: "Shakes no.", duration: 0.9, add: (u) => ({ "body.ry": Math.sin(u * Math.PI * 6) * 0.3 * Math.sin(u * Math.PI) }) },
     spin: { description: "Full 360° spin.", duration: 0.9, add: (u) => ({ "body.ry": EASINGS.inOut(u) * Math.PI * 2, squash: Math.sin(u * Math.PI) * 0.05 }) },
     wiggle: { description: "Happy side-to-side wiggle.", duration: 1.0, add: (u) => ({ "body.rz": Math.sin(u * Math.PI * 8) * 0.2 * Math.sin(u * Math.PI), squash: Math.sin(u * Math.PI * 8) * 0.04 }) },
+    beat: { description: "A small emphasis accent on a word: a quick forward dip and squash pulse (put it on `lN.word:K`).", duration: 0.4, add: (u) => ({ "body.rx": Math.sin(u * Math.PI) * 0.1, squash: -Math.sin(u * Math.PI) * 0.035 }) },
   },
   sockets: {
     top: "Above the top lobe (hats, icons, thought bubbles)",
@@ -100,6 +101,7 @@ export const claudeDef: ActorDefinition = {
     eyeColor: { type: "color", default: "#141418", description: "Eyes and feet shading" },
   },
   recipeGestures: { flinch: "flinch", stomp: "hop", stompContact: 0.85 },
+  persona: { description: "Calm, literal, deadpan AI: small, late reactions; most of the comedy is in its stillness.", listen: { delay: 0.35, nod: 0.5 } },
   // No arms: "reaching" is leaning the whole body toward the target (and pressing is a hop onto it).
   reach: (c, target) => {
     const up = target[1] - c["body.y"];
@@ -172,6 +174,12 @@ export const claudeDef: ActorDefinition = {
       c["footR.y"] = lerp(c["footR.y"], 0.022 + Math.max(0, -Math.sin(step)) * 0.018, s.walk);
       c["footL.z"] = lerp(c["footL.z"], 0.012 + Math.cos(step) * 0.022, s.walk);
       c["footR.z"] = lerp(c["footR.z"], 0.012 - Math.cos(step) * 0.022, s.walk);
+    }
+
+    // Listening nod (opt-in listening only): a small forward dip.
+    if (s.beat > 0) {
+      c["body.rx"] += s.beat * 0.08;
+      c.squash -= s.beat * 0.02;
     }
 
     const lid = lerp(1, 0.08, s.blink);

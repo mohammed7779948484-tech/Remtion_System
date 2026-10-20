@@ -59,6 +59,10 @@
     "wiggle": {
       "description": "Happy side-to-side wiggle.",
       "duration": 1
+    },
+    "beat": {
+      "description": "A small emphasis accent on a word: a quick forward dip and squash pulse (put it on `lN.word:K`).",
+      "duration": 0.4
     }
   },
   "anchors": {

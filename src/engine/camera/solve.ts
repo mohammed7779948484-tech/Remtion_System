@@ -9,7 +9,8 @@
 // Corrections only touch values the solver derived; authored values are used exactly.
 import type { Intent } from "../core/behaviour";
 import { clamp, lerp, lerpVec3, noise, progress, type EaseName, type Vec3 } from "../core/time";
-import { arcBlend, keyedValue, lifeOffset, splineAt, splineVec3 } from "./choreo";
+import { keyedValue, splineAt, splineVec3 } from "../core/spline";
+import { arcBlend, lifeOffset } from "./choreo";
 import type { Box, CameraSpot } from "../world/layout";
 
 export type ShotType = "establishing" | "wide" | "full" | "medium" | "close" | "two-shot" | "over-shoulder" | "insert" | "custom";

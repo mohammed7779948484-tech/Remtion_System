@@ -54,6 +54,9 @@ Patterns for everything below are in `references/direction-cookbook.md` (copy-pa
   `subject`; the solver frames for 9:16 and avoids occluders. Use `custom` only for deliberate compositions.
   `angle` is measured from where the subject faces in the middle of the shot; looks, turns and recipes change that,
   so a character looking at someone else can show you the back of their head (`validate` warns).
+- **Performance**: emotion `intensity`, a `beat` gesture on a word for emphasis, and opt-in listening
+  (`defaults.listen` / cast `listen`, 0..1: listeners look at the speaker, nod at phrase ends, blink on cuts; authored
+  looks always win, 0 is exactly off). Cut to the listener during a line to use it. Cookbook "Actions".
 - **Screens** (`props` cues on monitors/the giant screen): `code`, `terminal`, `error`, `deploy`, `window`, plus a
   `popup` on any of them. Text on in-world screens is small on phones — repeat the key words in a `window`/`text` fx.
 
@@ -69,8 +72,8 @@ accumulates state — Remotion renders frames out of order in parallel, so state
 Before writing markup or 3D code, load the installed `remotion-best-practices` skill (and the relevant
 `r3f-*` skill); where their advice conflicts with these determinism rules, these rules win.
 
-For one-off choreography the recipes can't do, use `joints` overrides — you can compute exact arm values with the
-actor's `reach` (see "Escape hatches" in the cookbook).
+For one-off choreography the recipes can't do, use `joints` overrides — with `keys` (via points) when a limb has to
+go around the body — and compute exact arm values with the actor's `reach` (see "Escape hatches" in the cookbook).
 
 ## 5. Voices
 

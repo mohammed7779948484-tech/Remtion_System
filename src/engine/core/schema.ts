@@ -47,6 +47,8 @@ const CastMember = z.strictObject({
   name: z.string().optional(),
   /** Findings about this character that are deliberate, e.g. ["floating"] for a hovering ghost. */
   allow: Allow.optional(),
+  /** Listening for this character, 0 (restrained) … 1 (overrides `defaults.listen`). */
+  listen: z.number().min(0).max(1).optional(),
 });
 
 const Line = z.strictObject({
@@ -80,10 +82,16 @@ const Action = z.strictObject({
   hold: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
   /** Precise channel overrides (see the actor manifest's channels). */
   joints: z.record(z.string(), z.number()).optional(),
+  /**
+   * Keyed joints: the override passes smoothly through every key (via points), e.g. the hand in front of the
+   * chest before it reaches the face. `joints`, when given, are the values at the action's `at`.
+   */
+  keys: z.array(z.strictObject({ at: TimeRef, joints: z.record(z.string(), z.number()) })).min(1).optional(),
   mode: z.union([z.literal("absolute"), z.literal("add")]).optional(),
   /** Seconds a joints override lasts (omit = holds). */
   duration: z.number().positive().optional(),
   transition: z.number().min(0).optional(),
+  /** The gesture's strength; on an action without a gesture, how far toward the `emotion` (0..1). */
   intensity: z.number().min(0).optional(),
   speed: z.number().positive().optional(),
   /**
@@ -192,13 +200,16 @@ export const EpisodeSchema = z.strictObject({
   allow: Allow.optional(),
   /**
    * Automatic behaviour switches. Corrections default on with `engine: 2` (focus pulls between speakers, blends
-   * that arc around the subject); styles are opt-in (cameraLife: subtle drift on shots without a move, 0..2).
+   * that arc around the subject, self-touch recipes through via points); styles are opt-in (cameraLife: subtle
+   * drift on shots without a move, 0..2; listen: characters look at whoever speaks and nod, 0..1).
    */
   defaults: z
     .strictObject({
       cameraLife: z.number().min(0).max(2).optional(),
       focusPull: z.boolean().optional(),
       arcBlend: z.boolean().optional(),
+      listen: z.number().min(0).max(1).optional(),
+      viaPoints: z.boolean().optional(),
     })
     .optional(),
   format: z

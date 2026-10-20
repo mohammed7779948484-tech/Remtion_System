@@ -18,9 +18,9 @@ recipe step) and the `allow` intent that would mark it deliberate:
 | `camera/cut-mid-word` | cut on `lN.word:K` / `lN.word:K.end` or in a pause |
 | `camera/jump-cut` | change size by ~30 %+ or angle by ~30°+ between the two shots |
 | `camera/focus-jump`, `focus-off-screen` | `rack` the focus, or focus on a subject in frame |
-| `motion/teleport` | lengthen the move/transition; a snap on purpose: ease `"snap"` or `allow: ["abrupt"]` on the action |
+| `motion/teleport` | lengthen the move/transition (a full-arm pose like `celebrate` needs ≥ ~0.4 s); a snap on purpose: ease `"snap"` or `allow: ["abrupt"]` on the action |
 | `motion/jitter` | longer transitions, fewer overlapping cues on that actor |
-| `contact/penetration` (limb × head) | a straight joints blend sweeps through the body: add an in-between `joints` cue or use the recipe |
+| `contact/penetration` (limb × head) | a straight joints blend sweeps through the body: use the recipe (`do: "facepalm"`, engine 2), or `keys` with a via point in front of the chest |
 | `contact/penetration` (hand × item) | raise the reach target, or move the actor off the furniture |
 | `contact/unreachable`, `missed-contact` | move the actor closer to the target (or the target closer) |
 | `contact/floating` | put the actor on a mark / the surface height; `allow: ["floating"]` on the cast member if it hovers |

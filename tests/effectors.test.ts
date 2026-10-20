@@ -43,7 +43,8 @@ describe("Rayan effectors", () => {
     const e = rayanDef.effectors!({ ...c, ...r.set });
     const d = dist(e.points.handR, e.points.head);
     // Known (engine 1): selfReach aims at the face *anchor*, which ignores the bowed head, so the palm sits
-    // ~8 cm inside the head volume (0.153 m from its centre, radius 0.23). Corrected for engine 2 in M3.
+    // ~8 cm inside the head volume (0.153 m from its centre, radius 0.23). Engine 2 asks for `{ precise: true }`
+    // targets on the bowed head instead (tests/performance.test.ts).
     expect(d).toBeGreaterThan(0.1);
     expect(d).toBeLessThan(0.3);
     expect(e.points.handR[2]).toBeGreaterThan(e.points.head[2]);

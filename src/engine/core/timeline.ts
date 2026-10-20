@@ -46,13 +46,15 @@ export type ResolvedActor = {
   appearance: Record<string, unknown>;
   start: { position: Vec3; yaw: number };
   poses: { at: number; pose: string; transition?: number }[];
-  emotions: { at: number; emotion: string; transition?: number }[];
+  emotions: { at: number; emotion: string; transition?: number; intensity?: number }[];
   gestures: { at: number; gesture: string; speed?: number; intensity?: number }[];
   looks: { at: number; target: LookTarget; transition?: number }[];
   moves: MoveCue[];
   turns: TurnCue[];
   overrides: OverrideCue[];
   holds: HoldCue[];
+  /** Listening intensity for this character (cast `listen`; absent = the episode's `defaults.listen`). */
+  listen?: number;
 };
 
 export type ResolvedEpisode = {
@@ -114,6 +116,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   const width = ep.format?.width ?? preset[0];
   const height = ep.format?.height ?? preset[1];
   const fps = ep.format?.fps ?? 30;
+  const behaviour = resolveBehaviour(ep);
 
   // ---- set
   const env = envs[ep.set.environment];
@@ -255,6 +258,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       turns: [],
       overrides: [],
       holds: [],
+      ...(c.listen !== undefined ? { listen: c.listen } : {}),
     };
     if (def && c.pose && !def.poses[c.pose]) errors.push(`cast ${id}: unknown pose "${c.pose}" for ${c.actor}`);
     if (def && c.emotion && !def.emotions[c.emotion]) errors.push(`cast ${id}: unknown emotion "${c.emotion}" for ${c.actor}`);
@@ -287,7 +291,9 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     }
     if (a.emotion) {
       if (def && !def.emotions[a.emotion]) errors.push(`${where}: unknown emotion "${a.emotion}" (has: ${Object.keys(def.emotions).join(", ")})`);
-      ra.emotions.push(traced({ at: t, emotion: a.emotion, transition: a.transition }, where, allow));
+      // `intensity` belongs to the gesture when there is one; otherwise it is how far toward the emotion.
+      const intensity = a.intensity !== undefined && !a.gesture ? { intensity: Math.min(1, a.intensity) } : {};
+      ra.emotions.push(traced({ at: t, emotion: a.emotion, transition: a.transition, ...intensity }, where, allow));
     }
     if (a.gesture) {
       if (def && !def.gestures[a.gesture]) errors.push(`${where}: unknown gesture "${a.gesture}" (has: ${Object.keys(def.gestures).join(", ")})`);
@@ -327,10 +333,20 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
         ra.holds.push(traced({ at: t, socket, item }, where, allow));
       }
     }
-    if (a.joints) {
-      if (def) for (const k of Object.keys(a.joints)) if (!def.channels[k]) errors.push(`${where}: ${ra.actor} has no channel "${k}"`);
-      ra.overrides.push(traced({ at: t, set: a.joints, duration: a.duration, blend: a.transition, mode: a.mode }, where, allow));
+    if (a.joints || a.keys) {
+      // Keyed joints: a smooth spline through every key; `joints` (if any) are the values at the action's time.
+      const keyed = a.keys?.map((k, j) => ({ at: timeOf(k.at, `${where}.keys[${j}]`), set: k.joints })).sort((x, y) => x.at - y.at);
+      const keys = keyed && a.joints ? [{ at: t, set: a.joints }, ...keyed] : keyed;
+      const set: Record<string, number> = { ...a.joints };
+      for (const k of keys ?? []) for (const ch in k.set) if (!(ch in set)) set[ch] = k.set[ch];
+      if (def) for (const k of Object.keys(set)) if (!def.channels[k]) errors.push(`${where}: ${ra.actor} has no channel "${k}"`);
+      for (const k of keyed ?? []) {
+        if (k.at < t - 1e-6) errors.push(`${where}: a joints key at ${k.at.toFixed(2)}s is before the action (${t.toFixed(2)}s)`);
+        if (a.duration !== undefined && k.at > t + a.duration + 1e-6) warnings.push(`${where}: a joints key at ${k.at.toFixed(2)}s is after the override ends (${(t + a.duration).toFixed(2)}s)`);
+      }
+      ra.overrides.push(traced({ at: t, set, duration: a.duration, blend: a.transition, mode: a.mode, ...(keys ? { keys } : {}) }, where, allow));
       if (a.duration !== undefined) contentEnd = Math.max(contentEnd, t + a.duration + (a.transition ?? 0.25));
+      if (keys) contentEnd = Math.max(contentEnd, keys[keys.length - 1].at);
     }
   };
 
@@ -386,6 +402,7 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
       ra,
       def,
       layout,
+      defaults: behaviour.defaults,
       where: `${where} do:${a.do}`,
       apply: (sub: SubAction) => applyAction({ ...sub, actor: a.actor, allow: [...(a.allow ?? []), ...(sub.allow ?? [])] }, sub.at, `${where} do:${a.do}${sub.step ? ` step '${sub.step}'` : ""}`),
       contact: (c) => ctx.trace?.contacts.push({ ...c, actor: a.actor, source: `${where} do:${a.do}${c.step ? ` step '${c.step}'` : ""}` }),
@@ -458,7 +475,6 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
   };
   const shotsIn = [...ep.camera].map((s, i) => ({ s, i, t: timeOf(s.at, `camera[${i}]`) })).sort((a, b) => a.t - b.t || a.i - b.i);
   for (const { i, t } of shotsIn) if (t >= duration) errors.push(`camera[${i}]: cut at ${t.toFixed(2)}s is at/after the end (${duration.toFixed(2)}s)`);
-  const behaviour = resolveBehaviour(ep);
   const shots: Shot[] = shotsIn.map(({ s, i, t }, k) => traced(toShot(s, t, shotsIn[k + 1]?.t ?? duration, `camera[${i}]`, { errors, warnings, castIds, itemIds, layout, focusTarget, timeOf, defaults: behaviour.defaults }), `camera[${i}] (${s.shot})`, s.allow));
 
   // ---- lighting / props / sfx

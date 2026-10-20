@@ -12,6 +12,7 @@ import {
   type EaseName,
   type Vec3,
 } from "../core/time";
+import { splineAt } from "../core/spline";
 
 export type Channels = Record<string, number>;
 
@@ -35,6 +36,8 @@ export type LifeSignals = {
   walkPhase: number;
   /** Seeded smooth noise in [-1,1], unique per actor. */
   noise: (name: string, frequency?: number) => number;
+  /** 0..1 listening nod pulse after another speaker's phrase ends (0 unless listening is on). */
+  beat: number;
 };
 
 export type GestureDef = {
@@ -85,7 +88,7 @@ export type ActorDefinition = {
    * Optional: hand-to-self moves for the `facepalm` and `sip` recipes (palm on the face with the head bowed; a held
    * cup at the mouth). Returns the channel values to hold, from the current channels.
    */
-  selfReach?: (c: Channels, what: "facepalm" | "sip", side: "L" | "R") => { set: Channels; reached: boolean };
+  selfReach?: (c: Channels, what: "facepalm" | "sip", side: "L" | "R", opts?: { precise?: boolean }) => { set: Channels; reached: boolean; /** Root-local, unscaled hand target (precise only). */ target?: Vec3 };
   /** Optional: gesture names the recipes use for this anatomy (defaults: flinch, stomp/hop). */
   recipeGestures?: { flinch?: string; stomp?: string; crouchPose?: string; /** Fraction of the stomp gesture where it lands (default 0.5). */ stompContact?: number };
   /**
@@ -94,7 +97,12 @@ export type ActorDefinition = {
    * `footR` when the anatomy has them) and simple volumes. Root-local, unscaled. Mirrors the view's hierarchy.
    */
   effectors?: (c: Channels) => Effectors;
+  /** Optional: acting defaults for the opt-in automatic behaviours (who this character is). */
+  persona?: Persona;
 };
+
+/** Acting defaults: a one-line character note and how it listens (reaction delay in seconds, nod amount 0..1). */
+export type Persona = { description: string; listen?: { delay?: number; nod?: number } };
 
 /** A body volume, root-local and unscaled: a capsule from `a` to `b` with radius `r` (a sphere when a = b). */
 export type BodyPart = { name: string; a: Vec3; b: Vec3; r: number };
@@ -105,7 +113,7 @@ export type Effectors = { points: Record<string, Vec3>; parts: BodyPart[] };
 export type LookTarget = Vec3 | { actor: string; anchor?: string } | "camera" | null;
 
 export type PoseCue = { at: number; pose: string; transition?: number };
-export type EmotionCue = { at: number; emotion: string; transition?: number };
+export type EmotionCue = { at: number; emotion: string; transition?: number; /** 0..1 (default 1): how far toward the emotion. */ intensity?: number };
 export type GestureCue = { at: number; gesture: string; speed?: number; intensity?: number };
 export type LookCue = { at: number; target: LookTarget; transition?: number; weight?: number };
 export type MoveCue = {
@@ -124,6 +132,8 @@ export type OverrideCue = {
   duration?: number;
   blend?: number;
   mode?: "absolute" | "add";
+  /** Keyed values (absolute times): the set follows a smooth spline through them (via points). */
+  keys?: { at: number; set: Channels }[];
 };
 export type HoldCue = { at: number; socket: string; item: string | null };
 
@@ -143,6 +153,21 @@ export type ActorTrack = {
   overrides: OverrideCue[];
   holds: HoldCue[];
   talk?: (t: number) => number;
+  /** Opt-in listening: look at whoever speaks, nod at their phrase ends, blink on cuts. */
+  listen?: ListenSpec;
+};
+
+export type ListenSpec = {
+  /** 0 = restrained (off) … 1 = full. */
+  intensity: number;
+  /** Seconds before the listener reacts to a new speaker. */
+  delay: number;
+  /** 0..1 nod amount at the speaker's phrase ends. */
+  nod: number;
+  /** Other characters' lines with their phrase ends (absolute seconds). */
+  lines: { speaker: string; start: number; end: number; pauses: number[] }[];
+  /** Cut times (a blink often lands on a cut). */
+  cuts: number[];
 };
 
 export const emptyTrack = (
@@ -319,16 +344,74 @@ export const localToWorld = (p: Placement, scale: number, local: Vec3): Vec3 => 
   return [p.position[0] + x * c + z * s, p.position[1] + local[1] * scale, p.position[2] - x * s + z * c];
 };
 
+/** An override's values at t: its set, or a smooth spline through its keys (a channel holds until a key changes it). */
+const overrideValues = (o: OverrideCue, t: number): Channels => {
+  if (!o.keys?.length) return o.set;
+  const out: Channels = {};
+  for (const k in o.set) {
+    const times: number[] = [];
+    const values: number[] = [];
+    let last: number | undefined;
+    for (const key of o.keys) {
+      last = key.set[k] ?? last;
+      if (last === undefined) continue;
+      times.push(key.at);
+      values.push(last);
+    }
+    out[k] = splineAt(times, values, t);
+  }
+  return out;
+};
+
 const applyOverrides = (c: Channels, overrides: OverrideCue[], t: number) => {
   for (const o of overrides) {
     const blend = o.blend ?? 0.25;
     const w = envelope(t, o.at, o.duration === undefined ? Infinity : o.at + o.duration, blend, blend);
     if (w <= 0) continue;
-    for (const k in o.set) {
+    const set = overrideValues(o, t);
+    for (const k in set) {
       if (!(k in c)) continue;
-      c[k] = o.mode === "add" ? c[k] + o.set[k] * w : lerp(c[k], o.set[k], w);
+      c[k] = o.mode === "add" ? c[k] + set[k] * w : lerp(c[k], set[k], w);
     }
   }
+};
+
+/**
+ * Listening (opt-in): the look toward whoever is speaking — after a reaction delay, held ~1 s after the line
+ * (a reply keeps facing them), with seeded brief glances away during long lines — and its weight.
+ */
+export const listenLook = (track: ActorTrack, t: number): { speaker: string; weight: number } | null => {
+  const L = track.listen;
+  if (!L || L.intensity <= 0) return null;
+  let best: { speaker: string; weight: number } | null = null;
+  for (const l of L.lines) {
+    if (t < l.start + L.delay || t > l.end + 1.3) continue;
+    const fadeIn = progress(t, l.start + L.delay, 0.35, "smooth");
+    const fadeOut = 1 - progress(t, l.end + 0.8, 0.5, "smooth");
+    let w = Math.min(fadeIn, fadeOut);
+    // A brief glance away now and then during a long line (seeded per 2.5 s window).
+    const win = Math.floor((t - l.start) / 2.5);
+    if (l.end - l.start > 3 && win > 0 && rand(track.seed, "glance", l.start, win) < 0.35) {
+      const g0 = l.start + win * 2.5 + 0.6;
+      w *= 1 - 0.7 * envelope(t, g0, g0 + 0.7, 0.2, 0.25);
+    }
+    if (!best || w > best.weight) best = { speaker: l.speaker, weight: w * L.intensity };
+  }
+  return best;
+};
+
+/** Listening nods: a small seeded nod shortly after some of the speaker's phrase ends. */
+export const listenBeat = (track: ActorTrack, t: number) => {
+  const L = track.listen;
+  if (!L || L.intensity <= 0 || L.nod <= 0) return 0;
+  let beat = 0;
+  for (const l of L.lines)
+    l.pauses.forEach((p, i) => {
+      const u = (t - (p + 0.12)) / 0.5;
+      if (u < 0 || u > 1 || rand(track.seed, "nod", l.start, i) > 0.55) return;
+      beat = Math.max(beat, Math.sin(u * Math.PI) * L.nod * L.intensity);
+    });
+  return beat;
 };
 
 const blinkAt = (seed: string, t: number, reactions: number[]) => {
@@ -376,7 +459,11 @@ export const actorBase = (track: ActorTrack, t: number): ActorBase => {
     track.emotions,
     t,
     emotionChannels(def, def.defaultEmotion),
-    (i) => emotionChannels(def, track.emotions[i].emotion),
+    (i) => {
+      const e = track.emotions[i];
+      const full = emotionChannels(def, e.emotion);
+      return e.intensity === undefined || e.intensity >= 1 ? full : mixChannels(emotionChannels(def, def.defaultEmotion), full, Math.max(0, e.intensity));
+    },
     mixChannels,
     0.22,
   );
@@ -449,7 +536,7 @@ export const actorFinal = (track: ActorTrack, base: ActorBase, t: number, ctx: L
   const c: Channels = { ...base.layered };
 
   type Look = { yaw: number; pitch: number; weight: number };
-  const look = sequenceAt<Look>(
+  let look = sequenceAt<Look>(
     track.looks,
     t,
     { yaw: 0, pitch: 0, weight: 0 },
@@ -458,8 +545,17 @@ export const actorFinal = (track: ActorTrack, base: ActorBase, t: number, ctx: L
     0.35,
   );
 
-  // Reaction blinks on emotion changes and gaze shifts read as alive.
-  const reactions = [...track.emotions.map((e) => e.at), ...track.looks.map((l) => l.at + 0.05)];
+  // Listening is a lower-priority look source: authored looks keep their weight, listening fills the rest.
+  const heard = listenLook(track, t);
+  if (heard && heard.weight > 0) {
+    const auto = lookAngles(base, { actor: heard.speaker, anchor: "face" }, ctx);
+    const wl = (1 - look.weight) * heard.weight;
+    const w = look.weight + wl;
+    look = { yaw: (look.yaw * look.weight + auto.yaw * wl) / w, pitch: (look.pitch * look.weight + auto.pitch * wl) / w, weight: w };
+  }
+
+  // Reaction blinks on emotion changes and gaze shifts read as alive (and on cuts, when listening).
+  const reactions = [...track.emotions.map((e) => e.at), ...track.looks.map((l) => l.at + 0.05), ...(track.listen && track.listen.intensity > 0 ? track.listen.cuts : [])];
   const seed = track.seed;
   def.life(c, {
     t,
@@ -473,6 +569,7 @@ export const actorFinal = (track: ActorTrack, base: ActorBase, t: number, ctx: L
     walk: Math.max(base.placement.walk, base.pose === "walk" ? 1 : 0),
     walkPhase: base.pose === "walk" && base.placement.walk === 0 ? t * Math.PI * 2 * 1.6 : base.placement.walkPhase,
     noise: (name, frequency = 1) => noise(`${seed}:${name}`, t, frequency),
+    beat: listenBeat(track, t),
   });
   applyOverrides(c, track.overrides, t);
   for (const k in c) {

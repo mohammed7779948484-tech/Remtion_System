@@ -65,6 +65,10 @@
       "description": "Glances away, snaps back with raised brows and a recoil.",
       "duration": 1.1
     },
+    "beat": {
+      "description": "A small emphasis accent on a word: a quick head dip and brow lift (put it on `lN.word:K`).",
+      "duration": 0.45
+    },
     "type_burst": {
       "description": "Frantic typing (use while seated at a keyboard).",
       "duration": 1.5

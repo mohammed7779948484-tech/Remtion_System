@@ -1,0 +1,174 @@
+{
+  "flash-pop": {
+    "file": "sfx/flash-pop-f4d9da6e.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Vintage press camera flashbulb firing: a bright pop with a short rising electric whine",
+      "duration_seconds": 1,
+      "prompt_influence": 0.7,
+      "loop": false
+    },
+    "characterCost": "10",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "rain-window": {
+    "file": "sfx/rain-window-c6eb213c.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Steady heavy rain against an old office window at night, rain pattering on glass and a tin ledge, distant wet city traffic hiss, muffled interior perspective, no thunder, no music",
+      "duration_seconds": 22,
+      "prompt_influence": 0.55,
+      "loop": true
+    },
+    "characterCost": "220",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "thunder-close": {
+    "file": "sfx/thunder-close-1e9b096e.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Close lightning strike: a sharp, loud thunder crack immediately followed by a deep rolling thunder rumble that fades out, heard from inside a building",
+      "duration_seconds": 6,
+      "prompt_influence": 0.6,
+      "loop": false
+    },
+    "characterCost": "60",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "thunder-roll": {
+    "file": "sfx/thunder-roll-da53f8c1.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Distant deep rolling thunder rumble, heard from inside a room, slow fade",
+      "duration_seconds": 5,
+      "prompt_influence": 0.6,
+      "loop": false
+    },
+    "characterCost": "50",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "door-burst": {
+    "file": "sfx/door-burst-50fed386.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "An old wooden office door with a frosted glass pane is flung open hard and bangs against the wall, the loose glass rattles",
+      "duration_seconds": 2,
+      "prompt_influence": 0.65,
+      "loop": false
+    },
+    "characterCost": "20",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "footsteps-wet": {
+    "file": "sfx/footsteps-wet-0e1c4a80.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Hurried footsteps of wet leather shoes on creaky wooden floorboards, four quick steps, slight squelch, indoors",
+      "duration_seconds": 2.2,
+      "prompt_influence": 0.6,
+      "loop": false
+    },
+    "characterCost": "22",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "stamp-thump": {
+    "file": "sfx/stamp-thump-fe42f579.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "A heavy rubber stamp slammed down hard on paper on a wooden desk, a single dull thump",
+      "duration_seconds": 0.8,
+      "prompt_influence": 0.7,
+      "loop": false
+    },
+    "characterCost": "8",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io",
+    "processed": "peak-normalised -31.0 → -3 dBFS (+28.0 dB)"
+  },
+  "keys-clack": {
+    "file": "sfx/keys-clack-7bd2472b.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Old mechanical typewriter-style computer keyboard, three loud slow clacky keystrokes, close up",
+      "duration_seconds": 1.4,
+      "prompt_influence": 0.6,
+      "loop": false
+    },
+    "characterCost": "14",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "noir-sting": {
+    "file": "sfx/noir-sting-ca0e5738.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Dramatic film noir brass sting: a low muted trombone and trumpet stab, dun dun dunnn, suspense reveal, with a cymbal swell",
+      "duration_seconds": 3.5,
+      "prompt_influence": 0.65,
+      "loop": false
+    },
+    "characterCost": "35",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "clock-tick": {
+    "file": "sfx/clock-tick-b8070485.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "An old wall clock ticking slowly in a silent room, loud clear tick tock, four ticks",
+      "duration_seconds": 3,
+      "prompt_influence": 0.65,
+      "loop": false
+    },
+    "characterCost": "30",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "neon-buzz": {
+    "file": "sfx/neon-buzz-9463c95d.wav",
+    "source": "ElevenLabs sound generation (/v1/sound-generation)",
+    "model": "eleven_text_to_sound_v2",
+    "request": {
+      "prompt": "Faint electric buzzing hum of a flickering neon sign outside a window, low steady buzz with occasional crackle",
+      "duration_seconds": 8,
+      "prompt_influence": 0.5,
+      "loop": true
+    },
+    "characterCost": "80",
+    "requestId": null,
+    "generated": "2026-10-21",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "clock-two-ticks": {
+    "file": "sfx/clock-two-ticks.wav",
+    "derivedFrom": "clock-tick",
+    "edit": "0–1.6 s, 0.25 s fade-out (ffmpeg, local)",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  }
+}

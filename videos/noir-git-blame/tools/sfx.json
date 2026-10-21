@@ -1,0 +1,20 @@
+{
+  "$comment": "Sound effects generated for this episode with ElevenLabs sound generation (paid run, authorized for this video). tools/gen-sfx.mts reads this file, caches each clip by a hash of its request in public/videos/noir-git-blame/sfx/, and records provenance in sfx/provenance.json.",
+  "model": "eleven_text_to_sound_v2",
+  "sounds": [
+    { "id": "rain-window", "duration": 22, "loop": true, "influence": 0.55, "prompt": "Steady heavy rain against an old office window at night, rain pattering on glass and a tin ledge, distant wet city traffic hiss, muffled interior perspective, no thunder, no music" },
+    { "id": "thunder-close", "duration": 6, "influence": 0.6, "prompt": "Close lightning strike: a sharp, loud thunder crack immediately followed by a deep rolling thunder rumble that fades out, heard from inside a building" },
+    { "id": "thunder-roll", "duration": 5, "influence": 0.6, "prompt": "Distant deep rolling thunder rumble, heard from inside a room, slow fade" },
+    { "id": "door-burst", "duration": 2, "influence": 0.65, "prompt": "An old wooden office door with a frosted glass pane is flung open hard and bangs against the wall, the loose glass rattles" },
+    { "id": "footsteps-wet", "duration": 2.2, "influence": 0.6, "prompt": "Hurried footsteps of wet leather shoes on creaky wooden floorboards, four quick steps, slight squelch, indoors" },
+    { "id": "flash-pop", "duration": 1, "influence": 0.7, "prompt": "Vintage press camera flashbulb firing: a bright pop with a short rising electric whine" },
+    { "id": "stamp-thump", "duration": 0.8, "influence": 0.7, "peak": -3, "prompt": "A heavy rubber stamp slammed down hard on paper on a wooden desk, a single dull thump" },
+    { "id": "keys-clack", "duration": 1.4, "influence": 0.6, "prompt": "Old mechanical typewriter-style computer keyboard, three loud slow clacky keystrokes, close up" },
+    { "id": "noir-sting", "duration": 3.5, "influence": 0.65, "prompt": "Dramatic film noir brass sting: a low muted trombone and trumpet stab, dun dun dunnn, suspense reveal, with a cymbal swell" },
+    { "id": "clock-tick", "duration": 3, "influence": 0.65, "prompt": "An old wall clock ticking slowly in a silent room, loud clear tick tock, four ticks" },
+    { "id": "neon-buzz", "duration": 8, "loop": true, "influence": 0.5, "prompt": "Faint electric buzzing hum of a flickering neon sign outside a window, low steady buzz with occasional crackle" }
+  ],
+  "derive": [
+    { "id": "clock-two-ticks", "from": "clock-tick", "start": 0, "end": 1.6, "fadeOut": 0.25 }
+  ]
+}

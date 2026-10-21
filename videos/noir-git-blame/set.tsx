@@ -346,9 +346,10 @@ export const PiDoor: React.FC<PropViewProps> = () => {
       <Box p={[-W / 2 - 0.045, H / 2, 0.02]} s={[0.09, H + 0.09, 0.18]} color={wood} rough={0.6} />
       <Box p={[W / 2 + 0.045, H / 2, 0.02]} s={[0.09, H + 0.09, 0.18]} color={wood} rough={0.6} />
       <Box p={[0, H + 0.045, 0.02]} s={[W + 0.18, 0.09, 0.18]} color={wood} rough={0.6} />
-      {/* leaf, hinged on the -x (back) side, swinging into the room */}
-      <group position={[-W / 2, 0, 0.0]} rotation={[0, -angle, 0]}>
-        <group position={[W / 2, 0, 0]}>
+      {/* leaf, hinged on the +x (front, camera) side, swinging into the room: it opens away from the
+          shots taken from behind the desk, so the bright doorway stays clear */}
+      <group position={[W / 2, 0, 0.0]} rotation={[0, angle, 0]}>
+        <group position={[-W / 2, 0, 0]}>
           <Box p={[0, 0.55, 0]} s={[W - 0.02, 1.1, 0.045]} color={wood} rough={0.55} />
           <Box p={[0, 0.55, 0.026]} s={[W - 0.2, 0.8, 0.01]} color="#24170f" rough={0.6} />
           <Box p={[-(W - 0.02) / 2 + 0.05, 1.62, 0]} s={[0.1, 1.04, 0.045]} color={wood} rough={0.55} />
@@ -358,7 +359,7 @@ export const PiDoor: React.FC<PropViewProps> = () => {
             <planeGeometry args={[W - 0.2, 0.9]} />
             <meshStandardMaterial map={glassTex} transparent opacity={0.62} emissiveMap={glassTex} emissive="#ffffff" emissiveIntensity={0.55 * hall} roughness={0.4} side={THREE.DoubleSide} depthWrite={false} />
           </mesh>
-          <mesh position={[W / 2 - 0.1, 1.02, 0.05]} castShadow>
+          <mesh position={[-W / 2 + 0.1, 1.02, 0.05]} castShadow>
             <sphereGeometry args={[0.03, 12, 8]} />
             <meshStandardMaterial color="#b08a3e" metalness={0.8} roughness={0.3} />
           </mesh>
@@ -367,22 +368,22 @@ export const PiDoor: React.FC<PropViewProps> = () => {
       {/* hallway: floor, walls, a bright end wall for silhouettes */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, -1.6]} receiveShadow>
         <planeGeometry args={[1.6, 3.2]} />
-        <meshStandardMaterial color="#3a2c22" roughness={0.8} />
+        <meshStandardMaterial color="#241a14" roughness={0.8} />
       </mesh>
       <mesh position={[0, 1.3, -3.1]}>
         <planeGeometry args={[1.8, 2.6]} />
-        <meshBasicMaterial color={[0.55 * hall + 0.2, 0.42 * hall + 0.15, 0.26 * hall + 0.08]} toneMapped={false} />
+        <meshBasicMaterial color={[1.5 * hall + 0.5, 1.1 * hall + 0.36, 0.62 * hall + 0.18]} toneMapped={false} />
       </mesh>
       {[-0.8, 0.8].map((x) => (
         <mesh key={x} position={[x, 1.3, -1.6]} rotation={[0, x > 0 ? -Math.PI / 2 : Math.PI / 2, 0]} receiveShadow>
           <planeGeometry args={[3.2, 2.6]} />
-          <meshStandardMaterial color="#5a4632" roughness={0.9} />
+          <meshStandardMaterial color="#1e1712" roughness={0.95} />
         </mesh>
       ))}
-      <pointLight position={[0, 2.2, -1.4]} color="#ffb36b" intensity={2.2} distance={2.6} decay={1.5} />
+      <pointLight position={[0, 2.3, -2.4]} color="#ffb36b" intensity={4.0} distance={2.6} decay={1.5} />
       {/* light spilling through the open door into the room */}
       <primitive object={spillTarget} position={[0, 0.4, 2.2]} />
-      <spotLight position={[0, 2.0, -1.9]} target={spillTarget} color="#ffbe7a" intensity={7 * clamp01(open)} distance={7} angle={0.42} penumbra={0.7} decay={1.6} />
+      <spotLight position={[0, 2.0, -1.9]} target={spillTarget} color="#ffbe7a" intensity={11 * clamp01(open)} distance={7} angle={0.42} penumbra={0.7} decay={1.6} />
     </group>
   );
 };
@@ -450,17 +451,19 @@ export const BankersLamp: React.FC<PropViewProps> = ({ practicals }) => {
 };
 
 export const CrtTerminal: React.FC<PropViewProps> = ({ params, since, t, practicals, screens }) => {
-  const content = (params.screen as { preset: string } | undefined) ?? { preset: "term-idle" };
+  // A `highlight` props cue (its own param, so the screen's typing doesn't restart) marks the culprit's line.
+  const screen = (params.screen as { preset: string } | undefined) ?? { preset: "term-idle" };
+  const content = params.highlight ? { ...screen, highlightSince: since.highlight ?? 0 } : screen;
   const draw = screens?.[content.preset];
-  const beige = "#b9ae94";
+  const beige = "#8f8a7c";
   const glow = practicals.screens;
   return (
     <group>
-      <Box p={[0, 0.02, -0.06]} s={[0.3, 0.04, 0.3]} color="#9d937c" rough={0.7} />
+      <Box p={[0, 0.02, -0.06]} s={[0.3, 0.04, 0.3]} color="#6f6a5e" rough={0.7} />
       <Box p={[0, 0.215, 0]} s={[0.42, 0.35, 0.06]} color={beige} rough={0.6} />
       <mesh position={[0, 0.2, -0.17]} castShadow receiveShadow>
         <boxGeometry args={[0.34, 0.29, 0.28]} />
-        <meshStandardMaterial color="#a89d84" roughness={0.65} />
+        <meshStandardMaterial color="#7f7a6d" roughness={0.65} />
       </mesh>
       <Box p={[0, 0.215, 0.031]} s={[0.35, 0.27, 0.004]} color="#0b0f0c" rough={0.3} />
       <group position={[0, 0.218, 0.034]}>
@@ -471,7 +474,7 @@ export const CrtTerminal: React.FC<PropViewProps> = ({ params, since, t, practic
         <meshBasicMaterial color={[0.4, 2.2, 0.8]} toneMapped={false} />
       </mesh>
       {/* the screen lights whoever stands in front of it */}
-      <pointLight position={[0, 0.22, 0.2]} color="#6dffa8" intensity={0.55 * glow} distance={1.3} decay={1.8} />
+      <pointLight position={[0, 0.24, 0.32]} color="#6dffa8" intensity={0.3 * glow} distance={1.3} decay={1.8} />
       {/* where the red string ends: a pin on the bezel */}
       <mesh position={[-0.18, 0.36, 0.035]}>
         <sphereGeometry args={[0.012, 10, 8]} />

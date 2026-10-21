@@ -84,15 +84,16 @@ export const termBlame: DrawFn = ({ ctx, w, h, t, since }, params) => {
   crtBase(ctx, w, h, t);
   const x = 40;
   const done = typed(ctx, "git blame login.ts", local, x, 120, 20, 66);
-  const hl = Number(params.highlightAfter ?? 2.0);
+  // Seconds since the highlight cue (absolute time from the props cue), or -1 before it.
+  const hs = params.highlightSince === undefined ? -1 : t - Number(params.highlightSince);
   BLAME.forEach((r, i) => {
     const at = done + 0.25 + i * 0.16;
     if (local < at) return;
     const y = 262 + i * 112;
     const isClaude = r.who === "claude";
-    if (isClaude && local >= hl) {
-      const k = Math.min(1, (local - hl) / 0.12);
-      const pulse = 0.88 + 0.12 * Math.sin((local - hl) * 9);
+    if (isClaude && hs >= 0) {
+      const k = Math.min(1, hs / 0.12);
+      const pulse = 0.88 + 0.12 * Math.sin(hs * 9);
       ctx.fillStyle = `rgba(255,140,80,${0.95 * k * pulse})`;
       ctx.fillRect(x - 18, y - 64, (w - 2 * x + 36) * k, 88);
       text(ctx, r.row, x, y, "#140803", 70);
@@ -108,7 +109,7 @@ export const termCommit: DrawFn = ({ ctx, w, h, t, since }) => {
   const local = Math.max(0, t - since);
   crtBase(ctx, w, h, t);
   const x = 40;
-  const done = typed(ctx, 'git commit -m "fix: DNS issue"', local, x, 150, 26, 66);
+  const done = typed(ctx, 'git commit -m "fix: DNS issue"', local, x, 150, 40, 66);
   if (local > done + 0.2) text(ctx, "[main 4e2b1d0] fix: DNS issue", x, 290, PHOSPHOR, 66);
   if (local > done + 0.4) text(ctx, " 1 file changed, 1 deletion(-)", x, 380, DIM, 62);
   if (local > done + 0.9) text(ctx, "login.service ..... UP", x, 520, PHOSPHOR, 66);

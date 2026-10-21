@@ -170,5 +170,17 @@
     "derivedFrom": "clock-tick",
     "edit": "0–1.6 s, 0.25 s fade-out (ffmpeg, local)",
     "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "thunder-crack": {
+    "file": "sfx/thunder-crack.wav",
+    "derivedFrom": "thunder-close",
+    "edit": "0–2.2 s, 1.6 s fade-out (ffmpeg, local)",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
+  },
+  "thunder-roll-short": {
+    "file": "sfx/thunder-roll-short.wav",
+    "derivedFrom": "thunder-roll",
+    "edit": "0–1.9 s, 0.9 s fade-out (ffmpeg, local)",
+    "license": "ElevenLabs free plan output: non-commercial use; credit elevenlabs.io"
   }
 }

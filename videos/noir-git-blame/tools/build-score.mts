@@ -49,7 +49,7 @@ const lufs = (file: string, from: number, dur: number) => {
   const m = [...res.stderr.matchAll(/I:\s+(-?[\d.]+) LUFS/g)].pop();
   return m ? Number(m[1]) : -23;
 };
-const MUSIC_TARGET = -26; // unducked bed; the master later lifts the whole mix to -14 LUFS
+const MUSIC_TARGET = -28; // unducked bed; the master later lifts the whole mix to -14 LUFS
 for (const c of cues) {
   const l = lufs(c.src.file, c.src.from, c.end - c.at);
   c.gain = MUSIC_TARGET - l;

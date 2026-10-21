@@ -15,6 +15,8 @@
     { "id": "neon-buzz", "duration": 8, "loop": true, "influence": 0.5, "prompt": "Faint electric buzzing hum of a flickering neon sign outside a window, low steady buzz with occasional crackle" }
   ],
   "derive": [
-    { "id": "clock-two-ticks", "from": "clock-tick", "start": 0, "end": 1.6, "fadeOut": 0.25 }
+    { "id": "clock-two-ticks", "from": "clock-tick", "start": 0, "end": 1.6, "fadeOut": 0.25 },
+    { "id": "thunder-crack", "from": "thunder-close", "start": 0, "end": 2.2, "fadeOut": 1.6 },
+    { "id": "thunder-roll-short", "from": "thunder-roll", "start": 0, "end": 1.9, "fadeOut": 0.9 }
   ]
 }

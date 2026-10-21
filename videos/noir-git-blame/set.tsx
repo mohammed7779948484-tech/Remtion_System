@@ -401,7 +401,7 @@ export const DetectiveDesk: React.FC<PropViewProps> = () => {
       <Box p={[0, 0.735, 0]} s={[W, 0.05, D]} color={wood} rough={0.72} />
       <mesh position={[0, 0.7605, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
         <planeGeometry args={[W - 0.16, D - 0.16]} />
-        <meshStandardMaterial color="#1d3a2a" roughness={0.88} />
+        <meshStandardMaterial color="#10201a" roughness={0.95} />
       </mesh>
       {[-1, 1].map((sx) => (
         <group key={sx} position={[sx * (W / 2 - 0.25), 0, 0]}>

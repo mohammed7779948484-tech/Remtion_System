@@ -53,9 +53,12 @@ inserts on the terminal for information. Cuts on lines, 1–3 s, except the boar
 Planted clue for rewatches: the terminal in the opening shot already shows "claude pushed 1 commit · 2:12".
 
 ## Sound
-- Voices: ElevenLabs Eleven v4 — a husky gravel voice for Claude + narrator, Liam for Rayan; audio tags for delivery.
-- Music: Kevin MacLeod — "Night on the Docks (Sax)" for the opening/narration and "Bass Walker" (walking upright
-  bass) under the investigation; cut to silence for the twist, back in on "I KNEW it!". CC BY 4.0 (credited).
+- Voices: ElevenLabs Eleven v4 — Callum ("husky trickster", picked by measurement: lowest, breathiest of three
+  auditioned) for Claude + narrator with `[low, gravelly]` on every line so the pitch stays put; Liam for Rayan.
+- Music: Kevin MacLeod (incompetech.com, CC BY 4.0, credited on the end card) — "Night on the Docks (Sax)" from its
+  theme entrance under the cold open, "Bass Walker" (walking upright bass, 112 bpm) from the whip into the board to
+  the string, silence (rain, a clock tick, a brass sting) for the twist and the lie, "Fast Talkin'" brass on
+  "I KNEW it!" through the title. Edited into one stem by `tools/build-score.mts`, ducked under every line.
 - SFX: generated with ElevenLabs where the CC0 kit has nothing (rain on glass loop, thunder, door burst, wet steps,
   camera-flash pop, rubber stamp, CRT hum, neon buzz, mechanical keys, noir brass sting); CC0 kit for UI blips.
 - Silence on purpose: the beat before "…DNS." (rain only).

@@ -26,7 +26,8 @@ export const npx = (cmd: string[]) => {
   if (r.status !== 0) fail(`npx ${cmd.join(" ")} failed`);
 };
 // Sparse --frames lists crash Remotion's inline audio mixing; stills don't need audio anyway.
-export const SILENT = process.platform === "win32" ? `--props="{\\"silent\\":true}"` : `--props={"silent":true}`;
+// npx runs through a shell: cmd.exe needs escaped double quotes, POSIX shells need single quotes.
+export const SILENT = process.platform === "win32" ? `--props="{\\"silent\\":true}"` : `'--props={"silent":true}'`;
 export const hasFfmpeg = () => spawnSync("ffmpeg", ["-version"], { shell: true }).status === 0;
 
 export const videoDir = (slug: string) => path.join(ROOT, "videos", slug);

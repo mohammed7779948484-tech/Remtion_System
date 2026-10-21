@@ -2,12 +2,12 @@
 import { Audio } from "@remotion/media";
 import { Sequence, staticFile, useVideoConfig } from "remotion";
 import type { ResolvedEpisode } from "../core/timeline";
+import { musicVolumeAt } from "./musicGain";
 
 const srcOf = (s: string) => (/^https?:\/\//.test(s) ? s : staticFile(s.replace(/^public\//, "")));
 
 export const Soundtrack: React.FC<{ resolved: ResolvedEpisode }> = ({ resolved }) => {
-  const { fps } = useVideoConfig();
-  const speaking = (t: number) => resolved.lines.some((l) => l.voiced && t >= l.start - 0.15 && t <= l.end + 0.15);
+  const { fps, durationInFrames } = useVideoConfig();
   return (
     <>
       {resolved.lines.map((l) =>
@@ -31,7 +31,9 @@ export const Soundtrack: React.FC<{ resolved: ResolvedEpisode }> = ({ resolved }
         <Audio
           src={srcOf(resolved.music.src)}
           loop
-          volume={(f) => resolved.music!.volume * (speaking(f / fps) ? resolved.music!.duck : 1)}
+          // The duck follows the episode timeline, not each pass of the loop.
+          loopVolumeCurveBehavior="extend"
+          volume={(f) => musicVolumeAt(f / fps, resolved.music!, resolved.lines, durationInFrames / fps)}
         />
       ) : null}
     </>

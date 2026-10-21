@@ -125,7 +125,7 @@ export const preview = async () => {
   const f1 = Math.min(r.durationInFrames - 1, Math.round(to * r.fps));
   const mp4 = path.join("out", slug, "preview.mp4");
   fs.mkdirSync(path.join(ROOT, "out", slug), { recursive: true });
-  const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `--props={"draft":true}`;
+  const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `'--props={"draft":true}'`;
   npx(["remotion", "render", slug, mp4, `--frames=${f0}-${f1}`, `--scale=${scale}`, draftProps, "--log=error"]);
   console.log(`✔ preview ${from.toFixed(2)}–${to.toFixed(2)}s at ${scale}× → ${mp4}`);
   if (!hasFfmpeg()) return;
@@ -151,7 +151,7 @@ export const render = async () => {
   if (blocking.length) fail(`not ready for a ${draft ? "draft" : "final"} render:\n${blocking.map((e) => `  • ${e}`).join("\n")}${draft ? "" : "\n  (render a draft with --draft)"}`);
   const out = flag("out") ?? path.join("out", `${slug}${draft ? "-draft" : ""}.mp4`);
   const timeout = flag("timeout");
-  const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `--props={"draft":true}`;
+  const draftProps = process.platform === "win32" ? `--props="{\\"draft\\":true}"` : `'--props={"draft":true}'`;
   const master = has("master");
   // Mastering reads the render and writes `out`, so they must be different files (ffmpeg cannot edit in place).
   const target = master ? (/\.mp4$/.test(out) ? out.replace(/\.mp4$/, ".unmastered.mp4") : `${out}.unmastered.mp4`) : out;

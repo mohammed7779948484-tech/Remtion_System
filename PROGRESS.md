@@ -392,3 +392,24 @@ overrides); key-line takes = the user auditions them, the agent picks the rest b
   `audition-l3.wav` wait for the director; `--report` suggests take 0 for both by measurement. A preview render
   confirms the trimmed, levelled playback (audio in each line window, silence between). `ctrl-z-remaster` (engine 2,
   now trimmed/levelled/speech motion) still inspects with 0 warnings. No ElevenLabs credits were spent.
+
+## Production — `videos/co-authored-by/` (2026-10-21, branch `episode/co-authored-by`)
+Original 9:16 short (~35 s, engine 2) made end to end in a GPU-less Linux cloud container.
+- **References**: 7 studio shorts (36–83 s) studied by contact sheets and loudness profiles: deadpan dialogue-led
+  comedy, 2–6-word lines, close shot/reverse-shot, full-frame screen inserts that reveal the escalation,
+  speaker-coloured captions, a callback button; a continuous bed (never under ≈ −25 LUFS), mastered −14 LUFS.
+- **Story**: Rayan rubber-ducks a bug at 2:47 AM and shushes the mascot beside him; finds the missing `return` by
+  saying it out loud, thanks the duck; the commit trailer says `Co-Authored-By: Claude` — "I was emotionally present."
+  Button: a squeak, callout "actual co-author".
+- **Audio**: Eleven v4 (Liam / Jessica, series voices), 3 takes on 4 key lines, choices recorded as measured picks;
+  every clip checked by ElevenLabs speech-to-text (no local whisper here) — one take rejected ("Doc"). Bed, room tone
+  and squeak from ElevenLabs sound generation (Music API is paid-only), vetted by level, pulse and chroma.
+- **QA loop findings that changed the film**: solver closes put Rayan's eyeline into the lens (→ authored angles);
+  duck coverage crossed the 180° line (→ duck turned to ¾ profile, shot from the coverage side); yellow duck read lime
+  under the cyan monitor (→ orange-shifted); monitor blocked the two-shot; a 1.4 s commit reveal typed too slowly to
+  read (→ `pop`, +0.3 s); payoff needed a physical beat (`beat` + glance to camera + wiggle); review of render 1:
+  medium shots clipped heads into the top UI band, bed ~4 dB too quiet, window whoosh +3.9 dB.
+- **Engine/tooling** (reusable, goldens unchanged, 221 tests): ramped music duck + end fade on engine 2 and the
+  loop's volume curve on the episode timeline; `swangle` on GPU-less Linux; POSIX `--props` quoting; flat-normal NaN
+  guard (SwiftShader white dashes on RoundedBox slivers). Render speed here: ~3.5 s/frame (1044 frames ≈ 50 min).
+- **Licensing**: ElevenLabs free plan → non-commercial; credit elevenlabs.io in the post title. SFX kit CC0.

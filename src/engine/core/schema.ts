@@ -268,7 +268,18 @@ export const EpisodeSchema = z.strictObject({
   lighting: z.array(z.strictObject({ at: TimeRef, mood: MoodRef, transition: z.number().min(0).optional() })).default([]),
   props: z.array(z.strictObject({ at: TimeRef, item: z.string(), set: z.record(z.string(), z.unknown()) })).default([]),
   sfx: z.array(z.strictObject({ at: TimeRef, sound: z.string(), volume: z.number().min(0).optional(), prompt: z.string().optional() })).default([]),
-  music: z.strictObject({ src: z.string(), volume: z.number().min(0).optional(), duck: z.number().min(0).max(1).optional() }).optional(),
+  /** Music bed: looped, ducked to `duck` × volume under dialogue. attack/release (s) ramp the duck (engine 2: 0.25 / 0.6,
+   *  engine 1: 0 = the original hard switch); fadeOut (s) fades the bed out before the end (engine 2: 0.6). */
+  music: z
+    .strictObject({
+      src: z.string(),
+      volume: z.number().min(0).optional(),
+      duck: z.number().min(0).max(1).optional(),
+      attack: z.number().min(0).optional(),
+      release: z.number().min(0).optional(),
+      fadeOut: z.number().min(0).optional(),
+    })
+    .optional(),
   events: z.array(z.strictObject({ at: TimeRef, name: z.string(), duration: z.number().min(0).optional(), data: z.record(z.string(), z.unknown()).optional() })).default([]),
   /** Accents: text | window | callout | impact | shake | glitch | flash | dip (catalog/fx.json). */
   fx: z.array(FxEntry).default([]),

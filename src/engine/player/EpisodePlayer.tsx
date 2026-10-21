@@ -21,6 +21,7 @@ import { itemParamsAt } from "../world/layout";
 import { PROP_VIEWS, type PropViewProps } from "../world/props";
 import type { DrawFn } from "../world/Screen";
 import { SetView } from "../world/SetView";
+import "../world/shaderGuards";
 import { FxOverlay } from "../fx/FxOverlay";
 import { cameraWithFx, chromaAt } from "../fx/state";
 import { FxWorld } from "../fx/FxWorld";

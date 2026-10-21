@@ -5,5 +5,6 @@ import launchPromo from "./launch-promo";
 import ctrlZ from "./ctrl-z";
 import oneTake from "./one-take";
 import ctrlZRemaster from "./ctrl-z-remaster";
+import noirGitBlame from "./noir-git-blame";
 
-export const VIDEOS: VideoModule[] = [itWorksOnMyMachine, launchPromo, ctrlZ, oneTake, ctrlZRemaster];
+export const VIDEOS: VideoModule[] = [itWorksOnMyMachine, launchPromo, ctrlZ, oneTake, ctrlZRemaster, noirGitBlame];

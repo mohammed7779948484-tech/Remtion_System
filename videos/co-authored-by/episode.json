@@ -433,7 +433,7 @@
       "subject": "rayan",
       "offset": [
         0,
-        0.2
+        0.04
       ],
       "angle": -25
     },
@@ -456,7 +456,7 @@
       "subject": "rayan",
       "offset": [
         0,
-        0.2
+        0.04
       ],
       "angle": -25
     },
@@ -510,7 +510,7 @@
       "subject": "rayan",
       "offset": [
         0,
-        0.2
+        0.04
       ],
       "angle": -15
     },
@@ -608,7 +608,7 @@
         "+ Co-Authored-By: Claude"
       ],
       "sound": "window-open",
-      "volume": 0.4,
+      "volume": 0.25,
       "width": 0.92
     },
     {
@@ -688,7 +688,7 @@
     {
       "at": "l9.end+1.08",
       "sound": "key-clack",
-      "volume": 0.45
+      "volume": 0.38
     },
     {
       "at": "l9.end+2.65",
@@ -707,7 +707,7 @@
   "end": "l11.end+3.0",
   "music": {
     "src": "videos/co-authored-by/sfx/lofi-bed.mp3",
-    "volume": 0.1,
+    "volume": 0.15,
     "duck": 0.5
   }
 }

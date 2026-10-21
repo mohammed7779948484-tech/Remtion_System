@@ -127,3 +127,49 @@ PATH="$PWD/videos/noir-git-blame/tools/bin:$PATH" npm run cli -- stills noir-git
   `sfx/provenance.json`). The 3 s clock clip ticks at 0.03/1.0/2.0/3.0 s; a 1.6 s excerpt (`clock-two-ticks.wav`)
   keeps a tick off the word "DNS". The door bang sits at 0.41 s into its clip, so the cue starts 0.12 s before the
   door event. Onsets, envelopes and a speech check (no speech in any clip) were measured with librosa/whisper.
+
+## 13. Masking and balance found by measurement, fixed before the full render
+
+- **Method:** with no way to listen, the soundtrack was simulated offline (ffmpeg: the same clip windows, gains,
+  SFX times/volumes and the music stem) and split into voice / music / SFX stems; per-line RMS of each stem and a
+  speech-to-text pass (faster-whisper small.en) on the *mix* measured intelligibility.
+- **Found (first pass):** word recall 90 %. The opening thunder was 16 dB above "Two a.m. Production was dead."
+  (1/5 words recovered); the brass sting + thunder at the twist buried "…that handwriting"; footsteps blurred
+  "What changed?". Narrator/Claude lines sat ~4.5 dB under Rayan's (the engine levels each speaker to its own
+  median, not across speakers); music under some narration was only 4.5–7 dB below the voice.
+- **Fixes:** first line moved to 0.75 s after a shortened thunder crack (derived clip, −8 dB); twist re-blocked so
+  the sting + lightning + startle come *after* "…I knew that handwriting." (dolly zoom held through the sting,
+  1.5 s before "Well? Who did it?"); `gain: 4` on every narrator/Claude line; music bed −2 dB; footsteps, door,
+  stamps and the twist thunder lowered (a short derived thunder roll).
+- **After:** all voices within 2 dB of each other; music 9–14 dB under every line; word recall 97 % on the real
+  engine soundtrack — the two "misses" are "Two" transcribed as "2" and "touched" heard as "touch", which the
+  isolated clip also gives. (Measured, not heard; the real soundtrack is ~3 dB hotter on voices than the
+  simulation because ffmpeg's mono→stereo upmix drops the centre by 3 dB and Remotion's doesn't.)
+
+## 14. `render --master` would fall back to dynamic loudnorm on this mix — measured
+
+- **Evidence:** the engine soundtrack (audio-only render, see 15) measures −17.1 LUFS integrated, sample peak −1.0
+  dBFS, true peak −0.9 dBTP: a peak-to-loudness ratio of ~16 dB. −14 LUFS with −1.5 dBTP allows 12.5 dB, so the
+  CLI's two-pass `loudnorm … linear=true` cannot stay linear; ffmpeg then silently switches to *dynamic* mode
+  (confirmed: "Normalization Type: Dynamic" on the same audio), i.e. a time-varying gain.
+- **Tried:** a gentle bus compressor before the limiter lowered loudness more than peaks (worse ratio, discarded).
+  A sample-level limiter at −6 dBFS kept loudnorm linear but left inter-sample overs: sample peak −2.2 dBFS vs
+  true peak **+0.1 dBTP** after normalisation.
+- **Local solution:** `tools/master.mts`: `aresample=192000, alimiter (−6 dBFS, 5 ms look-ahead,
+  latency-compensated), aresample=48000`, then the same two-pass linear loudnorm (−14 LUFS, −1.5 dBTP, LRA 11),
+  AAC 256 kbps, video stream copied. On the real soundtrack: loudnorm **Linear**, −13.8 LUFS, true peak −2.1 dBTP;
+  the limiter reduces gain by >1 dB in 2 % of 10 ms windows, never more than 4.7 dB (consonants of "propagating",
+  the door, a stamp). Measured, not heard.
+- **Suggested upstream:** have `render --master` report the loudnorm mode, and add an oversampled peak limiter
+  before it when the peak-to-loudness ratio exceeds the target's headroom.
+
+## 15. Rendering in parts + an audio-only soundtrack render
+
+- **Why:** the background job runner here stops commands after 2 h and a full software render is ~2 h.
+- **How:** the video is rendered muted in two frame ranges (`npx remotion render … --frames=0-829 --muted`,
+  `--frames=830-1658`), joined with ffmpeg's concat demuxer (stream copy, identical encoder settings), and the
+  soundtrack is rendered once in full with `--codec=wav --props='{"audioOnly":true}'`. In that mode index.tsx
+  mounts only the engine's own `<Soundtrack>` (same component and resolved data as the full render): ~20 s instead
+  of hours. `tools/master.mts` muxes and masters it. One audio render means no seam at the join.
+- **Also found:** an audio-only render of the full composition still mounts the 3D scene for every frame (it failed
+  without the GL shim), so it would not have been faster without this switch.

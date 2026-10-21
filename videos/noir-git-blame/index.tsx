@@ -1,8 +1,8 @@
 // "git blame" — a Claude P.I. mystery. A film-noir office built in this folder (set.tsx), green CRT screens
 // (screens.ts), noir captions/end card (overlay.tsx) and an invisible narrator actor (video.data.ts).
 import { useEffect, useState } from "react";
-import { continueRender, delayRender } from "remotion";
-import { defineVideo, type ActorViewProps, type VideoModule, type VideoProps } from "../../src/engine";
+import { continueRender, delayRender, getInputProps } from "remotion";
+import { defineVideo, Soundtrack, type ActorViewProps, type VideoModule, type VideoProps } from "../../src/engine";
 import episode from "./episode.json";
 import { loadNoirFonts } from "./lib";
 import { Overlay } from "./overlay";
@@ -81,11 +81,16 @@ const FontGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return ready ? <>{children}</> : null;
 };
 
-const Gated: React.FC<VideoProps> = (props) => (
-  <FontGate>
-    <base.component {...props} />
-  </FontGate>
-);
+const Gated: React.FC<VideoProps> = (props) => {
+  // `--props='{"audioOnly":true}'` + an audio codec: mount only the engine's Soundtrack (identical audio, no 3D),
+  // so the final soundtrack renders in seconds and can be muxed onto video rendered in parts (NOTES.md, problem 14).
+  if ((getInputProps() as { audioOnly?: boolean }).audioOnly === true) return props.resolved ? <Soundtrack resolved={props.resolved} /> : null;
+  return (
+    <FontGate>
+      <base.component {...props} />
+    </FontGate>
+  );
+};
 
 const video: VideoModule = { ...base, component: Gated };
 export default video;

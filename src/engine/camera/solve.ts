@@ -7,7 +7,10 @@
 //      Tracking uses a fixed time-window average over the subject's pure trajectory, so it is
 //      smooth, continuous and identical for any frame visit order.
 // Corrections only touch values the solver derived; authored values are used exactly.
+import type { Intent } from "../core/behaviour";
 import { clamp, lerp, lerpVec3, noise, progress, type EaseName, type Vec3 } from "../core/time";
+import { keyedValue, splineAt, splineVec3 } from "../core/spline";
+import { arcBlend, lifeOffset } from "./choreo";
 import type { Box, CameraSpot } from "../world/layout";
 
 export type ShotType = "establishing" | "wide" | "full" | "medium" | "close" | "two-shot" | "over-shoulder" | "insert" | "custom";
@@ -23,7 +26,7 @@ export const SHOT_TYPES: Record<ShotType, string> = {
   custom: "Explicit `position` / `target` / `fov`.",
 };
 
-export type MoveType = "static" | "push-in" | "pull-out" | "truck" | "orbit" | "crane" | "handheld";
+export type MoveType = "static" | "push-in" | "pull-out" | "truck" | "orbit" | "crane" | "handheld" | "life";
 export const MOVES: Record<MoveType, string> = {
   static: "Locked off.",
   "push-in": "Moves toward the aim point (amount = fraction of distance, default 0.22).",
@@ -32,8 +35,15 @@ export const MOVES: Record<MoveType, string> = {
   orbit: "Circles the aim point (amount = degrees, default 30).",
   crane: "Rises (amount = metres, default 0.6; negative descends).",
   handheld: "Seeded organic shake (amount = metres, default 0.012).",
+  life: "Barely visible breathing camera: slow push + drift (amount = intensity, default 1). Opt-in.",
 };
-export type MoveSpec = { type: MoveType; amount?: number; ease?: EaseName };
+/** A move over [at, at + duration] (defaults: the whole shot). */
+export type MoveSpec = { type: MoveType; amount?: number; ease?: EaseName; at?: number; duration?: number };
+/** Solver-space keyframe (angle in degrees around the subject's facing; values hold until changed). */
+export type ShotKey = { at: number; angle?: number; distance?: number; size?: number; height?: "eye" | "low" | "high" | number; lens?: number; fov?: number; offset?: [number, number]; roll?: number };
+/** World-space keyframe for authored flights. */
+export type PathKey = { at: number; position: Vec3; target: Vec3; lens?: number; fov?: number; roll?: number };
+export type Tracking = boolean | { lag?: number; lead?: number };
 
 export type FocusTarget = { actor: string; anchor?: string } | { item: string; anchor?: string } | Vec3;
 
@@ -57,14 +67,22 @@ export type Shot = {
   offset?: [number, number];
   roll?: number;
   moves?: MoveSpec[];
-  track?: boolean | { lag?: number };
-  follow?: boolean | { lag?: number };
+  keys?: ShotKey[];
+  path?: PathKey[];
+  track?: Tracking;
+  follow?: Tracking;
   focus?: "auto" | "none" | FocusTarget;
   rack?: { at: number; to: FocusTarget; duration?: number }[];
   dof?: "auto" | "off" | { bokeh?: number; range?: number };
   lock?: boolean;
   allowOcclusion?: string[];
   blend?: number;
+  /** Findings in this shot the director accepts on purpose (core/behaviour.ts INTENTS). */
+  allow?: Intent[];
+  /** Engine 2: auto focus holds the last speaker among the subjects and pulls over this many seconds. */
+  focusPull?: number;
+  /** Engine 2: the blend into this shot arcs around the subject. */
+  arcBlend?: boolean;
 };
 
 /** What the solver needs to know about the world. All functions must be pure in their args. */
@@ -81,6 +99,8 @@ export type SceneQuery = {
   occluders: Box[];
   bounds?: { min: Vec3; max: Vec3 };
   speakerAt?: (t: number) => string | undefined;
+  /** Dialogue lines sorted by start (for focus that holds the last speaker). */
+  lines?: { speaker: string; start: number; end: number }[];
 };
 
 export type CameraFrame = {
@@ -252,12 +272,17 @@ const smoothed = (f: (t: number) => Vec3 | null, t: number, window: number): Vec
 };
 
 const lagOf = (v: Shot["track"], fallback: number) => (typeof v === "object" && v.lag !== undefined ? v.lag : fallback);
+const leadOf = (v: Shot["track"]) => (typeof v === "object" && v.lead !== undefined ? v.lead : 0);
 
 // ---------------------------------------------------------------- layout
 
 export type ShotLayout = {
   /** World yaw of the direction from aim to camera. */
   yaw: number;
+  /** The subjects' facing (or a two-shot's perpendicular) that `angle` is measured from. */
+  baseYaw: number;
+  /** Framing heights the shot's `height` refers to (face, top, bottom of the subjects mid-shot). */
+  heights?: { face: number; top: number; bottom: number };
   /** Camera height above (or below) the aim point. */
   rise: number;
   distance: number;
@@ -281,7 +306,7 @@ const sampleTimes = (shot: Shot) => {
   return [0, 0.25, 0.5, 0.75, 0.999].map((u) => shot.at + u * d);
 };
 
-const heightRise = (shot: Shot, w: Window, aimY: number) => {
+const heightRise = (shot: Pick<Shot, "height">, w: Pick<Window, "top" | "bottom" | "face">, aimY: number) => {
   const span = w.top - w.bottom;
   const h = shot.height ?? "eye";
   const camY =
@@ -316,14 +341,15 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
     const target = shot.target ?? spot?.target ?? [0, 1, 0];
     const fov = shot.fov ?? (shot.lens ? lensToFov(shot.lens, q.aspect) : spot?.fov ?? 40);
     const d = sub(position, target);
-    return { yaw: Math.atan2(d[0], d[2]), rise: d[1], distance: len(d), fov, offset: [0, 0], aim: target, fixed: { position, target }, span: 2, warnings };
+    const yaw = Math.atan2(d[0], d[2]);
+    return { yaw, baseYaw: yaw, rise: d[1], distance: len(d), fov, offset: [0, 0], aim: target, fixed: { position, target }, span: 2, warnings };
   }
 
   const times = sampleTimes(shot);
   const windows = times.map((t) => framingWindow(shot, q, t)).filter((w): w is Window => w !== null);
   if (!windows.length) {
     warnings.push(`shot at ${shot.at.toFixed(2)}s has no resolvable subject`);
-    return { yaw: 0, rise: 0.2, distance: 3, fov: baseFov, offset: [0, 0], aim: [0, 1, 0], span: 1, warnings };
+    return { yaw: 0, baseYaw: 0, rise: 0.2, distance: 3, fov: baseFov, offset: [0, 0], aim: [0, 1, 0], span: 1, warnings };
   }
   const w0 = windows[Math.floor(windows.length / 2)];
   const top = Math.max(...windows.map((w) => w.top));
@@ -485,7 +511,7 @@ const computeLayout = (shot: Shot, q: SceneQuery): ShotLayout => {
   }
 
   const meanCenterY = windows.reduce((s, w) => s + w.center[1], 0) / windows.length;
-  return { yaw, rise, distance, fov, offset, aim, span, aimDY: aim[1] - meanCenterY, warnings };
+  return { yaw, baseYaw, rise, distance, fov, offset, aim, span, aimDY: aim[1] - meanCenterY, heights: { face: w0.face, top: w0.top, bottom: w0.bottom }, warnings };
 };
 
 const overShoulder = (shot: Shot, q: SceneQuery, w: Window, span: number, baseFov: number, fovAuthored: boolean, warnings: string[]): ShotLayout => {
@@ -496,7 +522,7 @@ const overShoulder = (shot: Shot, q: SceneQuery, w: Window, span: number, baseFo
   const target: Vec3 = [w.center[0], lerp(w.face, w.center[1], 0.3), w.center[2]];
   if (!oHead || !oTop) {
     warnings.push(`over-shoulder actor "${over}" not found`);
-    return { yaw: 0, rise: 0, distance: 2, fov: baseFov, offset: [0, 0], aim: target, span, warnings };
+    return { yaw: 0, baseYaw: 0, rise: 0, distance: 2, fov: baseFov, offset: [0, 0], aim: target, span, warnings };
   }
   const size = oTop[1] - (q.anchor(over, "feet", t)?.[1] ?? 0);
   const k = clamp(size / 1.78, 0.15, 3);
@@ -513,7 +539,8 @@ const overShoulder = (shot: Shot, q: SceneQuery, w: Window, span: number, baseFo
   const distance = len(sub(position, target));
   const fov = fovAuthored ? baseFov : clamp((2 * Math.atan(span / 0.75 / 2 / distance)) / DEG, 22, 55);
   const d = sub(position, target);
-  return { yaw: Math.atan2(d[0], d[2]), rise: d[1], distance, fov, offset: shot.offset ?? [side * 0.12, 0], aim: target, fixed: { position, target }, span, warnings };
+  const yaw = Math.atan2(d[0], d[2]);
+  return { yaw, baseYaw: yaw, rise: d[1], distance, fov, offset: shot.offset ?? [side * 0.12, 0], aim: target, fixed: { position, target }, span, warnings };
 };
 
 // ---------------------------------------------------------------- evaluation
@@ -533,7 +560,8 @@ const applyMoves = (shot: Shot, t: number, position: Vec3, target: Vec3, index: 
   let pos = position;
   let aim = target;
   for (const m of shot.moves ?? []) {
-    const u = progress(t, shot.at, shot.end - shot.at, m.ease ?? "smooth");
+    const start = m.at ?? shot.at;
+    const u = progress(t, start, m.duration ?? shot.end - start, m.ease ?? "smooth");
     const toCam = sub(pos, aim);
     if (m.type === "push-in") pos = add(aim, mul(toCam, 1 - (m.amount ?? 0.22) * u));
     else if (m.type === "pull-out") pos = add(aim, mul(toCam, 1 + (m.amount ?? 0.3) * u));
@@ -553,14 +581,49 @@ const applyMoves = (shot: Shot, t: number, position: Vec3, target: Vec3, index: 
       const seed = `handheld-${index}`;
       pos = add(pos, [noise(seed + "x", t, 0.9) * a, noise(seed + "y", t, 1.1) * a, noise(seed + "z", t, 0.7) * a]);
       aim = add(aim, [noise(seed + "ax", t, 0.8) * a * 0.6, noise(seed + "ay", t, 1.0) * a * 0.6, 0]);
+    } else if (m.type === "life") {
+      const o = lifeOffset(`life-${index}`, t, u, m.amount ?? 1, toCam, norm(cross(mul(toCam, -1), UP)));
+      pos = add(pos, o.pos);
+      aim = add(aim, o.aim);
     }
   }
   return { pos, aim };
 };
 
+/** The layout's framing values at time t, after the shot's keyframes (or the layout itself without keys). */
+const keyedLayout = (shot: Shot, q: SceneQuery, L: ShotLayout, t: number) => {
+  const keys = shot.keys;
+  if (!keys?.length || L.fixed) return { yaw: L.yaw, rise: L.rise, distance: L.distance, fov: L.fov, offset: L.offset, roll: shot.roll ?? 0 };
+  const at = shot.at;
+  const value = (pick: (k: ShotKey) => number | undefined, base: number) => keyedValue(keys, pick, base, at, t);
+  const angle = value((k) => k.angle, (L.yaw - L.baseYaw) / DEG);
+  const heights = L.heights;
+  return {
+    yaw: L.baseYaw + angle * DEG,
+    rise: value((k) => (k.height !== undefined && heights ? heightRise({ height: k.height }, heights, L.aim[1]) : undefined), L.rise),
+    distance: value((k) => k.distance ?? (k.size !== undefined ? L.distance * k.size : undefined), L.distance),
+    fov: value((k) => k.fov ?? (k.lens !== undefined ? lensToFov(k.lens, q.aspect) : undefined), L.fov),
+    offset: [value((k) => k.offset?.[0], L.offset[0]), value((k) => k.offset?.[1], L.offset[1])] as [number, number],
+    roll: value((k) => k.roll, shot.roll ?? 0),
+  };
+};
+
+/** An authored flight: position, target, lens and roll follow world-space keyframes (moves still apply on top). */
+const pathFrame = (shot: Shot, q: SceneQuery, t: number, index: number): CameraFrame => {
+  const keys = shot.path!;
+  const times = keys.map((k) => k.at);
+  const baseFov = shot.fov ?? lensToFov(shot.lens ?? 35, q.aspect);
+  const fov = splineAt(times, keys.map((k) => k.fov ?? (k.lens !== undefined ? lensToFov(k.lens, q.aspect) : baseFov)), t);
+  const moved = applyMoves(shot, t, splineVec3(times, keys.map((k) => k.position), t), splineVec3(times, keys.map((k) => k.target), t), index, false);
+  const L = shotLayout(shot, q);
+  return { position: moved.pos, target: moved.aim, fov, roll: splineAt(times, keys.map((k) => k.roll ?? shot.roll ?? 0), t), focus: focusFor(shot, q, t, moved.pos, L), shot: index };
+};
+
 /** Camera for one shot at time t (no blending). */
 export const shotFrame = (shot: Shot, q: SceneQuery, t: number, index = 0): CameraFrame => {
+  if (shot.path?.length) return pathFrame(shot, q, t, index);
   const L = shotLayout(shot, q);
+  const K = keyedLayout(shot, q, L, t);
   const tracking = !!shot.track || !!shot.follow;
   const center = subjectCenter(shot, q, L);
 
@@ -569,33 +632,34 @@ export const shotFrame = (shot: Shot, q: SceneQuery, t: number, index = 0): Came
   if (L.fixed) {
     position = L.fixed.position;
     target = L.fixed.target;
-    if (shot.track && !shot.target) target = smoothed(center, t, lagOf(shot.track, 0.35)) ?? target;
+    if (shot.track && !shot.target) target = smoothed(center, t + leadOf(shot.track), lagOf(shot.track, 0.35)) ?? target;
   } else {
-    const horiz = Math.sqrt(Math.max(0.01, L.distance * L.distance - L.rise * L.rise));
-    const offsetFromAim = add(mul(dirFromYaw(L.yaw), horiz), [0, L.rise, 0]);
-    const base = shot.follow ? smoothed(center, t, lagOf(shot.follow, 0.7)) ?? L.aim : L.aim;
+    const horiz = Math.sqrt(Math.max(0.01, K.distance * K.distance - K.rise * K.rise));
+    const offsetFromAim = add(mul(dirFromYaw(K.yaw), horiz), [0, K.rise, 0]);
+    const base = shot.follow ? smoothed(center, t + leadOf(shot.follow), lagOf(shot.follow, 0.7)) ?? L.aim : L.aim;
     position = add(base, offsetFromAim);
-    target = shot.track || shot.follow ? smoothed(center, t, lagOf(shot.track ?? shot.follow, 0.35)) ?? L.aim : L.aim;
+    target = shot.track || shot.follow ? smoothed(center, t + leadOf(shot.track ?? shot.follow), lagOf(shot.track ?? shot.follow, 0.35)) ?? L.aim : L.aim;
   }
 
   // Screen-space composition offset: shift the aim so the subject lands off-centre.
-  if (L.offset[0] !== 0 || L.offset[1] !== 0) {
+  if (K.offset[0] !== 0 || K.offset[1] !== 0) {
     const toCam = sub(position, target);
     const dist = len(toCam);
     const right = norm(cross(mul(toCam, -1), UP));
-    const halfH = Math.tan((L.fov * DEG) / 2) * dist;
+    const halfH = Math.tan((K.fov * DEG) / 2) * dist;
     const halfW = halfH * q.aspect;
-    target = add(target, add(mul(right, -L.offset[0] * halfW), [0, -L.offset[1] * halfH, 0]));
+    target = add(target, add(mul(right, -K.offset[0] * halfW), [0, -K.offset[1] * halfH, 0]));
   }
 
   const moved = applyMoves(shot, t, position, target, index, tracking);
   position = moved.pos;
   target = moved.aim;
-  if (q.bounds && !L.fixed && !shot.lock && shot.distance === undefined) {
+  // Derived cameras are kept inside the set; authored distances and keyframed choreography are used exactly.
+  if (q.bounds && !L.fixed && !shot.lock && shot.distance === undefined && !shot.keys?.length) {
     position = [softClamp(position[0], q.bounds.min[0], q.bounds.max[0]), softClamp(position[1], q.bounds.min[1], q.bounds.max[1]), softClamp(position[2], q.bounds.min[2], q.bounds.max[2])];
   }
 
-  return { position, target, fov: L.fov, roll: shot.roll ?? 0, focus: focusFor(shot, q, t, position, L), shot: index };
+  return { position, target, fov: K.fov, roll: K.roll, focus: focusFor(shot, q, t, position, L), shot: index };
 };
 
 const focusFor = (shot: Shot, q: SceneQuery, t: number, position: Vec3, L: ShotLayout): CameraFrame["focus"] => {
@@ -612,8 +676,14 @@ const focusFor = (shot: Shot, q: SceneQuery, t: number, position: Vec3, L: ShotL
     if (speaker && shot.subjects.includes(speaker)) return { actor: speaker };
     return shot.subjects[0] ? { actor: shot.subjects[0] } : undefined;
   };
-  const base = shot.focus && shot.focus !== "auto" ? shot.focus : auto();
-  let point = base ? resolveFocus(base, q, t) : undefined;
+  const authoredFocus = shot.focus && shot.focus !== "auto" ? shot.focus : undefined;
+  let point: Vec3 | undefined;
+  if (!authoredFocus && shot.focusPull !== undefined && shot.type !== "insert" && shot.subjects.length) {
+    point = pulledFocus(shot, q, t, shot.focusPull);
+  } else {
+    const base = authoredFocus ?? auto();
+    point = base ? resolveFocus(base, q, t) : undefined;
+  }
   for (const r of shot.rack ?? []) {
     if (t < r.at) break;
     const next = resolveFocus(r.to, q, t);
@@ -622,6 +692,27 @@ const focusFor = (shot: Shot, q: SceneQuery, t: number, position: Vec3, L: ShotL
   }
   if (!point) return null;
   return { distance: len(sub(point, position)), range, bokeh, point };
+};
+
+/**
+ * Engine 2 auto focus: the last subject who spoke (the first subject before anyone does), pulled smoothly
+ * from the previous one over `pull` seconds when it changes — no snapping in pauses or between lines.
+ */
+const pulledFocus = (shot: Shot, q: SceneQuery, t: number, pull: number): Vec3 | undefined => {
+  let current = shot.subjects[0];
+  let previous: string | undefined;
+  let since = -Infinity;
+  for (const l of q.lines ?? []) {
+    if (l.start > t) break;
+    if (!shot.subjects.includes(l.speaker) || l.speaker === current) continue;
+    previous = current;
+    current = l.speaker;
+    since = l.start;
+  }
+  const now = resolveFocus({ actor: current }, q, t);
+  if (!previous || !now || t - since >= pull) return now;
+  const before = resolveFocus({ actor: previous }, q, t);
+  return before ? lerpVec3(before, now, progress(t, since, pull, "smooth")) : now;
 };
 
 /** The camera at time t for a shot list (sorted by `at`), including blends between shots. */
@@ -633,9 +724,11 @@ export const cameraAt = (shots: Shot[], q: SceneQuery, t: number): CameraFrame =
   if (k > 0 && shot.blend && t < shot.at + shot.blend) {
     const prev = shotFrame(shots[k - 1], q, t, k - 1);
     const u = progress(t, shot.at, shot.blend, "inOut");
+    // Engine 2 arcs around the subject; engine 1 moves in a straight line (which can pass through it).
+    const pose = shot.arcBlend ? arcBlend(prev, frame, u) : { position: lerpVec3(prev.position, frame.position, u), target: lerpVec3(prev.target, frame.target, u) };
     return {
-      position: lerpVec3(prev.position, frame.position, u),
-      target: lerpVec3(prev.target, frame.target, u),
+      position: pose.position,
+      target: pose.target,
       fov: lerp(prev.fov, frame.fov, u),
       roll: lerp(prev.roll, frame.roll, u),
       focus: frame.focus && prev.focus ? { ...frame.focus, distance: lerp(prev.focus.distance, frame.focus.distance, u), bokeh: lerp(prev.focus.bokeh, frame.focus.bokeh, u) } : frame.focus,

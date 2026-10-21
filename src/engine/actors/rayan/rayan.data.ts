@@ -2,9 +2,9 @@
 // CLI and tests can import it in Node. Geometry lives in Rayan.tsx.
 // Conventions: metres, +Y up, actor faces +Z; joint angles in radians (XYZ order).
 // head.x / torso.x positive = tilt forward/down; hip.x negative = leg forward; knee.x positive = bend.
-import type { ActorDefinition, Channels, ChannelSpec } from "../rig";
+import type { ActorDefinition, Channels, ChannelSpec, Effectors } from "../rig";
 import { clamp, lerp, type Vec3 } from "../../core/time";
-import { armFK, armIK, inFrame, outOfFrame, type ArmRig, type Frame } from "../ik";
+import { armFK, armIK, childFrame, inFrame, outOfFrame, type ArmRig, type Frame } from "../ik";
 
 // Arm geometry, mirrored from Rayan.tsx (pelvis → torso (+0.06) → shoulder (±0.25, 0.38) → elbow
 // (±0.02, -0.23) → wrist (0, -0.22) → palm socket (0, -0.04, 0.04)). Keep in sync with the view.
@@ -23,6 +23,60 @@ const torsoFrame = (c: Channels): Frame => {
 export const rayanHand = (c: Channels, side: "L" | "R"): Vec3 => {
   const local = armFK(armRig(side === "L" ? 1 : -1), [c[`shoulder${side}.x`], c[`shoulder${side}.y`], c[`shoulder${side}.z`]], c[`elbow${side}.x`]);
   return outOfFrame(torsoFrame(c), local);
+};
+
+/**
+ * Body points and volumes for contact checks, following Rayan.tsx group by group (pelvis → torso → neck →
+ * head; shoulder → elbow → wrist → palm; hip → knee → ankle → sole). Keep in sync with the view.
+ */
+const rayanEffectors = (c: Channels): Effectors => {
+  const rot = (name: string): Vec3 => [c[`${name}.x`] ?? 0, c[`${name}.y`] ?? 0, c[`${name}.z`] ?? 0];
+  const pelvis: Frame = { position: [0, c["pelvis.y"], 0], rotations: [[c["pelvis.x"], 0, 0]] };
+  const torso = childFrame(pelvis, [0, 0.06, 0], rot("torso"));
+  const neck = childFrame(torso, [0, 0.46, 0], [0, 0, 0]);
+  const head = childFrame(neck, [0, 0.07, 0], rot("head"));
+  const headCentre = outOfFrame(head, [0, 0.19, 0]);
+  const arm = (side: 1 | -1) => {
+    const s = side === 1 ? "L" : "R";
+    const shoulder = childFrame(torso, [side * 0.25, 0.38, 0], rot(`shoulder${s}`));
+    const elbow = childFrame(shoulder, [side * 0.02, -0.23, 0], rot(`elbow${s}`));
+    const wrist = childFrame(elbow, [0, -0.22, 0], rot(`wrist${s}`));
+    return { shoulder: shoulder.position, elbow: elbow.position, wrist: wrist.position, hand: outOfFrame(wrist, [0, -0.04, 0.04]) };
+  };
+  const leg = (side: 1 | -1) => {
+    const s = side === 1 ? "L" : "R";
+    const hip = childFrame(pelvis, [side * 0.1, -0.05, 0], rot(`hip${s}`));
+    const knee = childFrame(hip, [0, -0.34, 0], [c[`knee${s}.x`], 0, 0]);
+    const ankle = childFrame(knee, [0, -0.31, 0.035], [0, 0, 0]);
+    return { hip: hip.position, knee: knee.position, ankle: ankle.position, sole: outOfFrame(ankle, [0, -0.0375, 0]) };
+  };
+  const [aL, aR, lL, lR] = [arm(1), arm(-1), leg(1), leg(-1)];
+  const limb = (name: string, a: Vec3, b: Vec3, r: number) => ({ name, a, b, r });
+  return {
+    points: { head: headCentre, face: outOfFrame(head, [0, 0.19, 0.23]), handL: aL.hand, handR: aR.hand, elbowL: aL.elbow, elbowR: aR.elbow, footL: lL.sole, footR: lR.sole, pelvis: pelvis.position },
+    parts: [
+      limb("head", headCentre, headCentre, 0.23),
+      limb("torso", torso.position, neck.position, 0.2),
+      limb("upperArmL", aL.shoulder, aL.elbow, 0.07),
+      limb("forearmL", aL.elbow, aL.wrist, 0.06),
+      limb("handL", aL.hand, aL.hand, 0.05),
+      limb("upperArmR", aR.shoulder, aR.elbow, 0.07),
+      limb("forearmR", aR.elbow, aR.wrist, 0.06),
+      limb("handR", aR.hand, aR.hand, 0.05),
+      limb("thighL", lL.hip, lL.knee, 0.075),
+      limb("shinL", lL.knee, lL.ankle, 0.06),
+      limb("thighR", lR.hip, lR.knee, 0.075),
+      limb("shinR", lR.knee, lR.ankle, 0.06),
+    ],
+  };
+};
+
+/** A point in the head's own frame (centre at [0, 0.19, 0], face front at +z 0.23), in root-local space. */
+const headPoint = (c: Channels, local: Vec3): Vec3 => {
+  const rot = (name: string): Vec3 => [c[`${name}.x`] ?? 0, c[`${name}.y`] ?? 0, c[`${name}.z`] ?? 0];
+  const pelvis: Frame = { position: [0, c["pelvis.y"], 0], rotations: [[c["pelvis.x"], 0, 0]] };
+  const head = childFrame(childFrame(childFrame(pelvis, [0, 0.06, 0], rot("torso")), [0, 0.46, 0], [0, 0, 0]), [0, 0.07, 0], rot("head"));
+  return outOfFrame(head, local);
 };
 
 const HALF_PI = Math.PI / 2;
@@ -183,6 +237,14 @@ export const rayanDef: ActorDefinition = {
       set: { "browL.y": 0.128, "browR.y": 0.128, "torso.x": -0.12 },
       add: (u) => ({ "head.y": u < 0.35 ? Math.sin((u / 0.35) * Math.PI) * 0.55 : 0, "head.x": u > 0.35 ? -Math.sin(((u - 0.35) / 0.65) * Math.PI) * 0.12 : 0 }),
     },
+    beat: {
+      description: "A small emphasis accent on a word: a quick head dip and brow lift (put it on `lN.word:K`).",
+      duration: 0.45,
+      add: (u) => {
+        const b = Math.sin(u * Math.PI);
+        return { "head.x": b * 0.11, "torso.x": b * 0.03, "browL.y": b * 0.012, "browR.y": b * 0.012 };
+      },
+    },
     type_burst: {
       description: "Frantic typing (use while seated at a keyboard).",
       duration: 1.5,
@@ -205,15 +267,21 @@ export const rayanDef: ActorDefinition = {
     headphones: { type: "boolean", default: true, description: "Headphones around the neck" },
   },
   recipeGestures: { flinch: "flinch", stomp: "stomp", crouchPose: "crouch", stompContact: 0.45 },
-  selfReach: (c0, what, side) => {
+  selfReach: (c0, what, side, opts) => {
     // Bow into the palm / tilt back to drink, then reach the hand there (works seated and standing).
     const bow = what === "facepalm" ? { head: 0.45, torso: 0.2 } : { head: -0.12, torso: 0.05 };
     const c = { ...c0, "head.x": c0["head.x"] + bow.head, "torso.x": c0["torso.x"] + bow.torso };
-    const face = rayanDef.anchors(c).face;
     const s = side === "L" ? 1 : -1;
-    const target: Vec3 = what === "facepalm" ? [face[0] + s * 0.11, face[1] - 0.07, face[2] - 0.06] : [face[0] + s * 0.03, face[1] - 0.2, face[2] + 0.05];
+    // Precise (engine 2): targets on the bowed head itself — the palm over the eye on that side, the cup just in
+    // front of the mouth — with the head's turn held so a look can't swing the face away from the hand. Legacy:
+    // relative to the face anchor, which ignores the bow (the palm ends ~8 cm inside the head).
+    const face = rayanDef.anchors(c).face;
+    const target: Vec3 = opts?.precise
+      ? headPoint(c, what === "facepalm" ? [s * 0.06, 0.25, 0.25] : [s * 0.03, 0.0, 0.3])
+      : what === "facepalm" ? [face[0] + s * 0.11, face[1] - 0.07, face[2] - 0.06] : [face[0] + s * 0.03, face[1] - 0.2, face[2] + 0.05];
     const r = rayanDef.reach!(c, target, side);
-    return { set: { ...r.set, "head.x": c["head.x"], "torso.x": c["torso.x"], ...(what === "facepalm" ? { lidL: 0.85, lidR: 0.85 } : {}) }, reached: r.reached };
+    const held: Channels = opts?.precise ? { "head.y": c0["head.y"] } : {};
+    return { set: { ...r.set, "head.x": c["head.x"], "torso.x": c["torso.x"], ...held, ...(what === "facepalm" ? { lidL: 0.85, lidR: 0.85 } : {}) }, reached: r.reached, ...(opts?.precise ? { target } : {}) };
   },
   reach: (c, target, side) => {
     const r = armIK(armRig(side === "L" ? 1 : -1), inFrame(torsoFrame(c), target));
@@ -222,6 +290,8 @@ export const rayanDef: ActorDefinition = {
       reached: r.reached,
     };
   },
+  effectors: rayanEffectors,
+  persona: { description: "Expressive developer: reacts quickly, nods along, talks with his hands.", listen: { delay: 0.2, nod: 1 } },
   anchors: (c) => {
     const pelvis = c["pelvis.y"];
     const lean = c["torso.x"];
@@ -254,19 +324,24 @@ export const rayanDef: ActorDefinition = {
     c["pupil.x"] = clamp(s.lookYaw * 0.025, -0.012, 0.012) * w + s.noise("saccadeX", 1.3) * 0.002;
     c["pupil.y"] = clamp(s.lookPitch * 0.025, -0.01, 0.01) * w + s.noise("saccadeY", 1.1) * 0.0015;
 
+    // Listening nod (opt-in listening only).
+    if (s.beat > 0) c["head.x"] += s.beat * 0.09;
+
     // Blinks never open a lid further than the emotion has it.
     c.lidL = Math.max(c.lidL, s.blink);
     c.lidR = Math.max(c.lidR, s.blink);
 
-    // Stylized amplitude mouthing + head/torso beats.
+    // Stylized amplitude mouthing; head/torso beats and hands follow the (slow, with speech motion) body energy.
     if (s.talk > 0.01) {
       c["mouth.open"] = Math.max(c["mouth.open"] * 0.6, 0.18 + s.talk * 1.25);
       c["mouth.wide"] = lerp(c["mouth.wide"], 0.92 + s.noise("mouthW", 6) * 0.15, s.talk);
-      c["head.x"] += s.noise("talkNod", 3) * 0.035 * s.talk;
-      c["torso.x"] += s.noise("talkBounce", 4) * 0.015 * s.talk;
+    }
+    if (s.talkBody > 0.01) {
+      c["head.x"] += s.noise("talkNod", 3) * 0.035 * s.talkBody;
+      c["torso.x"] += s.noise("talkBounce", 4) * 0.015 * s.talkBody;
       if (s.pose === "explaining" || s.pose === "sit_explaining") {
-        c["elbowL.x"] += s.noise("gestL", 2.2) * 0.16 * s.talk;
-        c["elbowR.x"] += s.noise("gestR", 2.4) * 0.16 * s.talk;
+        c["elbowL.x"] += s.noise("gestL", 2.2) * 0.16 * s.talkBody;
+        c["elbowR.x"] += s.noise("gestR", 2.4) * 0.16 * s.talkBody;
       }
     }
     if (s.pose === "sit_typing") {

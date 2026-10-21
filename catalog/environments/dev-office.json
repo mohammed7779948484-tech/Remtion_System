@@ -139,6 +139,7 @@
         -1.35
       ],
       "rotation": 0,
+      "scale": 0.8,
       "params": {
         "leaves": "#3fae6a"
       }

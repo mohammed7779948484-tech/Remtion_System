@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { captionPages } from "../src/engine/audio/Captions";
+import { captionPages } from "../src/engine/audio/captionLayout";
 import { envelopeFromSamples, lineCaptions, lineHash, splitWords, voiceFingerprint, voiceRequest, voiceStaleReason, wordsFromAlignment } from "../src/engine/audio/speech";
 import { elevenLabsClip, elevenLabsRequest, fixtureClip, generateVoices, parseProvider, readWav, writeWav } from "../scripts/voice";
 

@@ -2,11 +2,15 @@
 //   public/videos/<slug>/voice/<line>-<hash>.wav  +  public/videos/<slug>/voice.json
 // Providers: "elevenlabs" (API, needs ELEVENLABS_API_KEY), "system" (offline Windows voices),
 // "fixture" (deterministic synthetic babble; any OS; used by tests). Unchanged lines are skipped.
+// Every clip is analysed (energy, loudness, tags; cached clips are backfilled for free) and, when a local
+// whisper model exists, checked by speech-to-text. `takes` adds alternative takes stored as `<id>#<n>`.
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { analyzeClip, ANALYSIS_VERSION, tagsFromAlignment, wordErrorRate } from "../src/engine/audio/analysis";
 import { parseEpisode, type Episode, type EpisodeVoice } from "../src/engine/core/schema";
+import { sttModelName, sttUnavailable, transcribe } from "./stt";
 import {
   DEFAULT_ELEVEN_VOICES,
   ELEVEN_STITCH_MODELS,
@@ -14,6 +18,8 @@ import {
   envelopeFromSamples,
   hashString,
   splitWords,
+  takeKey,
+  takeSeed,
   VOICE_PROVIDERS,
   voiceFingerprint,
   voiceRequest,
@@ -88,8 +94,8 @@ const pcmToWav = (pcm: Buffer, sampleRate: number) => {
 
 // ---------------------------------------------------------------- providers
 
-type Clip = { wav: Buffer; words: Word[] };
-export type LineJob = { id: string; text: string; voice: EpisodeVoice | undefined; speakerIndex: number; previous?: string; next?: string };
+type Clip = { wav: Buffer; words: Word[]; /** Tag timings from the provider's alignment. */ tags?: { tag: string; start: number; end: number }[] };
+export type LineJob = { id: string; text: string; voice: EpisodeVoice | undefined; speakerIndex: number; previous?: string; next?: string; /** Alternative take (0 = the original seed). */ take?: number };
 
 export { DEFAULT_ELEVEN_VOICES };
 
@@ -121,13 +127,13 @@ const elevenError = async (res: Response, what: string) => {
 };
 
 export const elevenLabsRequest = (job: LineJob, apiKey: string) => {
-  const req = voiceRequest("elevenlabs", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "elevenlabs" }>;
+  const req = voiceRequest("elevenlabs", job.text, job.voice, job.speakerIndex, job.take ?? 0) as Extract<VoiceRequest, { provider: "elevenlabs" }>;
   const url = `https://api.elevenlabs.io/v1/text-to-speech/${req.voiceId}/with-timestamps?output_format=${req.format}`;
   const body = {
     text: req.text,
     model_id: req.model,
     voice_settings: req.settings,
-    seed: parseInt(hashString(job.text).slice(0, 7), 16),
+    seed: takeSeed(job.text, job.take ?? 0),
     ...(ELEVEN_STITCH_MODELS.includes(req.model) ? { previous_text: job.previous && stripTags(job.previous), next_text: job.next && stripTags(job.next) } : {}),
   };
   return { url, req, init: { method: "POST", headers: { "xi-api-key": apiKey, "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) } };
@@ -147,7 +153,7 @@ export const elevenLabsClip = async (job: LineJob, apiKey: string, fetchImpl: ty
   }
   const wav = raw.toString("ascii", 0, 4) === "RIFF" ? raw : pcmToWav(raw, 24000);
   const alignment = json.alignment ?? json.normalized_alignment;
-  return { wav, words: alignment ? wordsFromAlignment(alignment) : [] };
+  return { wav, words: alignment ? wordsFromAlignment(alignment) : [], tags: alignment ? tagsFromAlignment(alignment) : [] };
 };
 
 export type ElevenLabsAccount = {
@@ -242,10 +248,10 @@ const xml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 
 export const systemClip = (job: LineJob, tmpDir: string): Clip => {
   if (process.platform !== "win32") throw new Error("system voices need Windows (use --provider fixture or elevenlabs)");
-  const { voice, rate, pitch, text } = voiceRequest("system", job.text, job.voice, job.speakerIndex) as Extract<VoiceRequest, { provider: "system" }>;
+  const { voice, rate, pitch, text } = voiceRequest("system", job.text, job.voice, job.speakerIndex, job.take ?? 0) as Extract<VoiceRequest, { provider: "system" }>;
   const prosody = `<prosody rate="${rate >= 0 ? "+" : ""}${rate * 6}%"${pitch ? ` pitch="${xml(pitch)}"` : ""}>${xml(text)}</prosody>`;
   const ssml = `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">${prosody}</speak>`;
-  const out = path.join(tmpDir, `sapi-${hashString(job.id + job.text)}.wav`);
+  const out = path.join(tmpDir, `sapi-${hashString(`${job.id}${job.text}#${job.take ?? 0}`)}.wav`);
   const scriptFile = path.join(tmpDir, "sapi.ps1");
   const jobFile = path.join(tmpDir, `job-${job.id}.json`);
   fs.writeFileSync(scriptFile, SAPI_SCRIPT);
@@ -295,7 +301,8 @@ export const fixtureClip = (job: LineJob): Clip => {
     const start = t;
     const syllables = Math.max(1, Math.round(w.replace(/[^a-z]/gi, "").length / 3));
     for (let s = 0; s < syllables; s++) {
-      const len = 0.11 + (parseInt(hashString(`${job.text}|${wi}|${s}`).slice(0, 2), 16) / 255) * 0.08;
+      const seed = job.take ? `${job.text}#${job.take}` : job.text;
+      const len = 0.11 + (parseInt(hashString(`${seed}|${wi}|${s}`).slice(0, 2), 16) / 255) * 0.08;
       const n = Math.round(len * sr);
       const pitch = f0 * (1 + 0.12 * Math.sin(wi * 1.7 + s));
       for (let i = 0; i < n; i++) {
@@ -327,6 +334,14 @@ export type VoiceOptions = {
   tier?: string;
   /** Save each ElevenLabs response (audio reduced to its header) here, e.g. for test fixtures. */
   saveResponse?: string;
+  /** Alternative takes per line id (total count incl. take 0), e.g. { l3: 3 }. */
+  takes?: Record<string, number>;
+  /** Refuse a paid run that would use more credits (≈ characters, tags included). */
+  maxCredits?: number;
+  /** Speech-to-text validation when a local model exists (default true). */
+  stt?: boolean;
+  /** Re-analyse every clip (analysis is otherwise computed once and backfilled when missing). */
+  analyze?: boolean;
   log?: (msg: string) => void;
 };
 
@@ -385,23 +400,31 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
   fs.mkdirSync(path.join(dir, "voice"), { recursive: true });
   const speakers = Object.keys(ep.cast);
   const speakerIndex = (id: string) => Math.max(0, speakers.indexOf(id));
+  for (const id of Object.keys(opts.takes ?? {})) if (!ep.dialogue.some((l) => l.id === id)) throw new Error(`--takes: no line "${id}" in ${slug}`);
 
-  // Which lines need audio? Fresh = same provider, file present, unchanged effective request.
+  // Every (line, take) the episode needs: take 0, the requested alternative takes, and the selected take.
+  const jobs = ep.dialogue.flatMap((line, i) => {
+    const selected = typeof line.take === "number" ? line.take : (line.take?.n ?? 0);
+    const n = Math.max(1, opts.takes?.[line.id] ?? 0, selected + 1);
+    return Array.from({ length: n }, (_, take) => ({ line, i, take, key: takeKey(line.id, take) }));
+  });
+  // Which need audio? Fresh = same provider, file present, unchanged effective request.
   const todo = new Set(
-    ep.dialogue
-      .filter((line) => {
-        const prev = old?.lines[line.id];
+    jobs
+      .filter(({ line, key }) => {
+        const prev = old?.lines[key];
         if (opts.force || !prev || prev.provider !== provider) return true;
         if (!fs.existsSync(path.join(root, "public", prev.file))) return true;
         return voiceStaleReason(prev, line.text, ep.cast[line.speaker]?.voice, speakerIndex(line.speaker)) !== null;
       })
-      .map((l) => l.id),
+      .map((j) => j.key),
   );
   if (provider === "elevenlabs" && todo.size) {
-    if (!explicit) throw new Error(`${todo.size} line(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs. (--provider system re-voices ALL lines offline and discards the existing paid clips.)`);
+    if (!explicit) throw new Error(`${todo.size} clip(s) need new ElevenLabs audio. Paid generation needs an explicit flag: re-run with --provider elevenlabs. (--provider system re-voices ALL lines offline and discards the existing paid clips.)`);
     if (!apiKey) throw new Error("ELEVENLABS_API_KEY is not set (put it in .env)");
-    const chars = ep.dialogue.filter((l) => todo.has(l.id)).reduce((n, l) => n + l.text.length, 0);
-    log(`  elevenlabs: ${todo.size} line(s), ${chars} characters to generate`);
+    const chars = jobs.filter((j) => todo.has(j.key)).reduce((n, j) => n + j.line.text.length, 0);
+    log(`  elevenlabs: ${todo.size} clip(s), ${chars} characters ≈ ${chars} credits to generate`);
+    if (opts.maxCredits !== undefined && chars > opts.maxCredits) throw new Error(`this run would use about ${chars} credits, over --max-credits ${opts.maxCredits}: nothing was generated`);
   }
   const before = provider === "elevenlabs" && todo.size ? await elevenLabsUsage(apiKey, opts.fetchImpl) : null;
   if (before) log(`  plan: ${before.tier}, ${before.used}/${before.limit} credits used before this run`);
@@ -410,30 +433,61 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
   // Start from the old manifest so an interrupted run never forgets clips it already paid for.
   const manifest: VoiceManifest = { version: 1, lines: { ...(old?.lines ?? {}) } };
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "voice-"));
+  let stats = { analysed: 0, transcribed: 0, stt: "" };
   let generated = 0;
   try {
-    for (let i = 0; i < ep.dialogue.length; i++) {
-      const line = ep.dialogue[i];
-      if (!todo.has(line.id)) continue;
+    for (const { line, i, take, key } of jobs) {
+      if (!todo.has(key)) continue;
       const voice = ep.cast[line.speaker]?.voice;
-      const job: LineJob = { id: line.id, text: line.text, voice, speakerIndex: speakerIndex(line.speaker), previous: ep.dialogue[i - 1]?.text, next: ep.dialogue[i + 1]?.text };
-      const req = voiceRequest(provider, line.text, voice, job.speakerIndex);
+      const job: LineJob = { id: line.id, text: line.text, voice, speakerIndex: speakerIndex(line.speaker), previous: ep.dialogue[i - 1]?.text, next: ep.dialogue[i + 1]?.text, take };
+      const req = voiceRequest(provider, line.text, voice, job.speakerIndex, take);
       const hash = voiceFingerprint(req);
-      log(`  ${provider}: ${line.id} (${line.speaker}) "${line.text.slice(0, 60)}"`);
+      log(`  ${provider}: ${key} (${line.speaker}) "${line.text.slice(0, 60)}"`);
       const clip = provider === "elevenlabs" ? await elevenLabsClip(job, apiKey, opts.fetchImpl, opts.saveResponse) : provider === "system" ? systemClip(job, tmp) : fixtureClip(job);
       const { samples, sampleRate } = readWav(clip.wav);
-      const file = `videos/${slug}/voice/${line.id}-${hash}.wav`;
+      const file = `videos/${slug}/voice/${key.replace("#", "-t")}-${hash}.wav`;
       fs.writeFileSync(path.join(root, "public", file), clip.wav);
       const duration = samples.length / sampleRate;
       const words = clip.words.length ? clip.words : evenWords(line.text, duration);
-      const prev = manifest.lines[line.id];
+      const prev = manifest.lines[key];
       const entry: VoiceLine = { file, hash, scheme: 2, provider, text: line.text, duration, words, envelope: envelopeFromSamples(samples, sampleRate, 60), generatedAt: new Date().toISOString() };
       if (req.provider === "elevenlabs") Object.assign(entry, { model: req.model, voiceId: req.voiceId, format: req.format, tier });
-      manifest.lines[line.id] = entry;
+      if (take > 0) entry.take = take;
+      entry.analysis = analyzeClip({ samples, sampleRate, text: line.text, words, alignedTags: clip.tags });
+      manifest.lines[key] = entry;
       writeManifest(dir, manifest); // after every clip: a later failure keeps this one
       if (prev && prev.file !== file) fs.rmSync(path.join(root, "public", prev.file), { force: true });
       generated++;
     }
+
+    // Analysis for cached clips (free: no new audio), then speech-to-text where it hasn't run yet.
+    let analysed = 0;
+    for (const [key, e] of Object.entries(manifest.lines)) {
+      if (!opts.analyze && e.analysis?.v === ANALYSIS_VERSION) continue;
+      const wavPath = path.join(root, "public", e.file);
+      if (!fs.existsSync(wavPath)) continue;
+      const { samples, sampleRate } = readWav(fs.readFileSync(wavPath));
+      const stt = e.analysis?.stt;
+      e.analysis = { ...analyzeClip({ samples, sampleRate, text: e.text, words: e.words }), ...(stt ? { stt } : {}) };
+      analysed++;
+      log(`  analysed ${key}`);
+    }
+    let transcribed = 0;
+    const why = opts.stt === false ? "skipped (--no-stt)" : sttUnavailable();
+    if (!why) {
+      for (const [key, e] of Object.entries(manifest.lines)) {
+        if (!e.analysis || e.analysis.stt) continue;
+        const heard = transcribe(path.join(root, "public", e.file));
+        if (heard === null) break;
+        e.analysis.stt = { text: heard, wer: wordErrorRate(e.text, heard), model: sttModelName() };
+        transcribed++;
+        log(`  speech-to-text ${key}: "${heard}" (word error ${(e.analysis.stt.wer * 100).toFixed(0)} %)`);
+      }
+    }
+    const sttNote = why ?? sttUnavailable();
+    if (sttNote) log(`  speech-to-text: ${sttNote} — words not verified`);
+    if (analysed || transcribed) writeManifest(dir, manifest);
+    stats = { analysed, transcribed, stt: sttNote ?? `ok (${sttModelName()})` };
 
     // Generated sound effects (sfx entries with a `prompt`), cached next to the voices.
     for (const s of ep.sfx) {
@@ -459,15 +513,16 @@ export const generateVoices = async (slug: string, opts: VoiceOptions = {}) => {
     }
   }
 
-  // Forget lines that no longer exist, then drop clips nothing references.
+  // Forget lines that no longer exist (with their takes; takes of living lines are kept: they were paid for),
+  // then drop clips nothing references.
   const ids = new Set(ep.dialogue.map((l) => l.id));
-  for (const id of Object.keys(manifest.lines)) if (!ids.has(id)) delete manifest.lines[id];
+  for (const key of Object.keys(manifest.lines)) if (!ids.has(key.split("#")[0])) delete manifest.lines[key];
   writeManifest(dir, manifest);
   for (const f of fs.readdirSync(path.join(dir, "voice"))) {
     const keep = Object.values(manifest.lines).some((l) => l.file.endsWith(`/${f}`));
     if (!keep) fs.rmSync(path.join(dir, "voice", f), { force: true });
   }
-  return { provider, generated, skipped: ep.dialogue.length - generated, manifest };
+  return { provider, generated, skipped: jobs.length - generated, ...stats, manifest };
 };
 
 const evenWords = (text: string, duration: number): Word[] => {

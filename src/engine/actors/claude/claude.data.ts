@@ -2,7 +2,8 @@
 // stubby feet. No arms or skeleton, so its channels and acting vocabulary are its own.
 // Conventions: actor faces +Z; actor's left = +X; small by default (≈0.29 m at scale 1).
 import type { ActorDefinition, Channels, ChannelSpec } from "../rig";
-import { EASINGS, clamp, lerp } from "../../core/time";
+import { EASINGS, clamp, lerp, type Vec3 } from "../../core/time";
+import { outOfFrame, type Frame } from "../ik";
 
 const ch = (rest: number, min: number, max: number, description?: string): ChannelSpec => ({ rest, min, max, description });
 const eyes = (l: Partial<Record<"x" | "y" | "sx" | "sy" | "rz", number>>, r: Partial<Record<"x" | "y" | "sx" | "sy" | "rz", number>>): Channels => {
@@ -88,6 +89,7 @@ export const claudeDef: ActorDefinition = {
     shake: { description: "Shakes no.", duration: 0.9, add: (u) => ({ "body.ry": Math.sin(u * Math.PI * 6) * 0.3 * Math.sin(u * Math.PI) }) },
     spin: { description: "Full 360° spin.", duration: 0.9, add: (u) => ({ "body.ry": EASINGS.inOut(u) * Math.PI * 2, squash: Math.sin(u * Math.PI) * 0.05 }) },
     wiggle: { description: "Happy side-to-side wiggle.", duration: 1.0, add: (u) => ({ "body.rz": Math.sin(u * Math.PI * 8) * 0.2 * Math.sin(u * Math.PI), squash: Math.sin(u * Math.PI * 8) * 0.04 }) },
+    beat: { description: "A small emphasis accent on a word: a quick forward dip and squash pulse (put it on `lN.word:K`).", duration: 0.4, add: (u) => ({ "body.rx": Math.sin(u * Math.PI) * 0.1, squash: -Math.sin(u * Math.PI) * 0.035 }) },
   },
   sockets: {
     top: "Above the top lobe (hats, icons, thought bubbles)",
@@ -99,6 +101,7 @@ export const claudeDef: ActorDefinition = {
     eyeColor: { type: "color", default: "#141418", description: "Eyes and feet shading" },
   },
   recipeGestures: { flinch: "flinch", stomp: "hop", stompContact: 0.85 },
+  persona: { description: "Calm, literal, deadpan AI: small, late reactions; most of the comedy is in its stillness.", listen: { delay: 0.35, nod: 0.5 } },
   // No arms: "reaching" is leaning the whole body toward the target (and pressing is a hop onto it).
   reach: (c, target) => {
     const up = target[1] - c["body.y"];
@@ -106,6 +109,16 @@ export const claudeDef: ActorDefinition = {
     return {
       set: { "body.rx": clamp(Math.atan2(forward, Math.max(0.05, 0.12 - up)) * 0.6, -0.4, 0.75), "body.rz": clamp(-target[0] * 2.5, -0.45, 0.45), "body.z": clamp(target[2] * 0.25, -0.04, 0.06), squash: 1.06 },
       reached: Math.hypot(target[0], target[2]) < 0.25,
+    };
+  },
+  // Contact-check volumes (mirrors Claude.tsx): the body group turns with body.rx/ry/rz, so `face` follows it.
+  effectors: (c) => {
+    const body: Frame = { position: [0, c["body.y"], c["body.z"]], rotations: [[c["body.rx"], c["body.ry"], c["body.rz"]]] };
+    const centre = body.position;
+    const foot = (s: "L" | "R"): Vec3 => [(s === "L" ? 1 : -1) * 0.052, c[`foot${s}.y`] - 0.02, c[`foot${s}.z`]];
+    return {
+      points: { head: centre, face: outOfFrame(body, [0, 0, 0.09]), footL: foot("L"), footR: foot("R") },
+      parts: [{ name: "body", a: centre, b: centre, r: 0.13 }],
     };
   },
   anchors: (c) => {
@@ -136,11 +149,14 @@ export const claudeDef: ActorDefinition = {
     c["eyeL.y"] += ey;
     c["eyeR.y"] += ey;
 
+    // Talking: the whole body follows the (slow, with speech motion) speech energy; the eyes pulse with syllables.
+    if (s.talkBody > 0.01) {
+      c["body.y"] += s.talkBody * 0.012;
+      c.squash += s.talkBody * 0.065 * s.noise("talkSquash", 5);
+      c["body.rz"] += s.talkBody * 0.06 * s.noise("talkTilt", 3);
+      c["body.rx"] += s.talkBody * 0.04 * s.noise("talkPitch", 4);
+    }
     if (s.talk > 0.01) {
-      c["body.y"] += s.talk * 0.012;
-      c.squash += s.talk * 0.065 * s.noise("talkSquash", 5);
-      c["body.rz"] += s.talk * 0.06 * s.noise("talkTilt", 3);
-      c["body.rx"] += s.talk * 0.04 * s.noise("talkPitch", 4);
       const pulse = 1 + s.talk * 0.12 * s.noise("eyePulse", 6);
       c["eyeL.sy"] *= pulse;
       c["eyeR.sy"] *= pulse;
@@ -161,6 +177,12 @@ export const claudeDef: ActorDefinition = {
       c["footR.y"] = lerp(c["footR.y"], 0.022 + Math.max(0, -Math.sin(step)) * 0.018, s.walk);
       c["footL.z"] = lerp(c["footL.z"], 0.012 + Math.cos(step) * 0.022, s.walk);
       c["footR.z"] = lerp(c["footR.z"], 0.012 - Math.cos(step) * 0.022, s.walk);
+    }
+
+    // Listening nod (opt-in listening only): a small forward dip.
+    if (s.beat > 0) {
+      c["body.rx"] += s.beat * 0.08;
+      c.squash -= s.beat * 0.02;
     }
 
     const lid = lerp(1, 0.08, s.blink);

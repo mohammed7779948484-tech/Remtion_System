@@ -31,7 +31,12 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
             "voice": { "system": "Microsoft Zira Desktop", "pitch": "+30%", "rate": 1, "elevenlabs": { "voiceId": "cgSgspJ2msm6clMCkdW9" } } }
 ```
 - `at`: a mark (`show environment <id>` lists them), an item id, or `[x, y, z]` (y > 0 to stand on things).
-- Mascot scale: ~1.5 on a desk, ~2 on giant keys next to Rayan, ~4 standing beside him on the floor.
+- Environments (`set.environment`): `dev-office` (desk, monitors, lamp: `chair-seat`, `desk-mascot`, `beside-desk`),
+  `micro-keyboard` (giant laptop, stand on keys: `on-g`, `on-h`, `on-enter`…), `floating-space` (two floating islands
+  + a hard-light bridge in a starfield, mood `space-cool`: `stand-left`, `stand-right`, `stand-center`, `on-bridge`,
+  `far-spot`, `far-spot-2`, `drop-in`; walk `stand-right` → `far-spot` and the straight path follows the bridge;
+  spots `establishing`, `wide`, `hero-low`, `high`, `along-bridge`). Anything else: `new --env custom` (section 12).
+- Mascot scale: ~1.5 on a desk, ~2 on giant keys next to Rayan, ~4 standing beside him on the floor or an island.
 - Voice ids: `voice --check` lists the ones this key can use (Liam `TX3LPaxmHKxFdv7VOQHJ` = young male creator,
   Jessica `cgSgspJ2msm6clMCkdW9` = cute/playful, Will `bIHbv24MWmeRgasZH58o`, Laura `FGY2WhTYpPnrIDTdsKH5`).
 
@@ -41,6 +46,11 @@ Working example using almost everything here: `videos/ctrl-z/episode.json`.
 { "id": "l2", "speaker": "claude", "text": "[cheerfully] Relax! Just press Control Z.", "gap": 0.2 },
 { "id": "l3", "speaker": "claude", "text": "[sighs] I weigh nothing.", "at": "l2.end+5.9" }
 ```
+Per line (all optional): `"take": { "n": 2, "by": "director", "why": "…" }` (which generated take plays; `by:
+"agent"` = measured, not heard), `"trim": false` or `{ "start": 0.2, "end": 2.4 }` (file seconds; engine 2 trims
+silent edges itself), `"gain": -6` (dB on top of levelling), `"caption": "Hey!!"` (shown instead of the spoken text).
+Engine-2 voice corrections, off with `"defaults": { "trim": false, "level": false, "speechMotion": false }`.
+
 Refs: `"l2.start"`, `"l2.end+0.3"`, `"l3.word:2"` (2nd spoken word; tags don't count), `"l3.word:2.end-0.1"`.
 Lines can only reference earlier lines, and refs only point at dialogue lines: beats before the first line use
 absolute seconds. A pause between words is the right spot for a UI ping:
@@ -50,7 +60,7 @@ absolute seconds. A pause between words is the right spot for a UI ping:
 ```json
 { "at": "l1.start", "actor": "rayan", "emotion": "shocked", "look": "camera" },
 { "at": "l2.word:3", "actor": "claude", "gesture": "nod" },
-{ "at": 4, "actor": "rayan", "pose": "celebrate", "transition": 0.25 },
+{ "at": 4, "actor": "rayan", "pose": "celebrate", "transition": 0.45 },
 { "at": 5, "actor": "rayan", "move": { "to": "on-z", "duration": 2.3 } },
 { "at": 0.1, "actor": "rayan", "move": { "to": "on-enter", "duration": 0.38, "ease": "in", "face": "keep" } },
 { "at": 7, "actor": "rayan", "turn": 0, "transition": 0.2 },
@@ -58,7 +68,25 @@ absolute seconds. A pause between words is the right spot for a UI ping:
 ```
 `look`: actor (`"claude"`, `"claude.face"`), item (`"keyboard.key:ctrl"`), mark, `[x,y,z]`, `"camera"`, `null`.
 `turn`: degrees or a place/actor — not `"camera"` (use `look: "camera"` to face the lens).
-A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
+A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls. Big pose changes need time: arms
+thrown overhead in 0.25 s (`celebrate`) move the hands 44 cm in one frame — give them ≥ ~0.4 s.
+
+**Performance.**
+- `intensity` on an action without a `gesture` is how far toward its `emotion` (0..1):
+  `{ "emotion": "angry", "intensity": 0.4 }` reads irritated, not furious. With a gesture it stays the gesture's strength.
+- `gesture: "beat"` (Rayan: head dip + brow lift; mascot: forward dip) is a small emphasis accent — put it on a word:
+  `{ "at": "l3.word:4", "actor": "rayan", "gesture": "beat" }`.
+- Keyed joints pass smoothly through every key (via points), so a limb goes around the body instead of through it:
+  `{ "at": 2, "actor": "rayan", "joints": { "shoulderR.x": -0.3 }, "keys": [{ "at": 2.3, "joints": { "shoulderR.x": -1.2, "elbowR.x": -1.6 } },
+  { "at": 2.6, "joints": { "shoulderR.x": -2.0, "elbowR.x": -1.1 } }], "duration": 1.5, "transition": 0.3 }`.
+  `joints` are the values at `at`; a channel first keyed later takes that first keyed value from the start.
+
+**Listening (opt-in).** `"defaults": { "listen": 1 }` for the episode, or `"listen": 0..1` on a cast member (0 =
+restrained: exactly off). Characters then look at whoever is speaking after their persona's reaction delay (Rayan
+0.2 s, the mascot 0.35 s), glance away now and then in long lines, nod at some phrase ends (word gaps ≥ 0.3 s and the
+line end) and blink on cuts. It never overrides an authored `look`: it only fills the weight a look leaves
+(`look: null` hands control back to it). It shows only when the listener is on screen — cut to a reaction shot during
+the line (`videos/ctrl-z-remaster`).
 
 ## 5. Recipes (`do`)
 ```json
@@ -74,7 +102,10 @@ A `move` to a mark turns to the mark's yaw on arrival; `ease: "in"` for falls.
 { "at": "l5.end+0.4",  "actor": "rayan",  "do": "facepalm", "duration": 1.8 }
 ```
 - `facepalm` (palm on the face, head bowed, eyes shut) and `sip` (held cup to the mouth) work seated and standing.
-  `sip` needs a `pick-up` first; the armless mascot's `facepalm` becomes a tired head shake.
+  `sip` needs a `pick-up` first; the armless mascot's `facepalm` becomes a tired head shake. On engine 2
+  (`defaults.viaPoints`, on by default) the palm lands over the eye of the bowed head, the hand rises in front of the
+  chest first (no sweep through the head), and the head's turn is held meanwhile, so a look or listening can't swing
+  the face away from the hand. Prefer the recipe to raw `joints` for a hand on the face.
 - `press` while standing on the key = stomp/hop and the actor sinks with the key; otherwise a hand tap. Keys stay
   down unless you give `duration`. Release a key you stood on by moving off it and a props cue `{ "keys": { "z": false } }`.
 - `place` on a pressable anchor presses it (the weight); the carried item reappears there.
@@ -146,6 +177,32 @@ used exactly; solver warnings in `validate` mean a blocked or out-of-frame shot,
 `offset: [x, y]` moves the subject on screen in half-frame units (+x right, +y up), e.g. `[0, -0.12]` drops a face
 below a top toast. `fov` is vertical, as in three.js. In `dev-office` the monitors block many angles on the seated
 actor — try a few (`validate` is instant) before rendering stills. Close shots of the desk mascot work best from the front.
+
+**Moves inside a shot.** Moves span the shot unless timed: `{ "type": "push-in", "amount": 0.2, "at": "l3.word:4",
+"duration": 0.8 }` lands a push on a word. `move: "life"` is a barely visible breathing drift (opt-in, `amount` 0–2);
+`defaults.cameraLife` applies it to every shot without a move. `move: "static"` stays locked off.
+
+**Sustained choreography (`keys`).** Keyframes in the solver's terms, smooth through every key (no stop at each one),
+relative to the subject — with `follow` the camera rides along while orbiting:
+```json
+{ "at": "l2.end", "shot": "full", "subject": "rayan", "blend": 1.2, "follow": { "lag": 0.6, "lead": 0.3 },
+  "keys": [ { "at": "l2.end", "angle": 160 }, { "at": "l2.end+2.6", "angle": 95, "size": 1.15 },
+            { "at": "l2.end+5", "angle": 30, "size": 0.95, "height": "low" } ],
+  "allow": ["back-of-head"] }
+```
+(`videos/one-take`: a 7 s walk across the light bridge, from behind to a low front ¾.) Key fields: `angle` (as above),
+`distance` or `size`, `height`, `lens`/`fov` (key distance and lens together for a dolly-zoom), `offset`, `roll`. Values
+hold until a later key changes them. `angle` is measured from the subject's facing mid-shot: a mark arrival turns the
+actor to the mark's yaw — use `move.face: "path"` to keep the walking direction. Authored keys are never corrected:
+`inspect` checks the real path (faces blocked or out of frame, camera inside geometry). `follow`/`track` take
+`{ "lag": s, "lead": s }` (lead looks ahead of a walker).
+
+**Authored flights (`path`).** World-space keys on a `custom` shot: `"path": [{ "at": 0, "position": [0,1,4],
+"target": [0,1,0] }, { "at": 4, "position": [1,3,3], "target": [0,0.8,0], "lens": 28 }]` (crane, fly-through).
+
+**Engine 2 corrections** (on by default with `"engine": 2`, off with `"defaults": { "focusPull": false, "arcBlend":
+false }`): auto focus holds the last speaker and pulls (~0.45 s) instead of snapping; `blend` arcs around the subject
+instead of moving in a straight line through it. (The third correction, `viaPoints`, is in the recipes — section 5.)
 
 ## 10. Sound
 ```json

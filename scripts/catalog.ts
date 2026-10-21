@@ -7,6 +7,7 @@ import { ACTOR_DEFS } from "../src/engine/actors/defs";
 import { restChannels, type ActorDefinition } from "../src/engine/actors/rig";
 import { SFX_INFO } from "../src/engine/audio/sfx.data";
 import { MOVES, SHOT_TYPES } from "../src/engine/camera/solve";
+import { ENGINE_VERSIONS, INTENTS, PROFILES } from "../src/engine/core/behaviour";
 import { FX_INFO, FxSchemas } from "../src/engine/core/fx";
 import { EpisodeSchema } from "../src/engine/core/schema";
 import { MOODS } from "../src/engine/lighting/moods";
@@ -47,7 +48,7 @@ export const buildCatalog = (): Record<string, unknown> => {
       description: env.description,
       defaultMood: env.defaultMood,
       shell: env.shell,
-      items: env.items.map((i) => ({ id: i.id, kind: i.kind, position: i.position, rotation: i.rotation ?? 0, ...(i.on ? { on: i.on } : {}), ...(i.params ? { params: i.params } : {}) })),
+      items: env.items.map((i) => ({ id: i.id, kind: i.kind, position: i.position, rotation: i.rotation ?? 0, ...(i.scale !== undefined ? { scale: i.scale } : {}), ...(i.on ? { on: i.on } : {}), ...(i.params ? { params: i.params } : {}) })),
       marks: env.marks,
       cameras: env.cameras,
       bounds: env.bounds,
@@ -68,6 +69,7 @@ export const buildCatalog = (): Record<string, unknown> => {
       lock: "true = no automatic corrections at all",
       allowOcclusion: "ids allowed to block the view (deliberate foreground)",
       blend: "seconds to blend from the previous shot instead of cutting",
+      allow: "findings in this shot that are deliberate, e.g. [\"offscreen\"] (catalog/direction.json intents)",
     },
   };
   files["moods.json"] = MOODS;
@@ -76,6 +78,12 @@ export const buildCatalog = (): Record<string, unknown> => {
   files["fx.json"] = Object.fromEntries(
     Object.entries(FX_INFO).map(([type, info]) => [type, { ...info, params: Object.keys(FxSchemas[type as keyof typeof FxSchemas].shape).filter((k) => k !== "type" && k !== "at") }]),
   );
+  files["direction.json"] = {
+    engine: { versions: ENGINE_VERSIONS, note: "`engine: 2` = current behaviour (what `new` writes); omitted = 1, the original behaviour, kept exactly for older videos." },
+    profiles: PROFILES,
+    intents: INTENTS,
+    notes: { allow: "`allow: [intent, ...]` on the episode or a shot marks a finding as deliberate: it is reported as accepted by intent, never hidden." },
+  };
   files["episode.schema.json"] = z.toJSONSchema(EpisodeSchema, { io: "input", unrepresentable: "any" });
   return files;
 };

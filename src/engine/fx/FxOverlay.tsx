@@ -2,7 +2,6 @@
 // time and the current (shaken) camera, so any frame renders on its own.
 import { evolvePath } from "@remotion/paths";
 import { AbsoluteFill, interpolate, spring, useVideoConfig } from "remotion";
-import { project } from "../camera/solve";
 import { fxEnvelope, type ResolvedFx } from "../core/fx";
 import type { Vec3 } from "../core/time";
 import { FONTS } from "../fonts";
@@ -10,23 +9,23 @@ import { useEpisode } from "../player/EpisodePlayer";
 import { AppWindow } from "../ui/AppWindow";
 import { KineticText } from "../ui/KineticText";
 import type { WindowParams } from "../ui/window";
+import { activeScreenFx, calloutGeometry, FX_PLACE, fxPoint } from "./state";
 
 type Pos = "top" | "center" | "bottom" | [number, number];
 
 /** Where a screen accent sits; vertical frames keep clear of the platform UI bands. */
 const placeStyle = (pos: Pos, height: number, width: number): React.CSSProperties => {
   if (Array.isArray(pos)) return { position: "absolute", left: pos[0] * width, top: pos[1] * height, translate: "-50% -50%" };
-  const portrait = height > width;
-  if (pos === "top") return { position: "absolute", left: "50%", top: height * (portrait ? 0.12 : 0.07), translate: "-50% 0" };
-  if (pos === "bottom") return { position: "absolute", left: "50%", bottom: height * (portrait ? 0.3 : 0.18), translate: "-50% 0" };
+  const orient = height > width ? "portrait" : "landscape";
+  if (pos === "top") return { position: "absolute", left: "50%", top: height * FX_PLACE.top[orient], translate: "-50% 0" };
+  if (pos === "bottom") return { position: "absolute", left: "50%", bottom: height * FX_PLACE.bottom[orient], translate: "-50% 0" };
   return { position: "absolute", left: "50%", top: "50%", translate: "-50% -50%" };
 };
 
 /** Live 3D point of an accent target (actor anchors move). */
 export const useFxPoint = (fx: ResolvedFx): Vec3 | undefined => {
   const { query, t } = useEpisode();
-  if (!fx.on) return undefined;
-  return Array.isArray(fx.on) ? fx.on : query.anchor(fx.on.actor, fx.on.anchor, t);
+  return fxPoint(fx, (actor, anchor) => query.anchor(actor, anchor, t));
 };
 
 const Callout: React.FC<{ fx: ResolvedFx }> = ({ fx }) => {
@@ -34,16 +33,10 @@ const Callout: React.FC<{ fx: ResolvedFx }> = ({ fx }) => {
   const { width, height, fps } = useVideoConfig();
   const point = useFxPoint(fx);
   if (!point) return null;
-  const p = project(camera, point, width / height);
-  if (p.depth <= 0 || Math.abs(p.x) > 1.2 || Math.abs(p.y) > 1.2) return null;
+  const g = calloutGeometry(fx, camera, point, width, height);
+  if (!g) return null;
+  const { x, y, lx, ly, dir, u } = g;
   const local = t - fx.at;
-  const x = ((p.x + 1) / 2) * width;
-  const y = ((1 - p.y) / 2) * height;
-  const u = Math.min(width, height) / 1080;
-  const side = (fx.data.side as string | undefined) ?? (x > width / 2 ? "left" : "right");
-  const dir = side === "left" ? -1 : 1;
-  const lx = Math.min(width - 160 * u, Math.max(160 * u, x + dir * 230 * u));
-  const ly = Math.max(height * 0.14, y - 210 * u);
   const color = String(fx.data.color ?? "#ffd166");
   const path = `M ${lx} ${ly + 40 * u} Q ${(lx + x) / 2 + dir * -40 * u} ${ly + 40 * u} ${x} ${y - 18 * u}`;
   const draw = interpolate(local, [0.05, 0.4], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
@@ -108,7 +101,7 @@ const OneFx: React.FC<{ fx: ResolvedFx }> = ({ fx }) => {
 
 export const FxOverlay: React.FC = () => {
   const { resolved, t } = useEpisode();
-  const active = resolved.fx.filter((f) => t >= f.at && t <= f.end && ["text", "window", "callout", "flash", "dip"].includes(f.type));
+  const active = activeScreenFx(resolved.fx, t);
   if (!active.length) return null;
   return (
     <AbsoluteFill style={{ pointerEvents: "none" }}>

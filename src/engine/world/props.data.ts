@@ -1,6 +1,7 @@
-// Prop catalog metadata (pure). Origin = bottom centre, front faces +Z, metres.
+// Prop catalog metadata (pure). Origin = bottom centre (top centre for `origin: "top"` props), front faces +Z, metres.
 // `size` doubles as the occluder box used by the camera solver.
 import type { Vec3 } from "../core/time";
+import { BRIDGE_THICKNESS, BRIDGE_WIDTH, ISLAND_DEPTH, ISLAND_RADIUS, SKY_RADIUS } from "./floating-space/space";
 import { KEY_TOP, KEY_TRAVEL, KEYBOARD_SIZE, KEYS, keyTop } from "./micro-keyboard/keys";
 
 export type ParamSpec = { type: "color" | "boolean" | "number" | "string" | "screen" | "object" | "list"; default: unknown; description: string };
@@ -15,6 +16,8 @@ export type PropMeta = {
   size: Vec3;
   /** Blocks camera rays (false for flat things like rugs). */
   occluder: boolean;
+  /** "top": the item's position is its top surface and the size box hangs below it (floating platforms). */
+  origin?: "bottom" | "top";
   /** Named points in prop-local space (framing targets, seats, surfaces). */
   anchors: Record<string, Vec3>;
   params: Record<string, ParamSpec>;
@@ -167,6 +170,79 @@ export const PROPS: Record<string, PropMeta> = {
       area: { type: "list", default: [16, 5, 10], description: "Box [w, h, d] (metres) around the item origin, from the floor up" },
       color: { type: "color", default: "#ffd9a8", description: "Speck colour" },
       seed: { type: "string", default: "dust", description: "Layout seed" },
+    },
+  },
+  // ---- floating-space world (rock islands in a starfield; no ground plane)
+  floating_island: {
+    description: "Floating low-poly rock island. Its position is the flat walkable TOP (stand actors at that y); the rock hangs below. Size it with the item `scale` (top radius ≈ 1 m × scale, walkable within 0.86 × that). `bob`/`spin` are for decorative islands only: actors don't ride along.",
+    size: [ISLAND_RADIUS * 2, ISLAND_DEPTH, ISLAND_RADIUS * 2],
+    occluder: true,
+    origin: "top",
+    anchors: { top: [0, 0, 0], center: [0, -ISLAND_DEPTH / 2, 0], bottom: [0, -ISLAND_DEPTH, 0] },
+    params: {
+      seed: { type: "string", default: "island", description: "Shape seed (outline, rock facets, crystals)" },
+      rock: { type: "color", default: "#5a5475", description: "Rock underside" },
+      top: { type: "color", default: "#7fcf9f", description: "Moss on the walkable top" },
+      crystal: { type: "color", default: "#7ce8ff", description: "Glowing crystals on the rim and under the rock" },
+      crystals: { type: "number", default: 3, description: "Number of rim crystals (in the island's local back arc, yaw 125°–235°: rotate the island to aim them); 0 = none" },
+      bob: { type: "number", default: 0, description: "Bob amplitude (m) — decorative islands only" },
+      spin: { type: "number", default: 0, description: "Slow yaw (degrees/second) — decorative islands only" },
+    },
+  },
+  light_bridge: {
+    description: "Hard-light walkway between islands (local +X along the span). Its position is the walking surface, like an island top; walk `move` cues across it. Pulses travel along it.",
+    size: [3, BRIDGE_THICKNESS, BRIDGE_WIDTH],
+    occluder: false,
+    origin: "top",
+    anchors: { center: [0, 0, 0], top: [0, 0, 0] },
+    params: {
+      length: { type: "number", default: 3, description: "Span length (m)" },
+      width: { type: "number", default: BRIDGE_WIDTH, description: "Walkway width (m)" },
+      color: { type: "color", default: "#6fe7ff", description: "Light colour" },
+      speed: { type: "number", default: 0.6, description: "Pulses per second running along the span (0 = still)" },
+    },
+  },
+  starfield: {
+    description: `Space backdrop: a ${SKY_RADIUS} m nebula sky dome (procedural shader) plus twinkling stars around the item origin (keep it at the set centre; the camera far plane is 80 m). Unaffected by fog.`,
+    size: [0, 0, 0],
+    occluder: false,
+    anchors: {},
+    params: {
+      seed: { type: "string", default: "stars", description: "Star and nebula layout seed" },
+      count: { type: "number", default: 2400, description: "Number of stars" },
+      twinkle: { type: "number", default: 0.5, description: "Twinkle depth (0 = steady)" },
+      nebula: { type: "list", default: ["#6a3fd1", "#1aa6c4", "#d0479c"], description: "Nebula cloud colours" },
+      sky: { type: "color", default: "#060716", description: "Deep-space base colour" },
+      brightness: { type: "number", default: 1, description: "Overall sky and star brightness" },
+    },
+  },
+  planet: {
+    description: "Distant low-poly planet with an optional ring (a backdrop element: place it 30–45 m away). Lit by the mood; ignores fog.",
+    size: [0, 0, 0],
+    occluder: false,
+    anchors: {},
+    params: {
+      radius: { type: "number", default: 4.5, description: "Planet radius (m)" },
+      color: { type: "color", default: "#7fd6c8", description: "Main colour" },
+      band: { type: "color", default: "#4a68d0", description: "Band colour" },
+      ring: { type: "color", default: "#a9b6e6", description: "Ring colour (\"none\" = no ring)" },
+      tilt: { type: "number", default: 50, description: "Spin axis tilt toward +Z (degrees): 0 shows the ring edge-on from the front, ~50 opens it" },
+      seed: { type: "string", default: "planet", description: "Band layout seed" },
+      spin: { type: "number", default: 1.5, description: "Rotation (degrees/second)" },
+    },
+  },
+  space_rocks: {
+    description: "Field of small drifting, tumbling rocks in a ring around the item origin (decorative). Keeps clear of the inner radius (the action) and of a 90° cone toward +Z (the usual camera side).",
+    size: [0, 0, 0],
+    occluder: false,
+    anchors: {},
+    params: {
+      count: { type: "number", default: 46, description: "Number of rocks" },
+      inner: { type: "number", default: 9, description: "Clear radius around the origin (m)" },
+      outer: { type: "number", default: 26, description: "Outer radius (m)" },
+      height: { type: "list", default: [-9, 9], description: "Vertical range [min, max] (m)" },
+      color: { type: "color", default: "#4e4867", description: "Rock colour" },
+      seed: { type: "string", default: "rocks", description: "Layout seed" },
     },
   },
   window: {

@@ -1,12 +1,16 @@
-// Regression check: compares out/<slug>/stills against out/baseline/<slug>/stills.
-//   node scripts/compare-stills.mjs <slug> [...slugs]
+// Regression check: compares out/<slug>/stills against <baseline>/<slug>/stills (default out/baseline).
+//   node scripts/compare-stills.mjs [--baseline out/baseline-v3] <slug> [...slugs]
 // Prints byte-identical counts; for differing frames, PSNR and the differing-pixel count (ffmpeg).
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-for (const slug of process.argv.slice(2)) {
-  const a = path.join("out", "baseline", slug, "stills");
+const args = process.argv.slice(2);
+const bi = args.indexOf("--baseline");
+const baseline = bi >= 0 ? args.splice(bi, 2)[1] : path.join("out", "baseline");
+
+for (const slug of args) {
+  const a = path.join(baseline, slug, "stills");
   const b = path.join("out", slug, "stills");
   if (!fs.existsSync(a) || !fs.existsSync(b)) {
     console.log(`${slug}: missing ${!fs.existsSync(a) ? a : b}`);

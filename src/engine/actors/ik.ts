@@ -79,6 +79,9 @@ const frameQuat = (f: Frame) => {
   for (const r of f.rotations) q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(r[0], r[1], r[2], "XYZ")));
   return q;
 };
+/** The frame of a group nested in `parent` at `offset` (parent-local), rotated by Euler XYZ `rotation`. */
+export const childFrame = (parent: Frame, offset: Vec3, rotation: Vec3): Frame => ({ position: outOfFrame(parent, offset), rotations: [...parent.rotations, rotation] });
+
 /** Frame-local point → parent space. */
 export const outOfFrame = (f: Frame, local: Vec3): Vec3 => v(local).applyQuaternion(frameQuat(f)).add(v(f.position)).toArray() as Vec3;
 /** Parent-space point → frame-local. */

@@ -1,21 +1,48 @@
 # QA, rendering and review
 
-## validate
-Prints a beat sheet (everything in time order) and then:
-- `✖` errors — must fix (unknown ids, bad time refs, cuts after `end`, parent cycles, missing audio files).
-- `⚠ shot N … blocked / out of frame` — the camera can't see a face. Remove the authored `angle`/`distance`, or
-  change `angle`, or add `allowOcclusion` if the foreground object is deliberate.
-- `⚠ pacing:` — no hook in the first 1.5 s, or dead air > 1.5 s. Add a line, an action, a cut or a sound there.
-- `⚠ voice clip is stale` / `no voice clip` — run `voice`; final renders refuse these.
-- `⚠ free plan` / `unknown rights` — licensing notes for the report; prefer CC0 kit sounds.
-- `⚠ … has no param …` / `unknown screen preset` — typo; the item would silently ignore it.
-- `⚠ shot N … sees the back of <actor>` — that actor faces away from the camera mid-shot (looking at someone, turned by
-  a recipe). Author an `angle`, add `look: "camera"`, or cut elsewhere.
+## validate / inspect
+`validate` prints the beat sheet, direction and audio problems, then every `inspect` finding (`inspect <slug>` alone,
+`--json` for tools). Each finding has a time range, the object, the episode.json entry behind it (after `←`, with the
+recipe step) and the `allow` intent that would mark it deliberate:
+- `✖` error — objectively broken (bad ids/time refs, missing audio, the camera inside geometry). Must fix.
+- `⚠` warning — probably unintended. Fix it, or mark it deliberate with `allow` if it really is the point.
+- `·` note — a question (static runs, very short shots, pacing, crossing the line). Often exactly right.
+- `~ accepted by intent` — you marked it deliberate (`allow` on the episode, shot, action, cast member or accent;
+  `list direction`). Use it for creative choices, never to hide a mistake; accepted findings go in your report.
 
-## stills
+| Finding | Usual fix |
+|---|---|
+| `framing/face-offscreen` | loosen `size`, add `offset`, `follow`/`track`, or cut; `allow: ["offscreen"]` for a deliberate exit |
+| `framing/back-of-head` | author an `angle`, `look: "camera"`, or cut elsewhere |
+| `camera/inside-occluder` (✖) | shorten the move, change angle/position, or move/remove the item for that shot |
+| `camera/cut-mid-word` | cut on `lN.word:K` / `lN.word:K.end` or in a pause |
+| `camera/jump-cut` | change size by ~30 %+ or angle by ~30°+ between the two shots |
+| `camera/focus-jump`, `focus-off-screen` | `rack` the focus, or focus on a subject in frame |
+| `motion/teleport` | lengthen the move/transition (a full-arm pose like `celebrate` needs ≥ ~0.4 s); a snap on purpose: ease `"snap"` or `allow: ["abrupt"]` on the action |
+| `motion/jitter` | longer transitions, fewer overlapping cues on that actor |
+| `contact/penetration` (limb × head) | a straight joints blend sweeps through the body: use the recipe (`do: "facepalm"`, engine 2), or `keys` with a via point in front of the chest |
+| `contact/penetration` (hand × item) | raise the reach target, or move the actor off the furniture |
+| `contact/unreachable`, `missed-contact` | move the actor closer to the target (or the target closer) |
+| `contact/floating` | put the actor on a mark / the surface height; `allow: ["floating"]` on the cast member if it hovers |
+| `overlay/caption-over-face`, `text-over-face` | reframe (shot `offset`/size) or move the accent (`position`) |
+| `line lN: [sighs] not performed` | another take (`--takes lN=3`, `--report`), or drop the tag |
+| `line lN: clipping`, `cut off` | another take; a cut-off tail can also be a too-tight hand `trim` |
+| `line lN: speech-to-text heard "…"` | listen-free check failed: another take, or reword (a small model can mishear names: read the transcript) |
+| `trim … cuts into word/sound/tag` | widen the line's `trim` (look at `voice <slug> --show lN`) |
+| `lN has N takes and no recorded choice` | `--audition lN` for the director (key lines) or `--report`'s measured pick → `"take": {n, by, why}` |
+| other `⚠` lines: stale/no voice clip, free plan, unknown rights, unknown params | `voice`; licensing in the report; typo |
+
+When a finding is unclear, `explain <slug> --t <time> --actor <id>` (or `--camera`) shows every layer at that moment —
+placement/move, pose, emotion, gestures, look, joints weights, holds, speech, point speeds — with its source.
+`stills <slug> --at findings` renders one labelled frame per open finding so you can see it.
+
+## stills and preview
 `stills <slug> --guides` renders the middle of every shot into `out/<slug>/contact.png`, shading the vertical-video
-UI zones. Use `--frames a,b,c` to look at accents (pick their `at` × 30 + a few frames); those go to
-`contact-frames.png`, so the per-shot `contact.png` stays. Check:
+UI zones; every tile is labelled with its time and shot. `--edges` renders each shot just after it starts and just
+before it ends (+ recipe contact moments) → `contact-edges.png` — moves and blends go wrong at the ends. `--at findings`
+→ `contact-findings.png`; `--frames a,b,c` (frame numbers) → `contact-frames.png`. `preview <slug> --from a --to b`
+renders a short half-size MP4 and `preview-strip.png` (8 evenly spaced frames): look at the strip to judge motion.
+Check:
 - faces visible and lit; nobody cropped at the head; the subject of the beat is big enough to read
 - text readable at thumbnail size and outside the shaded zones; no two overlays fighting for the same spot
 - the gag reads without sound (a viewer scrolling muted)

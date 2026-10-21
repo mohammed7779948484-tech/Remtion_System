@@ -8,6 +8,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "text",
       "style",
       "position",
@@ -26,6 +27,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "kind",
       "title",
       "messages",
@@ -50,6 +52,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "on",
       "text",
       "color",
@@ -65,6 +68,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "on",
       "color",
       "size",
@@ -80,6 +84,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "amount",
       "frequency"
     ]
@@ -93,6 +98,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "amount"
     ]
   },
@@ -105,6 +111,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "color"
     ]
   },
@@ -117,6 +124,7 @@
       "duration",
       "sound",
       "volume",
+      "allow",
       "color"
     ]
   }

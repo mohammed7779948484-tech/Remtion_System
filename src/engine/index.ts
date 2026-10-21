@@ -14,7 +14,16 @@ export { resolveEpisode, type ResolvedEpisode, type ResolvedLine, type ResolvedA
 export * from "./core/time";
 export { FX_INFO, FxSchemas, fxEnvelope, type FxType, type ResolvedFx } from "./core/fx";
 export { expandRecipe } from "./core/recipes";
-export { beatSheet, pacingNotes } from "./core/pacing";
+export { beatSheet, pacingNotes, pacingFindings, type PacingFinding } from "./core/pacing";
+export * from "./core/behaviour";
+
+// Inspection: the frame-by-frame visual state (golden tests, inspect, remix gate), checks and explanations
+export { createSweep, digestSweep, canonical, digest, type Sweep, type SweepDigest, type VisualFrame } from "./inspect/sweep";
+export { inspectEpisode, CHECKS } from "./inspect/inspect";
+export { createContext, type InspectContext } from "./inspect/context";
+export { explainActor, explainCamera } from "./inspect/explain";
+export { formatFinding, sortFindings, type Finding, type Level, type Check } from "./inspect/findings";
+export { createTrace, sourceOf, allowOf, type Trace, type TraceEntry, type Contact } from "./core/trace";
 
 // Reusable screen-space components (also used by the `fx` cues and the "window" screen preset)
 export { AppWindow, type AppWindowProps } from "./ui/AppWindow";
@@ -23,6 +32,7 @@ export { drawWindow, wrapText } from "./ui/drawWindow";
 export { windowState, windowTheme, type WindowParams, type WindowKind } from "./ui/window";
 export { FxOverlay, useFxPoint } from "./fx/FxOverlay";
 export { FxWorld } from "./fx/FxWorld";
+export { activeScreenFx, cameraWithFx, chromaAt, calloutGeometry, fxPoint, FX_PLACE, SCREEN_FX } from "./fx/state";
 
 // Actors
 export { ACTORS, rayanDef, claudeDef, Rayan, Claude } from "./actors";
@@ -39,6 +49,8 @@ export { ScreenSurface, SCREEN_PRESETS, type DrawFn, type DrawContext, type Scre
 export { ENVIRONMENTS } from "./world/environments";
 export { KEYS, KEY_PITCH, KEY_TOP, KEY_TRAVEL, keyTop } from "./world/micro-keyboard/keys";
 export { GiantKeyboard, GiantScreen, RubberDuck, DustMotes, keyStates, keyTravel } from "./world/micro-keyboard/MicroKeyboard";
+export { ISLAND_DEPTH, ISLAND_INNER, SKY_RADIUS, bridgeBetween } from "./world/floating-space/space";
+export { FloatingIsland, LightBridge, Starfield, Planet, SpaceRocks } from "./world/floating-space/FloatingSpace";
 export * from "./world/layout";
 
 // Camera, lighting, post
@@ -50,5 +62,6 @@ export { Lighting } from "./lighting/Lighting";
 // Audio & captions
 export * from "./audio/speech";
 export { Captions } from "./audio/Captions";
+export { captionPages, captionIndexAt, CAPTION_LAYOUT, type CaptionPage } from "./audio/captionLayout";
 export { Soundtrack } from "./audio/Soundtrack";
 export { FONTS } from "./fonts";

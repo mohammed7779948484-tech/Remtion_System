@@ -29,7 +29,11 @@ For 9:16, 20–35 s is a good range. Cut anything that doesn't set up or pay off
 
 ## Camera grammar (vertical)
 
-- Shots of 1–3 s; cut on action (a landing, a press, a turn).
+- Shot length follows the scene: quick banter and gags cut every 1–3 s on action (a landing, a press, a turn); a
+  sustained move can carry a whole beat (a walk, a reveal, a confession) — see `keys`/`follow` in the cookbook. A
+  locked-off frame is a choice too (stillness, awkward silence): `move: "static"`. Decide per shot; nothing is forced.
+- Every move needs a reason: follow a subject, reveal something, change the distance as the emotion changes. Moves
+  can start and stop inside a shot (`move.at`/`duration`), so a push-in can land on the punchline word.
 - `close` for emotion and lines, `medium` for gestures, `full`/`wide` once for geography, `insert`/screen fx for
   information. A wide shot with tiny characters doesn't sell a gag — cut in when the gag happens.
 - Keep faces on the side they're looking from and screen direction consistent within a scene.
@@ -51,6 +55,9 @@ For 9:16, 20–35 s is a good range. Cut anything that doesn't set up or pay off
 - Claude mascot: no arms — it acts with squash, tilt, hops, wiggles and its eyes. Make its physical limits part of
   the joke instead of fighting them.
 - Use `look` to direct attention: characters looking at the thing tell the viewer where to look.
+- A listener sells the line: cut to their reaction during it. Listening (`defaults.listen`) gives a live listener for
+  free — the look at the speaker, a nod as a phrase lands. A stone-faced listener (`listen: 0`) is also a choice:
+  deadpan comedy lives on stillness; the mascot's persona is already late and small.
 - Audio tags in lines (`[sighs]`, `[panicked]`, `[whispers]`, `[laughs]`) give v4 delivery; one per line is plenty.
 
 ## Sound design

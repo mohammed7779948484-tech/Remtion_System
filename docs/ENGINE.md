@@ -22,6 +22,51 @@ videos/<slug>/video.data.ts (optional) ─┘                         │
   the cue history; idle motion uses seeded noise; mouths read precomputed envelopes; the camera's shot
   layout is computed once per shot and tracking uses a fixed time window over pure trajectories.
   `npm run cli -- stills <slug> --verify` renders frames in two different orders and compares bytes.
+- **Engine version, profile, intent** (`core/behaviour.ts`): `engine: 2` (what `new` writes) opts into
+  current defaults; omitted means 1, the original behaviour, kept exactly for older videos. Every new
+  automatic behaviour reads only from the resolved `behaviour`, never from the engine version directly.
+  `profile` names the check thresholds (`list direction`). `allow: [...]` on the episode or a shot marks a
+  finding as deliberate: it is reported as "accepted by intent", never hidden. `defaults` holds the switches:
+  corrections that engine 2 turns on (`focusPull`, `arcBlend`, `viaPoints`, `trim`, `level`, `speechMotion`) and
+  opt-in styles that stay off until asked for (`cameraLife` 0..2, `listen` 0..1).
+- **Visual state** (`inspect/sweep.ts`): `createSweep(resolved).at(frame)` is everything the picture
+  depends on (actors, the rendered camera incl. shake, mood, prop states, screen accents, caption page),
+  ~1 ms per frame in Node. Goldens (`tests/goldens/`) hash it for every finished video, so `npm test`
+  fails on any unintended change; accept an intended one with `UPDATE_GOLDENS=1 npx vitest run tests/golden.test.ts`.
+
+### Module map (where things live)
+
+| Area | Module | Responsibility |
+|---|---|---|
+| Direction | `core/schema.ts`, `core/timeline.ts`, `core/recipes.ts`, `core/fx.ts` | episode.json schema → resolved, absolute-time data |
+| Behaviour | `core/behaviour.ts` | engine version, profiles, intents (the only switch for new defaults) |
+| Pacing | `core/pacing.ts` | beat sheet, pacing findings |
+| Scene | `player/scene.ts` | pure per-frame evaluation (actors, camera, mood) |
+| Visual state | `inspect/sweep.ts` | per-frame picture state + digests (goldens, checks, remix gate) |
+| Checks | `inspect/inspect.ts` + `framing/camera/motion/contact/overlay/grammar.ts`, `findings.ts`, `context.ts` | findings with time, object, level, source, intent |
+| Explain | `inspect/explain.ts` | every layer of an actor / the camera at a time, with sources |
+| Provenance | `core/trace.ts` | where each resolved cue came from (filled when inspect/explain ask) |
+| Camera | `camera/solve.ts` (pure), `camera/choreo.ts` (pure), `camera/Camera.tsx` (R3F + post) | shot layout, per-frame camera, focus; paths, `life`, arc blends |
+| Splines | `core/spline.ts` (pure) | Hermite/Catmull-Rom keyframe interpolation shared by camera `keys` and keyed joints |
+| Accents | `fx/state.ts` (pure), `fx/FxOverlay.tsx`, `fx/FxWorld.tsx` | which accents show, shake/glitch, placement |
+| Captions | `audio/captionLayout.ts` (pure), `audio/Captions.tsx` | pages, layout constants, rendering |
+| Voice/audio | `audio/speech.ts` (pure), `audio/Soundtrack.tsx`, `scripts/voice.ts` (Node I/O) | clips, words, envelopes, takes, playback (clip windows, gain) |
+| Voice analysis | `audio/analysis.ts`, `audio/voiceReport.ts` (pure); `scripts/stt.ts`, `scripts/voiceTools.ts` (Node) | floor, segments, LUFS, tags, f0; edge trim, levels, validation, take report; whisper STT; strips, auditions |
+| Actors | `actors/rig.ts`, `actors/*/…data.ts` | channels, poses, life, overrides (keyed joints), listening; `effectors` (body points/volumes for contact checks), `persona` |
+| Node tools | `scripts/cli.ts`, `scripts/video.ts` (loader), `scripts/catalog.ts` | CLI, video loading, catalog |
+
+Engine code stays pure and browser-safe; file system, ffmpeg and HTTP live in `scripts/` (`scripts/cli.ts` dispatches
+to `scripts/cli/*.ts`: discover, scaffold, voices, check, media; `scripts/video.ts` loads video folders).
+
+**Diagnosis loop.** `inspect` evaluates every frame in Node and reports findings: an *error* is objectively broken
+(camera inside geometry), a *warning* probably unintended (a teleport, a limb through the head, a caption over a face,
+a cut mid-word, a jump cut, floating feet, an unreachable recipe target), a *note* a question (static runs, short shots,
+pacing, crossing the line). Each names the episode.json entry most likely responsible (recipe cues carry their step,
+e.g. `actions[22] … do:pick-up step 'reach'`) and the `allow` intent that would mark it deliberate. `explain` shows
+why a state is what it is at a time. Contact checks use each actor's `effectors(c)` (head/face/hands/feet points and
+capsules from the FINAL channels); thresholds are depths, not touching (a palm on a face is contact, not clipping).
+Furniture boxes are coarse, so hands count only when the forearm comes down through an item's top. Teleports are
+discontinuities (a big step that is also ≥3× the surrounding steps), so fast smooth moves pass.
 
 ## 2. `episode.json`
 
@@ -85,7 +130,9 @@ earlier lines.
 (`null` = straight ahead), `move` (`to`, `speed|duration`, `face`: `path|keep|<deg>`, `ease`: `in` for falls;
 arriving at a mark turns to its yaw), `turn` (deg or target), `hold` (`{ socket: item|null }`; a held set item
 hides from the set), `joints` (precise channel overrides, see the actor manifest's `channels`; `mode: add` for
-offsets, `duration` to release), `transition` (blend seconds).
+offsets, `duration` to release; `keys: [{ at, joints }]` for a smooth spline through via points, `joints` being
+the values at `at`), `transition` (blend seconds). `intensity` is the gesture's strength, or — on an action without
+a gesture — how far toward the `emotion` (0..1).
 
 **Interaction recipes** — `"do"` expands at resolve time into the cues above (plus props cues and sfx), so
 nothing new runs per frame and every anatomy uses its own channels (`reach`, `recipeGestures` in its definition):
@@ -98,8 +145,8 @@ nothing new runs per frame and every anatomy uses its own channels (`reach`, `re
 | `place` | `target` | walks close, reaches, releases; the carried item reappears there (a copy toggled visible, so camera occluders stay static). On a pressable anchor its weight presses it. |
 | `react` | `target?` | flinch + shocked + look at the source. |
 | `sit-down` / `stand-up` | `target?` (seat mark / where to walk) | walk + slow pose blend. |
-| `facepalm` | — | palm on the face, head bowed, eyes shut (seated or standing, via the actor's `selfReach`); armless actors get `tired` + a head shake. |
-| `sip` | a held item | brings it to the mouth (`hand` picks which). |
+| `facepalm` | — | palm on the face, head bowed, eyes shut (seated or standing, via the actor's `selfReach`); armless actors get `tired` + a head shake. Engine 2 (`defaults.viaPoints`): `selfReach(…, { precise: true })` aims at the bowed head (palm over the eye), holds the head's turn, and a keyed override rises through a point in front of the chest (0.6 s); a contact is recorded for `inspect`. |
+| `sip` | a held item | brings it to the mouth (`hand` picks which); same engine-2 via point. |
 
 Every recipe takes `sound` (played at the moment of contact). Only `emotion` is applied alongside a `do`. For
 choreography the recipes can't express, use `joints` or a custom `scene` component.
@@ -168,6 +215,11 @@ itself (Rayan: joint angles + face; the mascot: squash, tilt, eye shapes). A def
 `sockets`, `appearance`, framing `anchors(channels)` (`feet, waist, chest, head, face, top`) and
 `life(channels, signals)` mapping breath, blinks, amplitude talk, look yaw/pitch and gait onto its channels.
 Layering: placement/locomotion → pose → emotion → gestures → life → `joints` overrides.
+Optional `persona` (`{ description, listen: { delay, nod } }`) holds acting defaults read only by opt-in behaviours.
+Listening (`ActorTrack.listen`, built by `player/scene.ts` from `defaults.listen` / cast `listen`, the other speakers'
+lines and their phrase ends, and the cut times) is a look source below authored looks — it fills `1 − authored
+weight` — plus a `beat` life signal (a seeded nod 0.12 s after some phrase ends) and blinks on cuts. Off (no
+`listen`) everything is exactly as before.
 
 **Add an actor**: `src/engine/actors/<id>/<id>.data.ts` (pure) + `<Id>.tsx` (R3F view taking `channels`,
 `appearance`, `held`); register in `actors/defs.ts` and `actors/index.ts`; `npm run catalog && npm test`.
@@ -190,6 +242,12 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - `micro-keyboard` environment: the world is a laptop scaled ~50× (keys 0.95 m, tops at 0.42 m), actors stay
   real size. `giant_keyboard` keys press via props cues `{ "keys": { "ctrl": true } }` or the `press` recipe;
   anchors `key:<id>`; marks `on-<key>` and `drop-enter`. Environments may set `shadowRadius` for big sets.
+- `floating-space` environment (`world/floating-space/`): `shell.floor: "none"`; two `floating_island`s (tops at
+  y = 0, sized by item `scale`) joined by a `light_bridge`, a `starfield` (procedural nebula dome, 54 m, + twinkling
+  stars), a ringed `planet`, decorative bobbing islands and `space_rocks`; mood `space-cool`, `shadowRadius` 8.
+  Marks `stand-left`, `stand-right`, `stand-center`, `on-bridge`, `far-spot`, `far-spot-2`, `drop-in`; spots
+  `establishing`, `wide`, `hero-low`, `high`, `along-bridge` (framed for 9:16). Props with `origin: "top"` in the
+  catalog (islands, bridge) are positioned by their top surface and their occluder box hangs below it.
 - Moods (`lighting/moods.ts`): data for key/fill/rim/ambient/hemi/fog/background/exposure/bloom/practicals,
   plus optional `pulse`. Inline moods: `{ "base": "late-night", "bloom": 1.2, … }`.
 
@@ -207,6 +265,21 @@ A one-off actor can live in a video folder instead (`actors` + `actorDefs` in `v
 - SFX: library names resolve to the local CC0 kit in `public/sfx/` (`npm run cli -- list sfx`: description, tags,
   loudness, license; provenance in `src/engine/audio/sfx.data.ts` and `THIRD_PARTY_NOTICES.md`), then to legacy
   Remotion-hosted meme sounds (unknown rights → warned). Also URLs or files under `public/videos/<id>/`.
+- Analysis (`audio/analysis.ts`, stored per clip as `analysis` in `voice.json`, backfilled free by `voice <slug>`):
+  10 ms frame levels → noise floor (10th percentile), sound segments (≥ floor + 6 dB), BS.1770 loudness, peak,
+  clipping, the last 30 ms, tag spans (alignment times, else the gap between the neighbouring words) with the energy
+  inside them, pitch. Speech-to-text (`scripts/stt.ts`): ffmpeg's whisper filter with a local ggml model
+  (`$WHISPER_MODEL`), word error rate vs the script; without a model, validation says the words are unverified.
+- Engine-2 voice corrections (resolver): `trim` → `ResolvedLine.clip` in/out points on the untouched file (head cut
+  frame-aligned; never sound, a word — up to where its sound ends — or a performed tag; only edges with > 120 ms of
+  quiet, padded 60/200 ms), words/envelope shifted; `level` → `gain` dB toward the speaker's median loudness
+  (-12/+6 dB, peak ≤ -1 dBFS, plus the line's `gain`); `speechMotion` → `talkScale` (envelope peak relative to the
+  speaker's loudest line), mouth `shapedTalk` (30 ms lead, 70 ms release, closed form) and body `talkBody`
+  (`slowTalk`, ±0.2 s). The Soundtrack plays clip windows with `trimBefore` and a volume; sample-accurate fades
+  belong to the M5 mix plan (Remotion volumes are per frame; cuts land in ≥ 120 ms of near-floor audio).
+- Takes: `voice <slug> --takes l3=3` adds `l3#1`, `l3#2` (ElevenLabs/fixture: another seed; system voices: another
+  rate); take 0 keeps every existing fingerprint. The line's `take` picks one; `--max-credits` refuses an expensive
+  run before any request. `--report` (tiers 1–2 + a labelled measured pick), `--audition`, `--show`.
 - Voices: `voice --check` (free) shows plan, credits, models and usable voices. Paid generation needs
   `--provider elevenlabs`; the default model is `eleven_v4` (stability + similarity only; inline audio tags like
   `[sighs]` are performed, and stripped from captions, word refs and offline voices). Clips are cached by a

@@ -6,6 +6,7 @@ import { rand } from "../core/time";
 import type { Mood } from "../lighting/moods";
 import { PROPS } from "./props.data";
 import type { PropCue } from "./layout";
+import { FloatingIsland, LightBridge, Planet, SpaceRocks, Starfield } from "./floating-space/FloatingSpace";
 import { DustMotes, GiantKeyboard, GiantScreen, RubberDuck } from "./micro-keyboard/MicroKeyboard";
 import { SCREEN_PRESETS, ScreenSurface, type DrawFn, type ScreenContent } from "./Screen";
 
@@ -382,5 +383,10 @@ export const PROP_VIEWS: Record<string, React.FC<PropViewProps>> = {
   giant_screen: GiantScreen,
   rubber_duck: RubberDuck,
   dust_motes: DustMotes,
+  floating_island: FloatingIsland,
+  light_bridge: LightBridge,
+  starfield: Starfield,
+  planet: Planet,
+  space_rocks: SpaceRocks,
 };
 

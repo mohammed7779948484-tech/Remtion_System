@@ -11,11 +11,16 @@ export const Soundtrack: React.FC<{ resolved: ResolvedEpisode }> = ({ resolved }
   return (
     <>
       {resolved.lines.map((l) =>
-        l.file ? (
+        !l.file ? null : l.clip || l.gain ? (
+          // Trimmed/levelled line: play its window of the untouched file at its gain.
+          <Sequence key={l.id} from={Math.round(l.start * fps)} durationInFrames={Math.max(1, Math.ceil((l.end - l.start) * fps))} name={`voice ${l.id}`} layout="none">
+            <Audio src={staticFile(l.file)} trimBefore={Math.round((l.clip?.from ?? 0) * fps)} volume={10 ** ((l.gain ?? 0) / 20)} />
+          </Sequence>
+        ) : (
           <Sequence key={l.id} from={Math.round(l.start * fps)} name={`voice ${l.id}`} layout="none">
             <Audio src={staticFile(l.file)} />
           </Sequence>
-        ) : null,
+        ),
       )}
       {resolved.sfx.map((s, i) => (
         <Sequence key={i} from={Math.round(s.at * fps)} name={`sfx ${i}`} layout="none">

@@ -3,6 +3,7 @@
 // Pure data + zod schemas; renderers live in fx/FxOverlay.tsx (screen), fx/FxWorld.tsx (3D),
 // camera/Camera.tsx (post) and the player (camera shake).
 import { z } from "zod";
+import { INTENT_NAMES } from "./behaviour";
 
 const Vec3 = z.tuple([z.number(), z.number(), z.number()]);
 const Place = z.union([Vec3, z.string()]);
@@ -16,6 +17,8 @@ const base = {
   /** Sound played when the accent starts (library name or file). */
   sound: z.string().optional(),
   volume: z.number().min(0).optional(),
+  /** Findings this accent causes on purpose, e.g. ["text-over-face"] (core/behaviour.ts INTENTS). */
+  allow: z.array(z.enum(INTENT_NAMES)).optional(),
 };
 
 export const FxSchemas = {

@@ -1,7 +1,9 @@
 // Episode direction schema (zod). Strict objects so typos fail validation instead of being
 // silently ignored. `npm run catalog` exports this as catalog/episode.schema.json.
 import { z } from "zod";
+import { ENGINE_VERSIONS, INTENT_NAMES, PROFILE_NAMES } from "./behaviour";
 import { FxEntry } from "./fx";
+import { EASINGS, type EaseName } from "./time";
 
 /** Seconds, or a reference: "l2.start", "l2.end+0.3", "l3.word:4" (4th word start), "l3.word:4.end-0.1". */
 export const TIME_REF_RE = /^([A-Za-z][\w-]*)\.(start|end|word:(\d+)(?:\.(start|end))?)([+-]\d+(?:\.\d+)?)?$/;
@@ -10,6 +12,9 @@ export const TimeRef = z.union([z.number().min(0), z.string().regex(TIME_REF_RE,
 const Vec3 = z.tuple([z.number(), z.number(), z.number()]);
 /** A world point, a set mark name, or "<actor>[.<anchor>]" / "camera" for look targets. */
 const Place = z.union([Vec3, z.string()]);
+const Ease = z.enum(Object.keys(EASINGS) as [EaseName, ...EaseName[]]);
+/** Findings accepted on purpose (see core/behaviour.ts INTENTS): reported as "accepted by intent". */
+const Allow = z.array(z.enum(INTENT_NAMES));
 
 const Voice = z.strictObject({
   elevenlabs: z
@@ -40,6 +45,10 @@ const CastMember = z.strictObject({
   color: z.string().optional(),
   /** Display name for captions. */
   name: z.string().optional(),
+  /** Findings about this character that are deliberate, e.g. ["floating"] for a hovering ghost. */
+  allow: Allow.optional(),
+  /** Listening for this character, 0 (restrained) … 1 (overrides `defaults.listen`). */
+  listen: z.number().min(0).max(1).optional(),
 });
 
 const Line = z.strictObject({
@@ -49,6 +58,17 @@ const Line = z.strictObject({
   /** Start time. Omit to follow the previous line after `gap` seconds. */
   at: TimeRef.optional(),
   gap: z.number().optional(),
+  /**
+   * Which generated take plays (`voice <slug> --takes l3=3` makes them; 0 = the original). Record who chose it
+   * and why: `{ "n": 2, "by": "director", "why": "the tired sigh" }` (`by: "agent"` = measured, not heard).
+   */
+  take: z.union([z.number().int().min(0), z.strictObject({ n: z.number().int().min(0), by: z.enum(["director", "agent"]), why: z.string().min(1) })]).optional(),
+  /** Clip in/out points in seconds of the file (`false` = no automatic edge trim). Never edits the file. */
+  trim: z.union([z.literal(false), z.strictObject({ start: z.number().min(0).optional(), end: z.number().positive().optional() })]).optional(),
+  /** Deliberate level change in dB on top of the automatic levelling (e.g. -6 for a mutter). */
+  gain: z.number().min(-24).max(12).optional(),
+  /** Caption text to show instead of the spoken text (the voice and its cache are untouched). */
+  caption: z.string().min(1).optional(),
 });
 
 const Action = z.strictObject({
@@ -65,7 +85,7 @@ const Action = z.strictObject({
       speed: z.number().positive().optional(),
       face: z.union([z.literal("path"), z.literal("keep"), z.number()]).optional(),
       /** Timing curve: smooth (default), in (accelerate — falls), out (decelerate — lands softly), linear, snap, backOut, inOut. */
-      ease: z.enum(["linear", "in", "out", "inOut", "smooth", "backOut", "snap"]).optional(),
+      ease: Ease.optional(),
     })
     .optional(),
   /** Turn to a yaw (degrees) or toward a place/actor. */
@@ -73,10 +93,16 @@ const Action = z.strictObject({
   hold: z.record(z.string(), z.union([z.string(), z.null()])).optional(),
   /** Precise channel overrides (see the actor manifest's channels). */
   joints: z.record(z.string(), z.number()).optional(),
+  /**
+   * Keyed joints: the override passes smoothly through every key (via points), e.g. the hand in front of the
+   * chest before it reaches the face. `joints`, when given, are the values at the action's `at`.
+   */
+  keys: z.array(z.strictObject({ at: TimeRef, joints: z.record(z.string(), z.number()) })).min(1).optional(),
   mode: z.union([z.literal("absolute"), z.literal("add")]).optional(),
   /** Seconds a joints override lasts (omit = holds). */
   duration: z.number().positive().optional(),
   transition: z.number().min(0).optional(),
+  /** The gesture's strength; on an action without a gesture, how far toward the `emotion` (0..1). */
   intensity: z.number().min(0).optional(),
   speed: z.number().positive().optional(),
   /**
@@ -97,10 +123,41 @@ const Action = z.strictObject({
   volume: z.number().min(0).optional(),
   /** place: yaw (degrees) of the put-down item. */
   rotation: z.number().optional(),
+  /** Findings this action causes on purpose, e.g. ["abrupt"] for a snap move, ["clipping"]. */
+  allow: Allow.optional(),
 });
 
-const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld"]);
-const Move = z.union([MoveName, z.strictObject({ type: MoveName, amount: z.number().optional(), ease: z.string().optional() })]);
+const MoveName = z.enum(["static", "push-in", "pull-out", "truck", "orbit", "crane", "handheld", "life"]);
+const Move = z.union([
+  MoveName,
+  z.strictObject({
+    type: MoveName,
+    amount: z.number().optional(),
+    ease: Ease.optional(),
+    /** When the move starts (default: the shot's start). */
+    at: TimeRef.optional(),
+    /** How long it takes (default: until the shot ends). */
+    duration: z.number().positive().optional(),
+  }),
+]);
+const Height = z.union([z.enum(["eye", "low", "high"]), z.number()]);
+/** Solver-space keyframe: values relative to the subject, so a moving subject carries the camera. */
+const ShotKey = z.strictObject({
+  at: TimeRef,
+  /** Degrees around the subject from where it faces (like the shot's `angle`). */
+  angle: z.number().optional(),
+  distance: z.number().positive().optional(),
+  /** Multiplier on the solved distance (<1 closer). */
+  size: z.number().positive().optional(),
+  height: Height.optional(),
+  lens: z.number().positive().optional(),
+  fov: z.number().positive().optional(),
+  offset: z.tuple([z.number(), z.number()]).optional(),
+  roll: z.number().optional(),
+});
+/** World-space keyframe for authored flights (crane, fly-through). */
+const PathKey = z.strictObject({ at: TimeRef, position: Vec3, target: Vec3, lens: z.number().positive().optional(), fov: z.number().positive().optional(), roll: z.number().optional() });
+const Tracking = z.union([z.boolean(), z.strictObject({ lag: z.number().min(0).optional(), lead: z.number().min(0).optional() })]);
 const FocusRef = z.union([Vec3, z.string()]);
 
 const Shot = z.strictObject({
@@ -113,7 +170,7 @@ const Shot = z.strictObject({
   anchor: z.string().optional(),
   size: z.number().positive().optional(),
   angle: z.number().optional(),
-  height: z.union([z.enum(["eye", "low", "high"]), z.number()]).optional(),
+  height: Height.optional(),
   distance: z.number().positive().optional(),
   lens: z.number().positive().optional(),
   fov: z.number().positive().optional(),
@@ -122,14 +179,22 @@ const Shot = z.strictObject({
   offset: z.tuple([z.number(), z.number()]).optional(),
   roll: z.number().optional(),
   move: z.union([Move, z.array(Move)]).optional(),
-  track: z.union([z.boolean(), z.strictObject({ lag: z.number().min(0) })]).optional(),
-  follow: z.union([z.boolean(), z.strictObject({ lag: z.number().min(0) })]).optional(),
+  /** Keyframes in the solver's terms (angle, distance/size, height, lens/fov, offset, roll), smooth through every key. */
+  keys: z.array(ShotKey).optional(),
+  /** World-space position/target keyframes (custom shots): crane moves, fly-throughs. */
+  path: z.array(PathKey).optional(),
+  /** Aim follows the subject (camera body stays); `lag` smooths, `lead` looks ahead (seconds). */
+  track: Tracking.optional(),
+  /** Camera body follows the subject too; `lag`, `lead`. */
+  follow: Tracking.optional(),
   focus: z.union([z.literal("auto"), z.literal("none"), FocusRef]).optional(),
   rack: z.array(z.strictObject({ at: TimeRef, to: FocusRef, duration: z.number().positive().optional() })).optional(),
   dof: z.union([z.literal("auto"), z.literal("off"), z.strictObject({ bokeh: z.number().min(0).optional(), range: z.number().positive().optional() })]).optional(),
   lock: z.boolean().optional(),
   allowOcclusion: z.array(z.string()).optional(),
   blend: z.number().min(0).optional(),
+  /** Findings in this shot that are deliberate, e.g. ["offscreen"], ["back-of-head"]. */
+  allow: Allow.optional(),
 });
 
 const MoodRef = z.union([z.string(), z.record(z.string(), z.unknown())]);
@@ -138,6 +203,30 @@ export const EpisodeSchema = z.strictObject({
   $schema: z.string().optional(),
   id: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, "kebab-case id"),
   title: z.string(),
+  /** Engine behaviour version: 2 = current defaults (what `new` writes); omitted = 1, the original behaviour. */
+  engine: z.literal(ENGINE_VERSIONS).optional(),
+  /** Production profile: default behaviours and check thresholds (catalog/direction.json). */
+  profile: z.enum(PROFILE_NAMES).optional(),
+  /** Findings that are deliberate for the whole episode, e.g. ["silence"] for a film built on pauses. */
+  allow: Allow.optional(),
+  /**
+   * Automatic behaviour switches. Corrections default on with `engine: 2` (focus pulls between speakers, blends
+   * that arc around the subject, self-touch recipes through via points, dialogue edge trim, levels, speech
+   * motion); styles are opt-in (cameraLife: subtle drift on shots without a move, 0..2; listen: characters look
+   * at whoever speaks and nod, 0..1).
+   */
+  defaults: z
+    .strictObject({
+      cameraLife: z.number().min(0).max(2).optional(),
+      focusPull: z.boolean().optional(),
+      arcBlend: z.boolean().optional(),
+      listen: z.number().min(0).max(1).optional(),
+      viaPoints: z.boolean().optional(),
+      trim: z.boolean().optional(),
+      level: z.boolean().optional(),
+      speechMotion: z.boolean().optional(),
+    })
+    .optional(),
   format: z
     .strictObject({
       width: z.number().int().positive().optional(),

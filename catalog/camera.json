@@ -17,7 +17,8 @@
     "truck": "Slides sideways (amount = metres, default 0.6).",
     "orbit": "Circles the aim point (amount = degrees, default 30).",
     "crane": "Rises (amount = metres, default 0.6; negative descends).",
-    "handheld": "Seeded organic shake (amount = metres, default 0.012)."
+    "handheld": "Seeded organic shake (amount = metres, default 0.012).",
+    "life": "Barely visible breathing camera: slow push + drift (amount = intensity, default 1). Opt-in."
   },
   "notes": {
     "angle": "degrees around the subject from its facing (0 = frontal, + = toward its left). Authored angles are never auto-corrected.",
@@ -30,6 +31,7 @@
     "dof": "auto | off | { bokeh, range }",
     "lock": "true = no automatic corrections at all",
     "allowOcclusion": "ids allowed to block the view (deliberate foreground)",
-    "blend": "seconds to blend from the previous shot instead of cutting"
+    "blend": "seconds to blend from the previous shot instead of cutting",
+    "allow": "findings in this shot that are deliberate, e.g. [\"offscreen\"] (catalog/direction.json intents)"
   }
 }

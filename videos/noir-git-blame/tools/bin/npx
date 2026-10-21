@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# Linux/macOS adapter for the repo CLI (see ../../NOTES.md, problem 1).
+# scripts/cli/shared.ts and media.ts build `--props={"silent":true}` / `--props={"draft":true}` for POSIX and run
+# `npx remotion ...` through spawnSync(..., { shell: true }); /bin/sh strips the double quotes, so Remotion receives
+# `--props={silent:true}` (invalid JSON) and every stills/preview/draft render fails. This shim restores the quotes
+# and hands everything else to the real npx unchanged. Use it by putting this folder first on PATH:
+#   PATH="$PWD/videos/noir-git-blame/tools/bin:$PATH" npm run cli -- stills noir-git-blame
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATH="$(printf '%s' "$PATH" | tr ':' '\n' | grep -vxF "$here" | paste -sd: -)"
+args=()
+remotion=0
+render=0
+hasgl=0
+for a in "$@"; do
+  [[ "$a" == "remotion" ]] && remotion=1
+  [[ "$a" == "render" || "$a" == "still" ]] && render=1
+  [[ "$a" == --gl=* ]] && hasgl=1
+  [[ "$a" == --concurrency=* ]] && hasconc=1
+  if [[ "$a" =~ ^--props=\{([A-Za-z_]+):(true|false)\}$ ]]; then
+    args+=("--props={\"${BASH_REMATCH[1]}\":${BASH_REMATCH[2]}}")
+  else
+    args+=("$a")
+  fi
+done
+# remotion.config.ts asks for the "angle" GL backend (a GPU on Windows/macOS). A GPU-less Linux container
+# can't create that context (NOTES.md, problem 2): use ANGLE on SwiftShader unless NOIR_GL says otherwise.
+if [[ $remotion == 1 && $render == 1 && $hasgl == 0 ]]; then
+  args+=("--gl=${NOIR_GL:-swangle}")
+  # SwiftShader already uses every core: one tab renders as fast as two and faster than four (NOTES.md, problem 6).
+  [[ ${hasconc:-0} == 0 ]] && args+=("--concurrency=${NOIR_CONCURRENCY:-1}")
+fi
+exec npx "${args[@]}"

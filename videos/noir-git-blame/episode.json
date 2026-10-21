@@ -1,0 +1,1883 @@
+{
+  "$schema": "../../catalog/episode.schema.json",
+  "id": "noir-git-blame",
+  "title": "git blame",
+  "engine": 2,
+  "profile": "standard",
+  "format": {
+    "preset": "portrait"
+  },
+  "seed": "noir-214am",
+  "set": {
+    "environment": "pi-office"
+  },
+  "mood": {
+    "base": "late-night",
+    "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+    "background": "#05070b",
+    "fog": {
+      "color": "#06080d",
+      "near": 7,
+      "far": 16
+    },
+    "ambient": {
+      "color": "#5a6fa8",
+      "intensity": 0.07
+    },
+    "hemisphere": {
+      "sky": "#2a3a66",
+      "ground": "#0e0a08",
+      "intensity": 0.18
+    },
+    "key": {
+      "color": "#c9d8ff",
+      "intensity": 3.6,
+      "position": [
+        -1.9,
+        1.95,
+        -12
+      ]
+    },
+    "fill": {
+      "color": "#4a5f9a",
+      "intensity": 0.24,
+      "position": [
+        2.5,
+        2.2,
+        5
+      ]
+    },
+    "rim": {
+      "color": "#ff5a7a",
+      "intensity": 0.12,
+      "position": [
+        -1,
+        2.5,
+        -4
+      ]
+    },
+    "environment": 0.07,
+    "exposure": 1.0,
+    "bloom": 0.7,
+    "practicals": {
+      "lamp": 1.3,
+      "screens": 1.3,
+      "window": "#3c5bd6",
+      "windowIntensity": 0.6
+    }
+  },
+  "cast": {
+    "claude": {
+      "actor": "claude",
+      "at": "desk-top",
+      "scale": 1.8,
+      "name": "Claude",
+      "color": "#e8794a",
+      "voice": {
+        "elevenlabs": {
+          "voiceId": "N2lVS1w4EtoT3dr4eOWO",
+          "settings": {
+            "stability": 0.45
+          }
+        }
+      }
+    },
+    "narrator": {
+      "actor": "narrator",
+      "at": "desk-top",
+      "name": "Claude (V.O.)",
+      "color": "#e8794a",
+      "voice": {
+        "elevenlabs": {
+          "voiceId": "N2lVS1w4EtoT3dr4eOWO",
+          "settings": {
+            "stability": 0.45
+          }
+        }
+      }
+    },
+    "rayan": {
+      "actor": "rayan",
+      "at": "hall",
+      "name": "Rayan",
+      "color": "#9fb4c8",
+      "listen": 0.6,
+      "appearance": {
+        "jacketColor": "#4a5a6a",
+        "shirtColor": "#1a1d26",
+        "pantsColor": "#22252f",
+        "badgeColor": "#7dd3fc"
+      },
+      "voice": {
+        "elevenlabs": {
+          "voiceId": "TX3LPaxmHKxFdv7VOQHJ"
+        }
+      }
+    }
+  },
+  "dialogue": [
+    {
+      "id": "n1",
+      "speaker": "narrator",
+      "text": "[low, gravelly] Two a.m. Production was dead.",
+      "at": 0.75,
+      "gain": 4
+    },
+    {
+      "id": "r1",
+      "speaker": "rayan",
+      "text": "[panicked, out of breath] Somebody killed my login!",
+      "gap": 0.5
+    },
+    {
+      "id": "c1",
+      "speaker": "claude",
+      "text": "[low, gravelly, deadpan] Easy, kid. What changed?",
+      "gap": 0.2,
+      "gain": 4
+    },
+    {
+      "id": "r2",
+      "speaker": "rayan",
+      "text": "[defensive] Nothing! I swear!",
+      "gap": 0.1
+    },
+    {
+      "id": "n2",
+      "speaker": "narrator",
+      "text": "[low, gravelly] Something always changes.",
+      "gap": 0.25,
+      "gain": 4
+    },
+    {
+      "id": "n3",
+      "speaker": "narrator",
+      "text": "[low, gravelly] So I rounded up the usual suspects.",
+      "gap": 0.3,
+      "gain": 4
+    },
+    {
+      "id": "n4",
+      "speaker": "narrator",
+      "text": "[low, gravelly] The intern. Clean. Only ever touched the README.",
+      "gap": 0.2,
+      "gain": 4
+    },
+    {
+      "id": "n5",
+      "speaker": "narrator",
+      "text": "[low, gravelly] The cache. Couldn't remember a thing.",
+      "gap": 0.3,
+      "gain": 4
+    },
+    {
+      "id": "r3",
+      "speaker": "rayan",
+      "text": "[shouting] It's always DNS!",
+      "gap": 0.2
+    },
+    {
+      "id": "c2",
+      "speaker": "claude",
+      "text": "[low, gravelly] Not this time, kid. DNS had an alibi... it was still propagating.",
+      "gap": 0.15,
+      "gain": 4
+    },
+    {
+      "id": "n6",
+      "speaker": "narrator",
+      "text": "[low, gravelly] That left one place to look.",
+      "gap": 0.35,
+      "gain": 4
+    },
+    {
+      "id": "n7",
+      "speaker": "narrator",
+      "text": "[slowly, stunned] ...I knew that handwriting.",
+      "gap": 1.4,
+      "gain": 4
+    },
+    {
+      "id": "r4",
+      "speaker": "rayan",
+      "text": "[eager] Well? Who did it?",
+      "gap": 1.5
+    },
+    {
+      "id": "c3",
+      "speaker": "claude",
+      "text": "[flatly] ...DNS.",
+      "gap": 1.05,
+      "gain": 4
+    },
+    {
+      "id": "r5",
+      "speaker": "rayan",
+      "text": "[triumphant] I KNEW it! It's always DNS!",
+      "gap": 0.2
+    },
+    {
+      "id": "n8",
+      "speaker": "narrator",
+      "text": "[low, gravelly, satisfied] Case closed.",
+      "gap": 1.75,
+      "gain": 4
+    }
+  ],
+  "actions": [
+    {
+      "at": 0,
+      "actor": "claude",
+      "hold": {
+        "top": "fedora"
+      },
+      "emotion": "skeptical",
+      "intensity": 0.35
+    },
+    {
+      "at": 0,
+      "actor": "rayan",
+      "emotion": "shocked",
+      "intensity": 0.8
+    },
+    {
+      "at": "n1.end+0.3",
+      "actor": "rayan",
+      "move": {
+        "to": "client",
+        "duration": 1.7,
+        "ease": "inOut"
+      }
+    },
+    {
+      "at": "r1.word:4",
+      "actor": "rayan",
+      "look": "claude.face",
+      "transition": 0.3
+    },
+    {
+      "at": "r1.end+0.1",
+      "actor": "rayan",
+      "pose": "explaining",
+      "transition": 0.4
+    },
+    {
+      "at": "r1.start",
+      "actor": "claude",
+      "look": "rayan.face",
+      "transition": 0.4
+    },
+    {
+      "at": "c1.word:4",
+      "actor": "claude",
+      "gesture": "beat"
+    },
+    {
+      "at": "r2.start",
+      "actor": "rayan",
+      "gesture": "head_shake",
+      "emotion": "shocked",
+      "intensity": 0.6
+    },
+    {
+      "at": "r2.word:3",
+      "actor": "rayan",
+      "pose": "shrug",
+      "transition": 0.35
+    },
+    {
+      "at": "n2.start",
+      "actor": "claude",
+      "emotion": "skeptical",
+      "intensity": 1,
+      "transition": 0.5
+    },
+    {
+      "at": "n2.end",
+      "actor": "rayan",
+      "pose": "stand_idle",
+      "transition": 0.5
+    },
+    {
+      "at": "n3.start-0.25",
+      "actor": "claude",
+      "turn": [
+        -2.5,
+        0.9,
+        -0.45
+      ],
+      "transition": 0.45,
+      "look": null
+    },
+    {
+      "at": "n3.start",
+      "actor": "rayan",
+      "look": [
+        -2.5,
+        1.6,
+        -0.45
+      ],
+      "transition": 0.6
+    },
+    {
+      "at": "r3.start-0.05",
+      "actor": "rayan",
+      "do": "point",
+      "target": [
+        -2.53,
+        1.74,
+        -0.97
+      ],
+      "duration": 1.7
+    },
+    {
+      "at": "r3.start",
+      "actor": "rayan",
+      "emotion": "angry",
+      "intensity": 0.7
+    },
+    {
+      "at": "r3.end-0.2",
+      "actor": "claude",
+      "turn": "rayan",
+      "transition": 0.4
+    },
+    {
+      "at": "r3.end",
+      "actor": "claude",
+      "look": "rayan.face",
+      "transition": 0.3
+    },
+    {
+      "at": "c2.word:2",
+      "actor": "claude",
+      "gesture": "shake",
+      "intensity": 0.6
+    },
+    {
+      "at": "c2.start",
+      "actor": "rayan",
+      "emotion": "skeptical",
+      "intensity": 0.6,
+      "look": "claude.face"
+    },
+    {
+      "at": "c2.word:12",
+      "actor": "claude",
+      "gesture": "beat"
+    },
+    {
+      "at": "n6.word:3",
+      "actor": "claude",
+      "move": {
+        "to": "keys",
+        "duration": 0.55
+      },
+      "look": null
+    },
+    {
+      "at": "n6.word:3",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 1.3
+    },
+    {
+      "at": "n6.end+0.05",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "n6.end+0.42",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "n6.end+0.79",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "n7.word:2",
+      "actor": "claude",
+      "emotion": "shocked",
+      "intensity": 1,
+      "transition": 0.15
+    },
+    {
+      "at": "n7.end+0.08",
+      "actor": "claude",
+      "pose": "startled_back",
+      "transition": 0.2
+    },
+    {
+      "at": "r4.start-0.4",
+      "actor": "rayan",
+      "emotion": "happy",
+      "intensity": 0.55,
+      "look": "claude.face"
+    },
+    {
+      "at": "r4.end+0.1",
+      "actor": "claude",
+      "turn": "rayan",
+      "transition": 0.9,
+      "pose": "stand_idle"
+    },
+    {
+      "at": "r4.end+0.15",
+      "actor": "claude",
+      "emotion": "tired",
+      "intensity": 0.9,
+      "transition": 0.6
+    },
+    {
+      "at": "r4.end+0.6",
+      "actor": "claude",
+      "look": "rayan.face",
+      "transition": 0.4
+    },
+    {
+      "at": "r5.start",
+      "actor": "rayan",
+      "pose": "celebrate",
+      "emotion": "happy",
+      "intensity": 1,
+      "transition": 0.45
+    },
+    {
+      "at": "r5.end+0.25",
+      "actor": "rayan",
+      "pose": "stand_idle",
+      "transition": 0.6
+    },
+    {
+      "at": "r5.word:4",
+      "actor": "claude",
+      "turn": -70,
+      "transition": 0.35,
+      "look": null
+    },
+    {
+      "at": "r5.end+0.12",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "r5.end+0.49",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "r5.end+0.86",
+      "actor": "claude",
+      "gesture": "hop",
+      "speed": 2.2
+    },
+    {
+      "at": "n8.start+0.1",
+      "actor": "claude",
+      "turn": [
+        0.36,
+        1.0,
+        -0.64
+      ],
+      "transition": 0.45,
+      "emotion": "skeptical",
+      "intensity": 0.7,
+      "pose": "side_glance"
+    },
+    {
+      "at": "n8.word:1.end",
+      "actor": "claude",
+      "look": "camera",
+      "transition": 0.3
+    }
+  ],
+  "camera": [
+    {
+      "at": 0,
+      "shot": "custom",
+      "position": [
+        0.3,
+        3.12,
+        -0.3
+      ],
+      "target": [
+        0.02,
+        0.8,
+        -1.0
+      ],
+      "fov": 52,
+      "focus": "claude",
+      "allow": [
+        "slow-open"
+      ],
+      "path": [
+        {
+          "at": 0,
+          "position": [
+            0.3,
+            3.12,
+            -0.3
+          ],
+          "target": [
+            0.02,
+            0.8,
+            -1.0
+          ],
+          "fov": 52
+        },
+        {
+          "at": "n1.end",
+          "position": [
+            0.36,
+            2.96,
+            -0.44
+          ],
+          "target": [
+            0.04,
+            0.82,
+            -1.02
+          ],
+          "fov": 44
+        }
+      ]
+    },
+    {
+      "at": "n1.end",
+      "shot": "custom",
+      "position": [
+        -1.2,
+        1.44,
+        -1.32
+      ],
+      "target": [
+        2.6,
+        1.36,
+        -0.15
+      ],
+      "fov": 40,
+      "focus": [
+        2.6,
+        1.3,
+        -0.15
+      ],
+      "rack": [
+        {
+          "at": "r1.start",
+          "to": "rayan",
+          "duration": 0.35
+        }
+      ]
+    },
+    {
+      "at": "c1.start-0.15",
+      "shot": "close",
+      "subject": "claude",
+      "angle": 12,
+      "distance": 0.75,
+      "height": "low",
+      "move": {
+        "type": "push-in",
+        "amount": 0.12
+      },
+      "focus": "claude"
+    },
+    {
+      "at": "r2.start-0.05",
+      "shot": "close",
+      "subject": "rayan",
+      "angle": -22,
+      "height": -0.3,
+      "size": 0.9,
+      "offset": [
+        -0.14,
+        0
+      ],
+      "focus": "rayan"
+    },
+    {
+      "at": "r2.end+0.05",
+      "shot": "close",
+      "subject": "claude",
+      "angle": 18,
+      "distance": 0.5,
+      "height": "low",
+      "roll": 4,
+      "move": {
+        "type": "push-in",
+        "amount": 0.18
+      },
+      "focus": "claude"
+    },
+    {
+      "at": "n3.start-0.1",
+      "shot": "custom",
+      "position": [
+        -0.35,
+        1.6,
+        1.25
+      ],
+      "target": [
+        -2.55,
+        1.55,
+        -0.45
+      ],
+      "fov": 44,
+      "blend": 0.3,
+      "focus": [
+        -2.55,
+        1.55,
+        -0.45
+      ],
+      "allow": [
+        "abrupt"
+      ]
+    },
+    {
+      "at": "n3.word:6",
+      "shot": "custom",
+      "position": [
+        -1.6,
+        1.62,
+        0.45
+      ],
+      "target": [
+        -2.57,
+        1.66,
+        0.05
+      ],
+      "fov": 40,
+      "focus": "board",
+      "path": [
+        {
+          "at": "n3.word:6",
+          "position": [
+            -1.6,
+            1.62,
+            0.45
+          ],
+          "target": [
+            -2.57,
+            1.66,
+            0.05
+          ],
+          "fov": 40
+        },
+        {
+          "at": "n4.start",
+          "position": [
+            -1.95,
+            1.72,
+            0.12
+          ],
+          "target": [
+            -2.57,
+            1.72,
+            0.07
+          ],
+          "fov": 38
+        },
+        {
+          "at": "n4.end",
+          "position": [
+            -1.98,
+            1.68,
+            0.05
+          ],
+          "target": [
+            -2.57,
+            1.71,
+            0.06
+          ],
+          "fov": 37
+        },
+        {
+          "at": "n4.end+0.55",
+          "position": [
+            -1.95,
+            1.47,
+            -0.42
+          ],
+          "target": [
+            -2.57,
+            1.43,
+            -0.45
+          ],
+          "fov": 38
+        },
+        {
+          "at": "n5.end+0.05",
+          "position": [
+            -1.98,
+            1.45,
+            -0.47
+          ],
+          "target": [
+            -2.57,
+            1.42,
+            -0.46
+          ],
+          "fov": 37
+        }
+      ]
+    },
+    {
+      "at": "r3.start-0.1",
+      "shot": "medium",
+      "subject": "rayan",
+      "angle": 65,
+      "focus": "rayan"
+    },
+    {
+      "at": "r3.end+0.05",
+      "shot": "close",
+      "subject": "claude",
+      "angle": 10,
+      "distance": 0.8,
+      "height": "low",
+      "focus": "claude",
+      "allow": [
+        "cross-line"
+      ]
+    },
+    {
+      "at": "c2.word:5",
+      "shot": "custom",
+      "position": [
+        -1.7,
+        1.69,
+        -0.92
+      ],
+      "target": [
+        -2.57,
+        1.66,
+        -0.97
+      ],
+      "fov": 32,
+      "move": {
+        "type": "push-in",
+        "amount": 0.08
+      },
+      "focus": [
+        -2.57,
+        1.74,
+        -0.97
+      ]
+    },
+    {
+      "at": "n6.start-0.15",
+      "shot": "custom",
+      "position": [
+        -2.05,
+        1.5,
+        0.45
+      ],
+      "target": [
+        -2.5,
+        1.28,
+        -0.12
+      ],
+      "fov": 40,
+      "focus": "claude",
+      "path": [
+        {
+          "at": "n6.start-0.15",
+          "position": [
+            -2.05,
+            1.5,
+            0.45
+          ],
+          "target": [
+            -2.5,
+            1.28,
+            -0.12
+          ],
+          "fov": 40
+        },
+        {
+          "at": "n6.start+1.0",
+          "position": [
+            -1.45,
+            1.42,
+            0.15
+          ],
+          "target": [
+            -0.9,
+            1.0,
+            -1.0
+          ],
+          "fov": 44
+        },
+        {
+          "at": "n6.end+0.1",
+          "position": [
+            0.42,
+            1.24,
+            -0.48
+          ],
+          "target": [
+            -0.12,
+            0.98,
+            -1.36
+          ],
+          "fov": 46
+        }
+      ]
+    },
+    {
+      "at": "n6.end+0.6",
+      "shot": "custom",
+      "position": [
+        0.117,
+        0.99,
+        -0.423
+      ],
+      "target": [
+        -0.471,
+        0.978,
+        -1.232
+      ],
+      "fov": 38,
+      "move": {
+        "type": "push-in",
+        "amount": 0.06
+      },
+      "focus": [
+        -0.471,
+        0.978,
+        -1.232
+      ]
+    },
+    {
+      "at": "n7.word:3",
+      "shot": "close",
+      "subject": "claude",
+      "angle": 35,
+      "roll": -6,
+      "focus": "claude",
+      "keys": [
+        {
+          "at": "n7.word:3",
+          "distance": 0.55,
+          "lens": 35
+        },
+        {
+          "at": "n7.end+1.1",
+          "distance": 1.15,
+          "lens": 74
+        }
+      ]
+    },
+    {
+      "at": "r4.start-0.15",
+      "shot": "close",
+      "subject": "rayan",
+      "angle": -22,
+      "height": -0.3,
+      "offset": [
+        -0.14,
+        0
+      ],
+      "focus": "rayan",
+      "allow": [
+        "cross-line"
+      ]
+    },
+    {
+      "at": "r4.end+0.02",
+      "shot": "custom",
+      "position": [
+        0.3,
+        1.03,
+        -0.68
+      ],
+      "target": [
+        0.08,
+        1.04,
+        -1.42
+      ],
+      "fov": 44,
+      "move": "static",
+      "focus": "claude",
+      "allow": [
+        "static"
+      ]
+    },
+    {
+      "at": "r5.start-0.05",
+      "shot": "custom",
+      "position": [
+        -0.38,
+        0.98,
+        -1.78
+      ],
+      "target": [
+        0.18,
+        1.32,
+        0.32
+      ],
+      "fov": 55,
+      "focus": "rayan"
+    },
+    {
+      "at": "r5.end+0.15",
+      "shot": "custom",
+      "position": [
+        0.117,
+        0.99,
+        -0.423
+      ],
+      "target": [
+        -0.471,
+        0.978,
+        -1.232
+      ],
+      "fov": 38,
+      "focus": [
+        -0.471,
+        0.978,
+        -1.232
+      ]
+    },
+    {
+      "at": "n8.word:1.end+0.04",
+      "shot": "custom",
+      "position": [
+        0.36,
+        1.06,
+        -0.6
+      ],
+      "target": [
+        0.08,
+        1.08,
+        -1.42
+      ],
+      "fov": 46,
+      "move": {
+        "type": "pull-out",
+        "amount": 0.3
+      },
+      "focus": "claude"
+    }
+  ],
+  "lighting": [
+    {
+      "at": 0.05,
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": 0.11,
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.1
+    },
+    {
+      "at": 0.2,
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": 0.27,
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.4
+    },
+    {
+      "at": "n7.end+0.08",
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": "n7.end+0.14",
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.1
+    },
+    {
+      "at": "n7.end+0.23",
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": "n7.end+0.3",
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.4
+    },
+    {
+      "at": "n8.end+0.45",
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": "n8.end+0.51",
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.1
+    },
+    {
+      "at": "n8.end+0.6",
+      "mood": {
+        "base": "late-night",
+        "description": "Lightning: the key light through the blinds at full strength.",
+        "background": "#0e1424",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#9fb4ff",
+          "intensity": 0.3
+        },
+        "hemisphere": {
+          "sky": "#8fa6ff",
+          "ground": "#1a1410",
+          "intensity": 0.5
+        },
+        "key": {
+          "color": "#eef3ff",
+          "intensity": 14,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#c9d8ff",
+          "intensity": 0.6,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.9,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.03
+    },
+    {
+      "at": "n8.end+0.67",
+      "mood": {
+        "base": "late-night",
+        "description": "Noir: cold street light through the blinds, green banker's lamp, red neon spill.",
+        "background": "#05070b",
+        "fog": {
+          "color": "#06080d",
+          "near": 7,
+          "far": 16
+        },
+        "ambient": {
+          "color": "#5a6fa8",
+          "intensity": 0.07
+        },
+        "hemisphere": {
+          "sky": "#2a3a66",
+          "ground": "#0e0a08",
+          "intensity": 0.18
+        },
+        "key": {
+          "color": "#c9d8ff",
+          "intensity": 3.6,
+          "position": [
+            -1.9,
+            1.95,
+            -12
+          ]
+        },
+        "fill": {
+          "color": "#4a5f9a",
+          "intensity": 0.24,
+          "position": [
+            2.5,
+            2.2,
+            5
+          ]
+        },
+        "rim": {
+          "color": "#ff5a7a",
+          "intensity": 0.12,
+          "position": [
+            -1,
+            2.5,
+            -4
+          ]
+        },
+        "environment": 0.07,
+        "exposure": 1.0,
+        "bloom": 0.7,
+        "practicals": {
+          "lamp": 1.3,
+          "screens": 1.3,
+          "window": "#3c5bd6",
+          "windowIntensity": 0.6
+        }
+      },
+      "transition": 0.4
+    }
+  ],
+  "props": [
+    {
+      "at": "n6.end-0.05",
+      "item": "crt",
+      "set": {
+        "screen": {
+          "preset": "term-blame"
+        }
+      }
+    },
+    {
+      "at": "n7.word:2",
+      "item": "crt",
+      "set": {
+        "highlight": true
+      }
+    },
+    {
+      "at": "r5.end+0.05",
+      "item": "crt",
+      "set": {
+        "screen": {
+          "preset": "term-commit"
+        }
+      }
+    }
+  ],
+  "events": [
+    {
+      "at": 0.05,
+      "name": "lightning",
+      "duration": 0.9
+    },
+    {
+      "at": "n1.end+0.05",
+      "name": "door",
+      "duration": 8,
+      "data": {
+        "angle": 104
+      }
+    },
+    {
+      "at": "n4.word:2",
+      "name": "flash-intern",
+      "duration": 0.6
+    },
+    {
+      "at": "n4.word:8.end+0.08",
+      "name": "stamp-intern",
+      "duration": 30
+    },
+    {
+      "at": "n5.word:2",
+      "name": "flash-cache",
+      "duration": 0.6
+    },
+    {
+      "at": "n5.end+0.02",
+      "name": "stamp-cache",
+      "duration": 26
+    },
+    {
+      "at": "c2.word:5",
+      "name": "flash-dns",
+      "duration": 0.6
+    },
+    {
+      "at": "c2.word:12.end+0.05",
+      "name": "stamp-dns",
+      "duration": 18
+    },
+    {
+      "at": "n7.end+0.08",
+      "name": "lightning",
+      "duration": 0.9
+    },
+    {
+      "at": "n8.end+0.45",
+      "name": "lightning",
+      "duration": 0.9
+    },
+    {
+      "at": "n8.end+0.45",
+      "name": "endcard",
+      "duration": 2.8
+    }
+  ],
+  "fx": [],
+  "sfx": [
+    {
+      "at": 0.0,
+      "sound": "sfx/thunder-crack.wav",
+      "volume": 0.38
+    },
+    {
+      "at": "n1.end-0.12",
+      "sound": "sfx/door-burst-50fed386.wav",
+      "volume": 0.6
+    },
+    {
+      "at": "n1.end+0.3",
+      "sound": "sfx/footsteps-wet-0e1c4a80.wav",
+      "volume": 0.3
+    },
+    {
+      "at": "n3.start-0.2",
+      "sound": "whoosh",
+      "volume": 0.4
+    },
+    {
+      "at": "n4.word:2",
+      "sound": "sfx/flash-pop-f4d9da6e.wav",
+      "volume": 0.45
+    },
+    {
+      "at": "n4.word:8.end+0.08",
+      "sound": "sfx/stamp-thump-fe42f579.wav",
+      "volume": 0.38
+    },
+    {
+      "at": "n5.word:2",
+      "sound": "sfx/flash-pop-f4d9da6e.wav",
+      "volume": 0.45
+    },
+    {
+      "at": "n5.end+0.02",
+      "sound": "sfx/stamp-thump-fe42f579.wav",
+      "volume": 0.38
+    },
+    {
+      "at": "c2.word:5",
+      "sound": "sfx/flash-pop-f4d9da6e.wav",
+      "volume": 0.45
+    },
+    {
+      "at": "c2.word:12.end+0.05",
+      "sound": "sfx/stamp-thump-fe42f579.wav",
+      "volume": 0.42
+    },
+    {
+      "at": "n6.word:3+0.38",
+      "sound": "key-clack",
+      "volume": 0.3
+    },
+    {
+      "at": "n6.end+0.25",
+      "sound": "key-clack",
+      "volume": 0.35
+    },
+    {
+      "at": "n6.end+0.62",
+      "sound": "key-clack",
+      "volume": 0.35
+    },
+    {
+      "at": "n6.end+0.99",
+      "sound": "key-clack",
+      "volume": 0.4
+    },
+    {
+      "at": "n7.end+0.06",
+      "sound": "sfx/noir-sting-ca0e5738.wav",
+      "volume": 0.45
+    },
+    {
+      "at": "n7.end+0.15",
+      "sound": "sfx/thunder-roll-short.wav",
+      "volume": 0.45
+    },
+    {
+      "at": "r4.end-0.12",
+      "sound": "sfx/clock-two-ticks.wav",
+      "volume": 0.55
+    },
+    {
+      "at": "r5.end+0.32",
+      "sound": "key-clack",
+      "volume": 0.35
+    },
+    {
+      "at": "r5.end+0.69",
+      "sound": "key-clack",
+      "volume": 0.35
+    },
+    {
+      "at": "r5.end+1.06",
+      "sound": "key-clack",
+      "volume": 0.4
+    },
+    {
+      "at": "n8.end+0.45",
+      "sound": "sfx/thunder-roll-da53f8c1.wav",
+      "volume": 0.4
+    }
+  ],
+  "music": {
+    "src": "videos/noir-git-blame/music/score.wav",
+    "volume": 1,
+    "duck": 1
+  },
+  "captions": {
+    "style": "none"
+  },
+  "end": "n8.end+3.3"
+}

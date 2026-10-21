@@ -92,7 +92,7 @@ export type ResolvedEpisode = {
   fx: ResolvedFx[];
   /** Post effects this episode needs (fixed for the whole render, so passes never change mid-render). */
   post: { chroma: boolean };
-  music?: { src: string; volume: number; duck: number };
+  music?: { src: string; volume: number; duck: number; attack: number; release: number; fadeOut: number };
   captions: { style: "subtitle" | "pop" | "none"; pageSeconds: number };
   warnings: string[];
 };
@@ -586,7 +586,17 @@ export const resolveEpisode = (input: unknown, voice: VoiceManifest | null, ctx:
     events,
     fx,
     post: { chroma: fx.some((f) => f.type === "glitch") },
-    music: ep.music ? { src: ep.music.src, volume: ep.music.volume ?? 0.35, duck: ep.music.duck ?? 0.35 } : undefined,
+    music: ep.music
+      ? {
+          src: ep.music.src,
+          volume: ep.music.volume ?? 0.35,
+          duck: ep.music.duck ?? 0.35,
+          // Engine 2 ramps the duck and fades the bed out; engine 1 keeps the original hard switch.
+          attack: ep.music.attack ?? (behaviour.engine >= 2 ? 0.25 : 0),
+          release: ep.music.release ?? (behaviour.engine >= 2 ? 0.6 : 0),
+          fadeOut: ep.music.fadeOut ?? (behaviour.engine >= 2 ? 0.6 : 0),
+        }
+      : undefined,
     captions: { style: ep.captions?.style ?? "subtitle", pageSeconds: ep.captions?.pageSeconds ?? 1.6 },
     warnings,
   };

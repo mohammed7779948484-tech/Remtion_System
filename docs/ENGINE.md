@@ -112,7 +112,7 @@ Validated by zod (strict: unknown keys are errors). Abbreviated example:
   "lighting": [{ "at": "l2.end", "mood": "red-alert", "transition": 0.2 }],
   "props":    [{ "at": "l2.end", "item": "monitor-main", "set": { "screen": { "preset": "error" } } }],
   "sfx":      [{ "at": "l2.end", "sound": "vine-boom", "volume": 0.6 }],      // library name | URL | file in public/videos/<id>/
-  "music":    { "src": "music/bed.mp3", "volume": 0.3, "duck": 0.35 },
+  "music":    { "src": "music/bed.mp3", "volume": 0.3, "duck": 0.35 },     // engine 2: + attack 0.25, release 0.6, fadeOut 0.6 (s)
   "events":   [{ "at": "l2.end+1", "name": "title", "duration": 3, "data": { "text": "…" } }],
   "captions": { "style": "subtitle" },                                       // subtitle | pop | none
   "end": "l2.end+4"

@@ -213,6 +213,15 @@ impact-metal`; UI `click select toggle tick notify error confirm window-open win
 `pop pluck scratch`; digital `glitch zap power-up power-down success`; transitions `whoosh whip`.
 Episode-specific files: put them in `public/videos/<slug>/` and use the relative path (`"sound": "sfx/my.wav"`).
 
+**Bed (music / room tone).** `"music": { "src": "videos/<slug>/sfx/bed.mp3", "volume": 0.1, "duck": 0.5 }` loops under
+everything and drops to `duck` × volume while anyone speaks. Engine 2 ramps the duck (`attack` 0.25 s, `release` 0.6 s,
+sine) and fades the bed out over the last `fadeOut` 0.6 s; set any of them to 0 for a hard switch. A second, unducked
+layer (room tone, rain) is an ordinary `sfx` at 0 with a file at least as long as the episode. The references this
+studio imitates keep a bed under the whole short (≈10–12 dB under the voices between lines). ElevenLabs' Music API
+needs a paid plan; its sound-generation endpoint (`loop: true`, `duration_seconds` ≤ 30) makes seamless beds and
+one-shots (a squeak) on the free plan — cache the files in `public/videos/<slug>/` and note the prompt in BRIEF.md.
+You can't listen: check a generated bed's level (`ebur128`), pulse (onset autocorrelation) and key (chroma) before using it.
+
 ## 11. Mood
 `"mood": "macro-warm"` or inline `{ "base": "macro-warm", "fill": { "color": "#7f97ff", "intensity": 0.8, "position": [-6, 4, 9] } }`;
 change over time with `"lighting": [{ "at": "l2.end", "mood": "red-alert", "transition": 0.2 }]`. `list moods`.

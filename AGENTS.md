@@ -78,6 +78,9 @@ npm run catalog    # regenerate catalog/ after changing the shared engine
   angles see faces; strong side angles get blocked (validate will tell you).
 - The Claude mascot is ~0.27 m at scale 1; use `scale` 1.5–1.8 on a desk, ~2 on giant keys, ~4 standing next to Rayan.
 - Gestures along the lens axis (pointing at the camera) vanish; shoot them from the side.
+- On GPU-less Linux (cloud containers, CI) renders use SwiftShader (`swangle`, see `remotion.config.ts`; `REMOTION_GL`
+  overrides): correct but slow — ~4–5 s per 1080×1920 frame, so check with `stills`/short `preview`s and render the full
+  video once. Offline system voices need Windows; draft timing with `--provider fixture` or go straight to ElevenLabs.
 - If a render dies after the machine slept, just re-run it. Remote meme sounds download at render time.
 - A subject whose head is turned away (e.g. looking at another actor) can face away from a solver-chosen
   camera: add `look: "camera"` or author an `angle`, then re-check the contact sheet.

@@ -1706,6 +1706,18 @@
           "type": "number",
           "minimum": 0,
           "maximum": 1
+        },
+        "attack": {
+          "type": "number",
+          "minimum": 0
+        },
+        "release": {
+          "type": "number",
+          "minimum": 0
+        },
+        "fadeOut": {
+          "type": "number",
+          "minimum": 0
         }
       },
       "required": [
